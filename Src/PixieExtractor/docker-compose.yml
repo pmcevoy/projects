@@ -6,3 +6,6 @@ services:
     environment:
       - ACCEPT_EULA=Y
       - MSSQL_SA_PASSWORD=!QAZ2wsx£EDC
+    volumes:
+      - .:/backup
+      - c:\sqlserver_data:/var/opt/mssql/data
