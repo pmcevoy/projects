@@ -4,7 +4,7 @@
 			SUBSTRING(CAST(FileUID AS CHAR(36)), 3, 2) + '\' +
 			REPLACE( CAST(FileUID AS CHAR(36)), '-', '') + '.jpg' 
 		AS SourcePath,
-			Username + '\' + convert(varchar, ItemDate, 23) + '\' + ItemName + '.jpg' 
+			Username + '\' + convert(varchar, ItemDate, 23) + '\' + ItemName + + '-' + CONVERT(VARCHAR, ItemID, 8) + '.jpg' 
 		AS TargetPath
 	FROM Ark_Item 
 	INNER JOIN Ark_User
@@ -28,7 +28,7 @@ UNION
 				WHEN 'image/tiff' THEN '.tif'
 			END 
 		AS SourcePath,
-			Username + '\' + convert(varchar, ItemDate, 23) + '\' + ItemName + 
+			Username + '\' + convert(varchar, ItemDate, 23) + '\' + ItemName + + '-' + CONVERT(VARCHAR, ItemID, 8) +
 			CASE MediaType 
 				WHEN 'image/jpeg' THEN '.jpg'
 				WHEN 'image/png' THEN '.png'
