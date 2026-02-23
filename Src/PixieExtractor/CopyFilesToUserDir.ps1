@@ -5,8 +5,12 @@ $csvFilePath = ".\PixieFiles-Small.csv"
 $totalRecords = (Get-Content $csvFilePath | Measure-Object).Count - 1
 $recordCounter = 0
 
-Import-Csv -Path $csvFilePath |  %{
-	$src = "$($sourceRoot)\$($_.SourcePath)"
+Get-Content -Path $csvFilePath |  %{
+	$parts = $_.Split(",")
+	($sourcePath,$username,$itemDate,$itemID,$extension,$itemNameNotJoined) = $parts
+	$itemName = $itemNameNotJoined -join ","  #Re-add any commas that were removed by split
+
+	$src = "$($sourceRoot)\$($sourcePath)"
 	$dest = "$($destRoot)\$($_.TargetPath)"
 	$percentComplete = ($recordCounter++ / $totalRecords) * 100
 	Write-Progress -Activity "Copying" -Status "$($percentComplete)% complete" -PercentComplete $percentComplete
@@ -20,7 +24,6 @@ Import-Csv -Path $csvFilePath |  %{
 		return
 	}
 
-	($username, $date, $ignore) = $_.TargetPath.Split("\")
 
 	if( !(Test-Path "$($destRoot)\$($username)") ){
 		New-Item -Type Directory "$($destRoot)\$($username)\"  | Out-Null
