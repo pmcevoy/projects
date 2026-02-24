@@ -1,18 +1,19 @@
 $destRoot = "\Temp"
-$throttle = 2
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $folders   = Get-ChildItem -Path $destRoot -Directory
 $total     = $folders.Count
-$completed = [System.Collections.Concurrent.ConcurrentBag[byte]]::new()
+$completed = 0
 
-$folders | ForEach-Object -Parallel {
-	Add-Type -AssemblyName System.IO.Compression.FileSystem
-
+$folders | %{
 	$username     = $_.Name
 	$sourceFolder = $_.FullName
-	$zipPath      = "$($using:destRoot)\$($username).zip"
+	$zipPath      = "$($destRoot)\$($username).zip"
+
+	$completed++
+	$pct = [Math]::Round(($completed / $total) * 100)
+	Write-Progress -Activity "Zipping user folders" -Status "$completed of $total - $username" -PercentComplete $pct
 
 	if( Test-Path $zipPath ){
 		Write-Host "Skipping $username - zip already exists" -ForegroundColor DarkGray
@@ -29,13 +30,7 @@ $folders | ForEach-Object -Parallel {
 			Write-Host "Failed to zip $username`: $_" -ForegroundColor Red
 		}
 	}
-
-	($using:completed).Add(0)
-	$count = ($using:completed).Count
-	$pct   = [Math]::Round(($count / $using:total) * 100)
-	Write-Progress -Activity "Zipping user folders" -Status "$count of $($using:total)" -PercentComplete $pct
-
-} -ThrottleLimit $throttle
+}
 
 Write-Progress -Activity "Zipping user folders" -Completed
 Write-Host "Done. Processed $total folders." -ForegroundColor Green
