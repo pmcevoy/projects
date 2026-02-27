@@ -1,0 +1,14 @@
+" tilde-files location: https://stackoverflow.com/a/1625850/228732
+set backup
+set backupdir=~/vimfiles/tmp//
+set directory=~/vimfiles/tmp//
+
+"""""""""""""""""""""""""""""""""""""""""""
+" vim-plugin plugins
+call plug#begin()
+" List your plugins here
+Plug 'morhetz/gruvbox'
+call plug#end()
+"""""""""""""""""""""""""""""""""""""""""""
+
+colorscheme gruvbox
