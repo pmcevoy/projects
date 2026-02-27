@@ -10,5 +10,10 @@ call plug#begin()
 Plug 'morhetz/gruvbox'
 call plug#end()
 """""""""""""""""""""""""""""""""""""""""""
-
 colorscheme gruvbox
+
+set tabstop=4
+set ruler
+set hlsearch
+set lines=100 columns=200
+
