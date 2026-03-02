@@ -1,19 +1,27 @@
-" tilde-files location: https://stackoverflow.com/a/1625850/228732
 set backup
 set backupdir=~/vimfiles/tmp//
 set directory=~/vimfiles/tmp//
 
-"""""""""""""""""""""""""""""""""""""""""""
-" vim-plugin plugins
 call plug#begin()
-" List your plugins here
+"Add plugins here and run :PlugInstall or :PlugUpdate
+"https://github.com/junegunn/vim-plug?tab=readme-ov-file#usage
 Plug 'morhetz/gruvbox'
+Plug 'pprovost/vim-ps1'
 call plug#end()
-"""""""""""""""""""""""""""""""""""""""""""
-colorscheme gruvbox
 
-set tabstop=4
+colorscheme gruvbox
 set ruler
 set hlsearch
 set lines=100 columns=200
 
+filetype plugin on
+
+set tabstop=4
+set shiftwidth=4
+set softtabstop=0
+set noexpandtab
+set noautoindent
+set nosmartindent
+set nocindent
+
+autocmd FileType ps1 setlocal indentexpr= indentkeys=
