@@ -25,3 +25,5 @@ set nosmartindent
 set nocindent
 
 autocmd FileType ps1 setlocal indentexpr= indentkeys=
+"Highlight end-of-line whitespace
+autocmd BufRead,BufNewFile * match Error /\s\+$/
