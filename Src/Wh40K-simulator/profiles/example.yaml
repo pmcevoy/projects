@@ -1,0 +1,35 @@
+simulationRuns: 100000
+
+attacker:
+  name: "Intercessor Squad"
+  models: 5
+  weapon:
+    name: "Bolt Rifle"
+    attacks: 2
+    skill: 3
+    strength: 4
+    ap: 1
+    damage: 1
+    abilities:
+      torrent: false
+      blast: false
+      melta: 0
+      rapidFire: 1
+      sustainedHits: 0
+      lethalHits: false
+      devastatingWounds: false
+    withinHalfRange: false
+  rerolls:
+    hitRerollOnes: false
+    hitRerollAll: false
+    woundRerollOnes: false
+    woundRerollAll: false
+
+defender:
+  name: "Space Marine Squad"
+  models: 10
+  toughness: 4
+  save: 3
+  invulnerableSave: null
+  wounds: 2
+  feelNoPain: null
