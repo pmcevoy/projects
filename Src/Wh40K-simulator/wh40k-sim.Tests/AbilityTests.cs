@@ -382,6 +382,48 @@ public class AbilityTests
     }
 
     [Fact]
+    public void TwinLinked_RerollsFailedWound()
+    {
+        // Twin-Linked: first wound roll fails (2 vs threshold 4+), reroll succeeds (4).
+        // Save fails (1) → 1 damage.
+        var dice = new FakeDiceRoller(4, 2, 4, 1); // hit, wound(fail→rerolled), wound(success), save(fail)
+        var weapon = new WeaponProfile
+        {
+            Attacks = DiceExpression.Fixed(1),
+            Skill = 3,
+            Strength = 4,
+            Ap = 0,
+            Damage = DiceExpression.Fixed(1),
+            Abilities = new WeaponAbilities { TwinLinked = true },
+        };
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(weapon, defenderSave: 7);
+        var results = sim.Run(config);
+        Assert.Equal(1, results[0]);
+    }
+
+    [Fact]
+    public void TwinLinked_DoesNotRerollSuccess()
+    {
+        // Twin-Linked: wound roll of 4 already succeeds (S4 vs T4 = 4+) → no reroll.
+        // Save fails (1) → 1 damage. Only 3 dice consumed total (hit, wound, save).
+        var dice = new FakeDiceRoller(4, 4, 1);
+        var weapon = new WeaponProfile
+        {
+            Attacks = DiceExpression.Fixed(1),
+            Skill = 3,
+            Strength = 4,
+            Ap = 0,
+            Damage = DiceExpression.Fixed(1),
+            Abilities = new WeaponAbilities { TwinLinked = true },
+        };
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(weapon, defenderSave: 7);
+        var results = sim.Run(config);
+        Assert.Equal(1, results[0]);
+    }
+
+    [Fact]
     public void InvulnerableSave_BetterThanArmour_IsUsed()
     {
         // Armour save 5+, AP 3 → armour becomes 8+ (impossible). Invuln 3+ → uses 3+.

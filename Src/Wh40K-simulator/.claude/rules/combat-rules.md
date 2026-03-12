@@ -106,6 +106,10 @@ All abilities are opt-in. Absence of an ability in the YAML means it does not ap
 ### Anti
 - If a weapon has `abilities.anti.keyword: x` and `defender.keywords` contains `keyword`, then an unmodified Wound roll of ‘x+’ scores a Critical Wound.
 
+### Twin-linked
+- Each time an attack is made with a Twin-Linked weapon, you can re-roll that attack’s Wound roll.
+- Identfied by `twinLinked: true` on the weapon's abilities
+
 ---
 
 ## Core Special Rules
@@ -183,6 +187,7 @@ attacker:
       anti:
         Psyker: 4
         Character: 2
+      twinLinked: false
     withinHalfRange: false
   rerolls:
     hitRerollOnes: false

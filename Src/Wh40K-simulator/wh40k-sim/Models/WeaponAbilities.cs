@@ -11,4 +11,5 @@ public sealed record WeaponAbilities
     public bool DevastatingWounds { get; init; }
     /// <summary>Anti ability: maps defender keyword → minimum unmodified wound roll for a Critical Wound.</summary>
     public IReadOnlyDictionary<string, int> Anti { get; init; } = new Dictionary<string, int>();
+    public bool TwinLinked { get; init; }
 }

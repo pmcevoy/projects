@@ -43,6 +43,7 @@ public static class YamlLoader
                 LethalHits = rw.Abilities.LethalHits,
                 DevastatingWounds = rw.Abilities.DevastatingWounds,
                 Anti = rw.Abilities.Anti,
+                TwinLinked = rw.Abilities.TwinLinked,
             },
             WithinHalfRange = rw.WithinHalfRange,
         };
@@ -133,6 +134,7 @@ public static class YamlLoader
         public bool LethalHits { get; set; }
         public bool DevastatingWounds { get; set; }
         public Dictionary<string, int> Anti { get; set; } = new();
+        public bool TwinLinked { get; set; }
     }
 
     private class RawRerolls

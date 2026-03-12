@@ -144,9 +144,11 @@ public sealed class CombatSimulator
         int raw = _dice.RollD6();
         int threshold = AbilityProcessor.WoundThreshold(weapon.Strength, defender.Toughness);
 
-        // Rerolls before modifiers; don't reroll a Critical Wound or a normal success
+        // Rerolls before modifiers; don't reroll a Critical Wound or a normal success.
+        // Twin-Linked grants a free wound reroll (equivalent to WoundRerollAll).
+        bool canRerollAll = rerolls.WoundRerollAll || weapon.Abilities.TwinLinked;
         bool shouldReroll =
-            rerolls.WoundRerollAll  ? (raw < criticalWoundsOn && raw < threshold) :
+            canRerollAll            ? (raw < criticalWoundsOn && raw < threshold) :
             rerolls.WoundRerollOnes ? (raw == 1) :
             false;
 
