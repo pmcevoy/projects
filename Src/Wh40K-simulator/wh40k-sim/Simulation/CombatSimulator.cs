@@ -26,9 +26,9 @@ public sealed class CombatSimulator
         // Determine per-model attack count
         int weaponAttacks = _dice.Roll(weapon.Attacks);
 
-        // Apply Blast: minimum 3 if defender has 6+ models
-        if (weapon.Abilities.Blast && defender.Models >= 6)
-            weaponAttacks = Math.Max(weaponAttacks, 3);
+        // Apply Blast: add 1 per 5 models in the target unit (rounding down)
+        if (weapon.Abilities.Blast)
+            weaponAttacks += defender.Models / 5;
 
         // Total attacks across all models
         int totalAttacks = weaponAttacks * attacker.Models;

@@ -78,8 +78,7 @@ All abilities are opt-in. Absence of an ability in the YAML means it does not ap
 - The weapon automatically hits. Skip the hit roll entirely for all attacks.
 
 ### Blast
-- If the target unit has **6 or more models**, the weapon makes a minimum of 3 attacks.
-- If the weapon's attacks characteristic (after rolling dice) is already 3 or more, use that value.
+- Each time you determine how many attacks are made with a Blast weapon, add 1 to the result for every five models that were in the target unit when you selected it as the target (rounding down).
 - Model count comes from `defender.models` in the profile.
 
 ### Melta X

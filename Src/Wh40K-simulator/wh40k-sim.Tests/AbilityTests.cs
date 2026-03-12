@@ -165,11 +165,33 @@ public class AbilityTests
     }
 
     [Fact]
-    public void Blast_LessThan6Models_NoMinimum()
+    public void Blast_FourModels_AddsZero()
     {
-        // 5 models in defender → blast minimum NOT applied
-        // Attacks dice expression = D6 (roll 1), no minimum → 1 attack
-        var dice = new FakeDiceRoller(1); // D6 roll = 1 (attack count), then miss on hit
+        // 4 models → 4/5 = 0 bonus. D6 roll = 2 → 2 attacks total.
+        // Both miss (roll 2 vs BS3). Total = 0 damage.
+        var dice = new FakeDiceRoller(2, 2, 2);
+        var weapon = new WeaponProfile
+        {
+            Attacks = DiceExpression.Parse("D6"),
+            Skill = 3,
+            Strength = 4,
+            Ap = 0,
+            Damage = DiceExpression.Fixed(1),
+            Abilities = new WeaponAbilities { Blast = true },
+        };
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(weapon, defenderModels: 4, defenderSave: 7);
+        // D6=2, blast bonus=0 → 2 attacks; both miss (roll 2 each)
+        var results = sim.Run(config);
+        Assert.Equal(0, results[0]);
+    }
+
+    [Fact]
+    public void Blast_FiveModels_AddsOne()
+    {
+        // 5 models → 5/5 = 1 bonus. D6 roll = 2 → 3 attacks total.
+        // All 3 hit(4), wound(4), save fails(1) → 3 damage
+        var dice = new FakeDiceRoller(2, 4, 4, 1, 4, 4, 1, 4, 4, 1);
         var weapon = new WeaponProfile
         {
             Attacks = DiceExpression.Parse("D6"),
@@ -181,16 +203,15 @@ public class AbilityTests
         };
         var sim = new CombatSimulator(dice);
         var config = MakeConfig(weapon, defenderModels: 5, defenderSave: 7);
-        // 1 attack (no blast min). roll 1 = miss. total 0
         var results = sim.Run(config);
-        Assert.Equal(0, results[0]);
+        Assert.Equal(3, results[0]);
     }
 
     [Fact]
-    public void Blast_SixOrMoreModels_MinimumThreeAttacks()
+    public void Blast_TenModels_AddsTwo()
     {
-        // 6 models in defender → blast minimum 3 attacks
-        // D6 roll = 1 → clamped to 3 attacks. All 3 attacks: hit(4), wound(4), save(1) = 1 damage each
+        // 10 models → 10/5 = 2 bonus. D6 roll = 1 → 3 attacks total.
+        // All 3 hit(4), wound(4), save fails(1) → 3 damage
         var dice = new FakeDiceRoller(1, 4, 4, 1, 4, 4, 1, 4, 4, 1);
         var weapon = new WeaponProfile
         {
@@ -202,7 +223,7 @@ public class AbilityTests
             Abilities = new WeaponAbilities { Blast = true },
         };
         var sim = new CombatSimulator(dice);
-        var config = MakeConfig(weapon, defenderModels: 6, defenderSave: 7);
+        var config = MakeConfig(weapon, defenderModels: 10, defenderSave: 7);
         var results = sim.Run(config);
         Assert.Equal(3, results[0]);
     }
