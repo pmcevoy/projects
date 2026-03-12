@@ -39,7 +39,7 @@ public sealed class CombatSimulator
 
         int totalDamage = 0;
         for (int i = 0; i < totalAttacks; i++)
-            totalDamage += ResolveOneAttack(weapon, attacker.Rerolls, defender, isFromSustainedHits: false);
+            totalDamage += ResolveOneAttack(weapon, attacker.Rerolls, defender, attacker.CriticalHitsOn, isFromSustainedHits: false);
 
         return totalDamage;
     }
@@ -48,28 +48,29 @@ public sealed class CombatSimulator
         WeaponProfile weapon,
         RerollOptions rerolls,
         DefenderProfile defender,
+        int criticalHitsOn,
         bool isFromSustainedHits)
     {
         int damage = 0;
-        bool hitNaturalSix = false;
+        bool isCriticalHit = false;
 
         // Step 1: Hit roll
         // Torrent = auto-hit; sustained-hit bonus attacks ARE hits already (skip roll)
         if (!weapon.Abilities.Torrent && !isFromSustainedHits)
         {
-            bool hit = RollHit(weapon, rerolls, out hitNaturalSix);
+            bool hit = RollHit(weapon, rerolls, criticalHitsOn, out isCriticalHit);
             if (!hit) return 0;
         }
 
-        // Sustained Hits: natural 6 on hit generates X bonus attacks (no chaining)
-        if (hitNaturalSix && weapon.Abilities.SustainedHits > 0 && !isFromSustainedHits)
+        // Sustained Hits: Critical Hit on hit roll generates X bonus attacks (no chaining)
+        if (isCriticalHit && weapon.Abilities.SustainedHits > 0 && !isFromSustainedHits)
         {
             for (int s = 0; s < weapon.Abilities.SustainedHits; s++)
-                damage += ResolveOneAttack(weapon, rerolls, defender, isFromSustainedHits: true);
+                damage += ResolveOneAttack(weapon, rerolls, defender, criticalHitsOn, isFromSustainedHits: true);
         }
 
-        // Lethal Hits: natural 6 on hit = auto-wound (not for sustained-hit bonus attacks)
-        bool isLethalHit = hitNaturalSix && weapon.Abilities.LethalHits && !isFromSustainedHits;
+        // Lethal Hits: Critical Hit on hit roll = auto-wound (not for sustained-hit bonus attacks)
+        bool isLethalHit = isCriticalHit && weapon.Abilities.LethalHits && !isFromSustainedHits;
 
         // Step 2: Wound roll
         bool wounded = RollWound(weapon, defender, rerolls, isLethalHit,
@@ -98,25 +99,27 @@ public sealed class CombatSimulator
         return damage;
     }
 
-    /// <returns>true if the hit succeeds; sets <paramref name="naturalSix"/> if raw roll was 6.</returns>
-    private bool RollHit(WeaponProfile weapon, RerollOptions rerolls, out bool naturalSix)
+    /// <returns>true if the hit succeeds; sets <paramref name="isCriticalHit"/> if the roll was a Critical Hit.</returns>
+    private bool RollHit(WeaponProfile weapon, RerollOptions rerolls, int criticalHitsOn, out bool isCriticalHit)
     {
         int raw = _dice.RollD6();
 
-        // Rerolls are applied before modifiers; check against unmodified skill
+        // Rerolls applied before modifiers; a Critical Hit or normal success should not be rerolled
         bool shouldReroll =
-            rerolls.HitRerollAll  ? (raw != 6 && raw < weapon.Skill) :
+            rerolls.HitRerollAll  ? (raw < criticalHitsOn && raw < weapon.Skill) :
             rerolls.HitRerollOnes ? (raw == 1) :
             false;
 
         if (shouldReroll)
             raw = _dice.RollD6();
 
-        // Natural 1/6 on the kept die
-        if (raw == 1) { naturalSix = false; return false; }
-        if (raw == 6) { naturalSix = true;  return true;  }
+        // Natural 1 always fails
+        if (raw == 1) { isCriticalHit = false; return false; }
 
-        naturalSix = false;
+        // Critical Hit: raw >= criticalHitsOn (usually 6, can be lower) — always succeeds
+        if (raw >= criticalHitsOn) { isCriticalHit = true; return true; }
+
+        isCriticalHit = false;
         return raw >= weapon.Skill;
     }
 

@@ -58,6 +58,7 @@ public static class YamlLoader
                 WoundRerollOnes = ra.Rerolls.WoundRerollOnes,
                 WoundRerollAll = ra.Rerolls.WoundRerollAll,
             },
+            CriticalHitsOn = ra.CriticalHitsOn,
         };
 
         var defender = new DefenderProfile
@@ -105,6 +106,7 @@ public static class YamlLoader
         public int Models { get; set; }
         public RawWeapon Weapon { get; set; } = new();
         public RawRerolls Rerolls { get; set; } = new();
+        public int CriticalHitsOn { get; set; } = 6;
     }
 
     private class RawWeapon

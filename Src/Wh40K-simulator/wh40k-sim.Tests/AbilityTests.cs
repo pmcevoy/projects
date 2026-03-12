@@ -12,7 +12,8 @@ public class AbilityTests
         int? invuln = null,
         int? fnp = null,
         int attackerModels = 1,
-        RerollOptions? rerolls = null)
+        RerollOptions? rerolls = null,
+        int criticalHitsOn = 6)
     {
         return new SimulationConfig
         {
@@ -22,6 +23,7 @@ public class AbilityTests
                 Models = attackerModels,
                 Weapon = weapon,
                 Rerolls = rerolls ?? new RerollOptions(),
+                CriticalHitsOn = criticalHitsOn,
             },
             Defender = new DefenderProfile
             {
@@ -311,6 +313,70 @@ public class AbilityTests
         var config = MakeConfig(weapon, defenderSave: 7);
         var results = sim.Run(config);
         Assert.Equal(1, results[0]);
+    }
+
+    [Fact]
+    public void CriticalHitsOn5_SustainedHits_TriggersOnRoll5()
+    {
+        // criticalHitsOn=5: a roll of 5 is a Critical Hit → triggers Sustained Hits.
+        // Hit=5 (critical → sustained 1 extra). Extra: wound=4, save=1.
+        // Original: wound=4, save=1. Total = 2 damage.
+        var dice = new FakeDiceRoller(5, 4, 1, 4, 1);
+        var weapon = new WeaponProfile
+        {
+            Attacks = DiceExpression.Fixed(1),
+            Skill = 3,
+            Strength = 4,
+            Ap = 0,
+            Damage = DiceExpression.Fixed(1),
+            Abilities = new WeaponAbilities { SustainedHits = 1 },
+        };
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(weapon, defenderSave: 7, criticalHitsOn: 5);
+        var results = sim.Run(config);
+        Assert.Equal(2, results[0]);
+    }
+
+    [Fact]
+    public void CriticalHitsOn5_LethalHits_TriggersOnRoll5()
+    {
+        // criticalHitsOn=5: roll of 5 = Critical Hit → Lethal Hits auto-wound (skip wound roll).
+        // S1 vs T4 would need 6+ normally, but Lethal Hits skips it. Save=1 fails → 1 damage.
+        var dice = new FakeDiceRoller(5, 1);
+        var weapon = new WeaponProfile
+        {
+            Attacks = DiceExpression.Fixed(1),
+            Skill = 3,
+            Strength = 1,
+            Ap = 0,
+            Damage = DiceExpression.Fixed(1),
+            Abilities = new WeaponAbilities { LethalHits = true },
+        };
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(weapon, defenderSave: 7, criticalHitsOn: 5);
+        var results = sim.Run(config);
+        Assert.Equal(1, results[0]);
+    }
+
+    [Fact]
+    public void CriticalHitsOn5_Roll4_DoesNotTriggerLethalHits()
+    {
+        // criticalHitsOn=5: roll of 4 hits normally vs BS3 but is NOT a Critical Hit.
+        // Lethal Hits should NOT trigger. S1 vs T4 needs 6+ → wound roll of 4 fails.
+        var dice = new FakeDiceRoller(4, 4);
+        var weapon = new WeaponProfile
+        {
+            Attacks = DiceExpression.Fixed(1),
+            Skill = 3,
+            Strength = 1,
+            Ap = 0,
+            Damage = DiceExpression.Fixed(1),
+            Abilities = new WeaponAbilities { LethalHits = true },
+        };
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(weapon, defenderSave: 7, criticalHitsOn: 5);
+        var results = sim.Run(config);
+        Assert.Equal(0, results[0]);
     }
 
     [Fact]

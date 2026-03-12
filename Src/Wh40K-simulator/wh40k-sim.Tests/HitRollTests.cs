@@ -8,7 +8,7 @@ public class HitRollTests
     private static SimulationConfig MakeConfig(
         int skill = 3, int strength = 4, int ap = 1, int damage = 1,
         bool hitRerollOnes = false, bool hitRerollAll = false,
-        int toughness = 4, int save = 3)
+        int toughness = 4, int save = 3, int criticalHitsOn = 6)
     {
         return new SimulationConfig
         {
@@ -29,6 +29,7 @@ public class HitRollTests
                     HitRerollOnes = hitRerollOnes,
                     HitRerollAll = hitRerollAll,
                 },
+                CriticalHitsOn = criticalHitsOn,
             },
             Defender = new DefenderProfile
             {
@@ -113,5 +114,41 @@ public class HitRollTests
         var config = MakeConfig(skill: 3, hitRerollAll: true);
         var results = sim.Run(config);
         Assert.Equal(0, results[0]);
+    }
+
+    [Fact]
+    public void CriticalHitsOn5_Roll5_IsCriticalHit_AlwaysHits()
+    {
+        // criticalHitsOn=5, BS=6 (would never hit normally). Roll 5 → Critical Hit → auto-hit.
+        // Wound=4, save fails=1 → 1 damage
+        var dice = new FakeDiceRoller(5, 4, 1);
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(skill: 6, strength: 4, toughness: 4, ap: 0, save: 7, damage: 1, criticalHitsOn: 5);
+        var results = sim.Run(config);
+        Assert.Equal(1, results[0]);
+    }
+
+    [Fact]
+    public void CriticalHitsOn5_Roll4_IsNotCritical_FollowsSkill()
+    {
+        // criticalHitsOn=5, BS=6. Roll 4 → not a Critical Hit, and 4 < 6 → miss.
+        var dice = new FakeDiceRoller(4);
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(skill: 6, criticalHitsOn: 5);
+        var results = sim.Run(config);
+        Assert.Equal(0, results[0]);
+    }
+
+    [Fact]
+    public void RerollAll_DoesNotReroll_CriticalHitThreshold()
+    {
+        // criticalHitsOn=5, BS=6, HitRerollAll. Roll 5 → Critical Hit (not rerolled despite being < skill).
+        // Wound=4, save fails=1 → 1 damage
+        var dice = new FakeDiceRoller(5, 4, 1);
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(skill: 6, strength: 4, toughness: 4, ap: 0, save: 7, damage: 1,
+            hitRerollAll: true, criticalHitsOn: 5);
+        var results = sim.Run(config);
+        Assert.Equal(1, results[0]);
     }
 }

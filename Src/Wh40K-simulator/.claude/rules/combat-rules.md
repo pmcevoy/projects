@@ -9,13 +9,13 @@ implementing or modifying any combat-related code.
 
 Each attack resolves through up to four sequential steps. Some special rules skip or modify steps.
 Simulate each attack individually, not in aggregate, so that per-attack special rule triggers
-(e.g. natural 6s) are correctly detected.
+(e.g. Critical Hits) are correctly detected.
 
 ### Step 1 — Hit Roll
 
 - Roll a D6 against the weapon's BS (ranged) or WS (melee). Meet or beat the value to hit.
 - **Natural 1** always fails, regardless of modifiers.
-- **Natural 6** always hits, regardless of modifiers.
+- **Natural 6** always hits, regardless of modifiers. See Critical Hit below.
 - Apply rerolls before applying modifiers.
 - Sum all modifiers, then cap the total at +1/-1 before applying to the target number.
 
@@ -89,14 +89,14 @@ All abilities are opt-in. Absence of an ability in the YAML means it does not ap
 - If `withinHalfRange: true`, add X additional attacks to the weapon's attack count.
 
 ### Sustained Hits X
-- Each **natural 6** on the hit roll generates X additional hits.
+- Each **Critical Hit** on the hit roll generates X additional hits.
 - These additional hits do not trigger further Sustained Hits.
 
 ### Lethal Hits
-- A **natural 6** on the hit roll causes an automatic wound. Skip the wound roll for that hit.
+- A **Critical Hit** on the hit roll causes an automatic wound. Skip the wound roll for that hit.
 - The automatic wound still proceeds to the saving throw.
 - Compatible with Sustained Hits — additional hits from Sustained Hits do not benefit from
-  Lethal Hits unless that hit roll is itself a natural 6.
+  Lethal Hits unless that hit roll is itself a Critical Hit.
 
 ### Devastating Wounds
 - A **natural 6** on the wound roll causes **mortal wounds** equal to the weapon's Damage.
@@ -106,6 +106,11 @@ All abilities are opt-in. Absence of an ability in the YAML means it does not ap
 ---
 
 ## Core Special Rules
+
+### Critical Hit
+- The hit is always successful
+- Usually a natural 6 on the hit roll
+- Some attacker profiles can adjust this lower, specified by `criticalHitsOn: 5`, meaning that a natural 5 or 6 on the dice roll is a Critical Hit
 
 ### Rerolls
 
