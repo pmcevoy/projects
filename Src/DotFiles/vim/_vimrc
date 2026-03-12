@@ -30,3 +30,6 @@ set hlsearch
 autocmd FileType ps1 setlocal indentexpr= indentkeys=
 "Highlight end-of-line whitespace
 autocmd BufRead,BufNewFile * match Error /\s\+$/
+
+"Map // to search for selected text. From https://vim.fandom.com/wiki/Search_for_visually_selected_text#Simple
+vnoremap // y/\V<C-R>=escape(@",'/\')<CR><CR>
