@@ -31,7 +31,7 @@ Compare the weapon's **Strength (S)** to the target's **Toughness (T)**:
 | S < T           | 5+            |
 | S <= T / 2      | 6+            |
 
-- Same natural 1/6 rules and modifier cap (+1/-1) as hit rolls.
+- Same natural 1/6 rules and modifier cap (+1/-1) as hit rolls. See Critical Wound section below
 - Apply rerolls before modifiers.
 
 ### Step 3 — Saving Throw
@@ -99,9 +99,12 @@ All abilities are opt-in. Absence of an ability in the YAML means it does not ap
   Lethal Hits unless that hit roll is itself a Critical Hit.
 
 ### Devastating Wounds
-- A **natural 6** on the wound roll causes **mortal wounds** equal to the weapon's Damage.
+- A **Critical Wound** on the wound roll causes **mortal wounds** equal to the weapon's Damage.
 - Skip the saving throw for that wound. Feel No Pain still applies.
 - Roll damage dice separately for each Devastating Wounds trigger.
+
+### Anti
+- If a weapon has `abilities.anti.keyword: x` and `defender.keywords` contains `keyword`, then an unmodified Wound roll of ‘x+’ scores a Critical Wound.
 
 ---
 
@@ -111,6 +114,11 @@ All abilities are opt-in. Absence of an ability in the YAML means it does not ap
 - The hit is always successful
 - Usually a natural 6 on the hit roll
 - Some attacker profiles can adjust this lower, specified by `criticalHitsOn: 5`, meaning that a natural 5 or 6 on the dice roll is a Critical Hit
+
+### Critical Wound
+- The wound is always successful
+- Usually a natural 6 on the wound roll
+- Some weapon abilities can adjust this lower
 
 ### Rerolls
 
@@ -172,12 +180,16 @@ attacker:
       sustainedHits: 0       # 0 means not active; set to X for Sustained Hits X
       lethalHits: false
       devastatingWounds: false
+      anti:
+        Psyker: 4
+        Character: 2
     withinHalfRange: false
   rerolls:
     hitRerollOnes: false
     hitRerollAll: false
     woundRerollOnes: false
     woundRerollAll: false
+  criticalHitsOn: 5          # the minimum value on the hit roll to count as a Critical Hit
 ```
 
 ### Defender profile
@@ -191,6 +203,10 @@ defender:
   invulnerableSave: null     # null or an int e.g. 4
   wounds: 2                  # wounds per model (used for total pool = models × wounds)
   feelNoPain: null           # null or an int e.g. 5
+  keywords:
+    - Psyker
+    - Vehicle
+    - Character
 ```
 
 ---

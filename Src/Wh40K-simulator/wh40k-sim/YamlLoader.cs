@@ -42,6 +42,7 @@ public static class YamlLoader
                 SustainedHits = rw.Abilities.SustainedHits,
                 LethalHits = rw.Abilities.LethalHits,
                 DevastatingWounds = rw.Abilities.DevastatingWounds,
+                Anti = rw.Abilities.Anti,
             },
             WithinHalfRange = rw.WithinHalfRange,
         };
@@ -70,6 +71,7 @@ public static class YamlLoader
             InvulnerableSave = rd.InvulnerableSave,
             Wounds = rd.Wounds,
             FeelNoPain = rd.FeelNoPain,
+            Keywords = rd.Keywords,
         };
 
         return new SimulationConfig
@@ -130,6 +132,7 @@ public static class YamlLoader
         public int SustainedHits { get; set; }
         public bool LethalHits { get; set; }
         public bool DevastatingWounds { get; set; }
+        public Dictionary<string, int> Anti { get; set; } = new();
     }
 
     private class RawRerolls
@@ -149,5 +152,6 @@ public static class YamlLoader
         public int? InvulnerableSave { get; set; }
         public int Wounds { get; set; }
         public int? FeelNoPain { get; set; }
+        public List<string> Keywords { get; set; } = new();
     }
 }

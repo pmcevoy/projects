@@ -1,35 +1,43 @@
 simulationRuns: 100000
 
 attacker:
-  name: "Intercessor Squad"
-  models: 5
+  name: "Librarian with Force Sword"
+  models: 1
   weapon:
-    name: "Bolt Rifle"
-    attacks: 2
+    name: "Force Sword"
+    attacks: 4
     skill: 3
-    strength: 4
-    ap: 1
-    damage: 1
+    strength: 6
+    ap: 2
+    damage: 2
     abilities:
       torrent: false
       blast: false
       melta: 0
-      rapidFire: 1
+      rapidFire: 0
       sustainedHits: 0
       lethalHits: false
-      devastatingWounds: false
+      devastatingWounds: true
+      anti:
+        Psyker: 4          # Critical Wound on 4+ against Psykers
+        Daemon: 5          # Critical Wound on 5+ against Daemons
     withinHalfRange: false
   rerolls:
     hitRerollOnes: false
     hitRerollAll: false
     woundRerollOnes: false
     woundRerollAll: false
+  criticalHitsOn: 6
 
 defender:
-  name: "Space Marine Squad"
-  models: 10
+  name: "Chaos Psyker"
+  models: 1
   toughness: 4
-  save: 3
-  invulnerableSave: null
-  wounds: 2
+  save: 5
+  invulnerableSave: 4
+  wounds: 4
   feelNoPain: null
+  keywords:
+    - Psyker
+    - Character
+    - Chaos

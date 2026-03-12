@@ -9,4 +9,5 @@ public sealed record DefenderProfile
     public int? InvulnerableSave { get; init; }
     public int Wounds { get; init; }
     public int? FeelNoPain { get; init; }
+    public IReadOnlyList<string> Keywords { get; init; } = [];
 }

@@ -13,7 +13,8 @@ public class AbilityTests
         int? fnp = null,
         int attackerModels = 1,
         RerollOptions? rerolls = null,
-        int criticalHitsOn = 6)
+        int criticalHitsOn = 6,
+        IReadOnlyList<string>? defenderKeywords = null)
     {
         return new SimulationConfig
         {
@@ -33,6 +34,7 @@ public class AbilityTests
                 InvulnerableSave = invuln,
                 Wounds = 10,
                 FeelNoPain = fnp,
+                Keywords = defenderKeywords ?? [],
             },
         };
     }
@@ -397,5 +399,127 @@ public class AbilityTests
         var config = MakeConfig(weapon, defenderSave: 5, invuln: 3);
         var results = sim.Run(config);
         Assert.Equal(0, results[0]);
+    }
+
+    [Fact]
+    public void DevastatingWounds_TriggersOnCriticalWound_Natural6()
+    {
+        // Default criticalWoundsOn=6. Hit(4), Wound=6 (Critical Wound → devastating, skip save).
+        // Damage=1 → 1 mortal wound through (no FNP).
+        var dice = new FakeDiceRoller(4, 6, 1); // hit, wound (nat6=crit wound), damage
+        var weapon = new WeaponProfile
+        {
+            Attacks = DiceExpression.Fixed(1),
+            Skill = 3,
+            Strength = 4,
+            Ap = 0,
+            Damage = DiceExpression.Fixed(1),
+            Abilities = new WeaponAbilities { DevastatingWounds = true },
+        };
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(weapon, defenderSave: 2); // great save but devastating wounds skips it
+        var results = sim.Run(config);
+        Assert.Equal(1, results[0]);
+    }
+
+    [Fact]
+    public void Anti_MatchingKeyword_LowersCriticalWoundThreshold()
+    {
+        // S3 vs T4 normally requires 5+ to wound. Anti Psyker 4+ lowers Critical Wound to 4+.
+        // Wound roll of 4 fails the normal threshold (4 < 5) but is a Critical Wound via Anti
+        // → Devastating Wounds triggers, save skipped, 1 mortal wound dealt.
+        var dice = new FakeDiceRoller(4, 4, 1); // hit, wound(4=crit via anti, fails normal 5+), damage
+        var weapon = new WeaponProfile
+        {
+            Attacks = DiceExpression.Fixed(1),
+            Skill = 3,
+            Strength = 3,   // S3 vs T4 → threshold 5+; wound of 4 fails without Anti
+            Ap = 0,
+            Damage = DiceExpression.Fixed(1),
+            Abilities = new WeaponAbilities
+            {
+                DevastatingWounds = true,
+                Anti = new Dictionary<string, int> { ["Psyker"] = 4 },
+            },
+        };
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(weapon, defenderSave: 2, defenderKeywords: ["Psyker"]);
+        var results = sim.Run(config);
+        Assert.Equal(1, results[0]);
+    }
+
+    [Fact]
+    public void Anti_NonMatchingKeyword_NoEffect()
+    {
+        // S3 vs T4 → threshold 5+. Anti Psyker 4+ does NOT apply (defender is Vehicle, not Psyker).
+        // Wound roll of 4 fails the normal threshold (4 < 5) and is not a Critical Wound → miss.
+        var dice = new FakeDiceRoller(4, 4); // hit, wound(4 fails normal 5+, no Anti)
+        var weapon = new WeaponProfile
+        {
+            Attacks = DiceExpression.Fixed(1),
+            Skill = 3,
+            Strength = 3,   // S3 vs T4 → threshold 5+
+            Ap = 0,
+            Damage = DiceExpression.Fixed(1),
+            Abilities = new WeaponAbilities
+            {
+                DevastatingWounds = true,
+                Anti = new Dictionary<string, int> { ["Psyker"] = 4 },
+            },
+        };
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(weapon, defenderSave: 2, defenderKeywords: ["Vehicle"]);
+        var results = sim.Run(config);
+        Assert.Equal(0, results[0]);
+    }
+
+    [Fact]
+    public void Anti_MultipleKeywords_UsesLowestThreshold()
+    {
+        // Anti Psyker 4, Anti Character 2. Defender has both → criticalWoundsOn = 2.
+        // Wound roll of 2 = Critical Wound → devastating wounds triggers, skip save. Damage=1.
+        var dice = new FakeDiceRoller(4, 2, 1); // hit, wound(2=crit via anti char:2), damage
+        var weapon = new WeaponProfile
+        {
+            Attacks = DiceExpression.Fixed(1),
+            Skill = 3,
+            Strength = 4,
+            Ap = 0,
+            Damage = DiceExpression.Fixed(1),
+            Abilities = new WeaponAbilities
+            {
+                DevastatingWounds = true,
+                Anti = new Dictionary<string, int> { ["Psyker"] = 4, ["Character"] = 2 },
+            },
+        };
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(weapon, defenderSave: 2, defenderKeywords: ["Psyker", "Character"]);
+        var results = sim.Run(config);
+        Assert.Equal(1, results[0]);
+    }
+
+    [Fact]
+    public void Anti_WithoutDevastatingWounds_CriticalWoundProceedsThroughSave()
+    {
+        // S3 vs T4 → threshold 5+. Anti Psyker 4+ makes wound roll of 4 a Critical Wound
+        // (always wounds, even though 4 < 5 fails normally). No DevastatingWounds → save still applies.
+        // Save 2+ roll of 1 (natural 1 always fails) → 1 damage.
+        var dice = new FakeDiceRoller(4, 4, 1); // hit, wound(4=crit via anti, fails normal 5+), save(1=nat fail)
+        var weapon = new WeaponProfile
+        {
+            Attacks = DiceExpression.Fixed(1),
+            Skill = 3,
+            Strength = 3,   // S3 vs T4 → threshold 5+; wound of 4 fails without Anti
+            Ap = 0,
+            Damage = DiceExpression.Fixed(1),
+            Abilities = new WeaponAbilities
+            {
+                Anti = new Dictionary<string, int> { ["Psyker"] = 4 },
+            },
+        };
+        var sim = new CombatSimulator(dice);
+        var config = MakeConfig(weapon, defenderSave: 2, defenderKeywords: ["Psyker"]);
+        var results = sim.Run(config);
+        Assert.Equal(1, results[0]);
     }
 }

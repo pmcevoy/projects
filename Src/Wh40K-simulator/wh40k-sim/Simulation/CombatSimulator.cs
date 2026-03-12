@@ -37,9 +37,11 @@ public sealed class CombatSimulator
         if (weapon.WithinHalfRange && weapon.Abilities.RapidFire > 0)
             totalAttacks += weapon.Abilities.RapidFire * attacker.Models;
 
+        int criticalWoundsOn = ComputeCriticalWoundsOn(weapon, defender);
+
         int totalDamage = 0;
         for (int i = 0; i < totalAttacks; i++)
-            totalDamage += ResolveOneAttack(weapon, attacker.Rerolls, defender, attacker.CriticalHitsOn, isFromSustainedHits: false);
+            totalDamage += ResolveOneAttack(weapon, attacker.Rerolls, defender, attacker.CriticalHitsOn, criticalWoundsOn, isFromSustainedHits: false);
 
         return totalDamage;
     }
@@ -49,6 +51,7 @@ public sealed class CombatSimulator
         RerollOptions rerolls,
         DefenderProfile defender,
         int criticalHitsOn,
+        int criticalWoundsOn,
         bool isFromSustainedHits)
     {
         int damage = 0;
@@ -66,15 +69,15 @@ public sealed class CombatSimulator
         if (isCriticalHit && weapon.Abilities.SustainedHits > 0 && !isFromSustainedHits)
         {
             for (int s = 0; s < weapon.Abilities.SustainedHits; s++)
-                damage += ResolveOneAttack(weapon, rerolls, defender, criticalHitsOn, isFromSustainedHits: true);
+                damage += ResolveOneAttack(weapon, rerolls, defender, criticalHitsOn, criticalWoundsOn, isFromSustainedHits: true);
         }
 
         // Lethal Hits: Critical Hit on hit roll = auto-wound (not for sustained-hit bonus attacks)
         bool isLethalHit = isCriticalHit && weapon.Abilities.LethalHits && !isFromSustainedHits;
 
         // Step 2: Wound roll
-        bool wounded = RollWound(weapon, defender, rerolls, isLethalHit,
-            out bool woundNaturalSix, out bool devastatingWound);
+        bool wounded = RollWound(weapon, defender, rerolls, isLethalHit, criticalWoundsOn,
+            out bool devastatingWound);
 
         if (devastatingWound)
         {
@@ -129,12 +132,11 @@ public sealed class CombatSimulator
         DefenderProfile defender,
         RerollOptions rerolls,
         bool isLethalHit,
-        out bool naturalSix,
+        int criticalWoundsOn,
         out bool devastatingWound)
     {
         if (isLethalHit)
         {
-            naturalSix = false;
             devastatingWound = false;
             return true;
         }
@@ -142,26 +144,38 @@ public sealed class CombatSimulator
         int raw = _dice.RollD6();
         int threshold = AbilityProcessor.WoundThreshold(weapon.Strength, defender.Toughness);
 
+        // Rerolls before modifiers; don't reroll a Critical Wound or a normal success
         bool shouldReroll =
-            rerolls.WoundRerollAll  ? (raw != 6 && raw < threshold) :
+            rerolls.WoundRerollAll  ? (raw < criticalWoundsOn && raw < threshold) :
             rerolls.WoundRerollOnes ? (raw == 1) :
             false;
 
         if (shouldReroll)
             raw = _dice.RollD6();
 
-        if (raw == 1) { naturalSix = false; devastatingWound = false; return false; }
+        // Natural 1 always fails
+        if (raw == 1) { devastatingWound = false; return false; }
 
-        if (raw == 6)
+        // Critical Wound: raw >= criticalWoundsOn — always wounds, triggers Devastating Wounds
+        if (raw >= criticalWoundsOn)
         {
-            naturalSix = true;
             devastatingWound = weapon.Abilities.DevastatingWounds;
             return true;
         }
 
-        naturalSix = false;
         devastatingWound = false;
         return raw >= threshold;
+    }
+
+    private static int ComputeCriticalWoundsOn(WeaponProfile weapon, DefenderProfile defender)
+    {
+        int threshold = 6;
+        foreach (var (keyword, value) in weapon.Abilities.Anti)
+        {
+            if (defender.Keywords.Any(k => string.Equals(k, keyword, StringComparison.OrdinalIgnoreCase)))
+                threshold = Math.Min(threshold, value);
+        }
+        return threshold;
     }
 
     /// <returns>true if the save passes (wound is negated).</returns>
