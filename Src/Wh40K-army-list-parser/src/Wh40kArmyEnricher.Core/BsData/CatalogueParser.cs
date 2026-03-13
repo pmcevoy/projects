@@ -76,13 +76,21 @@ public class CatalogueParser
             id,
             depth: 0);
 
+        // Also include entries from sharedSelectionEntryGroups (wargear option groups)
+        var sharedGroupEntries = root.Element(Ns + "sharedSelectionEntryGroups")
+            ?.Elements(Ns + "selectionEntryGroup")
+            .SelectMany(grp => ParseSelectionEntries(
+                grp.Element(Ns + "selectionEntries"),
+                sharedProfiles, sharedEntries, id, depth: 0))
+            .ToList() ?? [];
+
         return new CatalogueData
         {
             Id = id,
             Name = name,
             IsGameSystem = isGst,
             CatalogueLinks = catalogueLinks,
-            Entries = entries.Concat(sharedTopEntries).ToList()
+            Entries = entries.Concat(sharedTopEntries).Concat(sharedGroupEntries).ToList()
         };
     }
 
@@ -167,13 +175,22 @@ public class CatalogueParser
             statline = EnrichStatlineFromAbilities(statline, abilities);
         }
 
-        // Child entries: direct selectionEntries + via entryLinks
+        // Child entries: direct selectionEntries + selectionEntryGroups + entryLinks
         var children = new List<CatalogueEntry>();
-        if (depth < 3) // Avoid infinite recursion
+        if (depth < 6) // Avoid infinite recursion on pathological files
         {
             var directChildren = ParseSelectionEntries(
                 el.Element(Ns + "selectionEntries"), sharedProfiles, sharedEntries, catalogueId, depth + 1);
             children.AddRange(directChildren);
+
+            // selectionEntryGroups — wargear/option groups whose entries become children
+            var groupChildren = el.Element(Ns + "selectionEntryGroups")
+                ?.Elements(Ns + "selectionEntryGroup")
+                .SelectMany(grp => ParseSelectionEntries(
+                    grp.Element(Ns + "selectionEntries"),
+                    sharedProfiles, sharedEntries, catalogueId, depth + 1))
+                .ToList() ?? [];
+            children.AddRange(groupChildren);
 
             // entryLinks pointing to sharedSelectionEntries
             var linkChildren = el.Element(Ns + "entryLinks")

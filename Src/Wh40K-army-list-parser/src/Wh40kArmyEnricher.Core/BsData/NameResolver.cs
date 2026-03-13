@@ -64,28 +64,47 @@ public class NameResolver
 
     public WeaponProfileData? ResolveWeapon(string weaponName, CatalogueEntry? unitEntry,
         CatalogueEntry? modelEntry, CatalogueStore store)
+        => ResolveWeaponProfiles(weaponName, unitEntry, modelEntry, store)?.FirstOrDefault();
+
+    /// <summary>
+    /// Resolves a weapon by profile name first, then by entry name (for multi-mode weapons
+    /// like "Hellforged weapons" whose profiles are named "- strike" / "- sweep").
+    /// Returns all matching profiles so the caller can build variants.
+    /// Returns null if the weapon cannot be resolved.
+    /// </summary>
+    public IReadOnlyList<WeaponProfileData>? ResolveWeaponProfiles(string weaponName,
+        CatalogueEntry? unitEntry, CatalogueEntry? modelEntry, CatalogueStore store)
     {
-        // Search model scope first, then unit scope, then globally
-        var candidates = new List<WeaponProfileData>();
-
+        // --- Pass 1: search by profile name ---
+        var profileCandidates = new List<WeaponProfileData>();
         if (modelEntry != null)
-            candidates.AddRange(modelEntry.Weapons);
-
+            profileCandidates.AddRange(modelEntry.Weapons);
         if (unitEntry != null)
         {
-            candidates.AddRange(unitEntry.Weapons);
+            profileCandidates.AddRange(unitEntry.Weapons);
             foreach (var child in unitEntry.ChildEntries)
-                candidates.AddRange(child.Weapons);
+                profileCandidates.AddRange(child.Weapons);
         }
+        var byProfile = ResolveWeaponByProfile(weaponName, profileCandidates);
+        if (byProfile != null) return [byProfile];
 
-        var result = ResolveWeapon(weaponName, candidates, "scoped");
-        if (result != null) return result;
+        var globalProfiles = store.GetAllEntries().SelectMany(e => e.Weapons).ToList();
+        byProfile = ResolveWeaponByProfile(weaponName, globalProfiles);
+        if (byProfile != null) return [byProfile];
 
-        // Global search
-        var globalWeapons = store.GetAllEntries()
-            .SelectMany(e => e.Weapons)
-            .ToList();
-        return ResolveWeapon(weaponName, globalWeapons, "global");
+        // --- Pass 2: search by entry name (handles weapons whose profile names differ) ---
+        var scopedEntries = new List<CatalogueEntry>();
+        if (modelEntry != null) scopedEntries.AddRange(FlattenEntry(modelEntry));
+        if (unitEntry != null) scopedEntries.AddRange(FlattenEntry(unitEntry));
+
+        var byEntry = ResolveEntryByName(weaponName, scopedEntries.Where(e => e.Weapons.Count > 0).ToList());
+        if (byEntry?.Weapons.Count > 0) return byEntry.Weapons.ToList();
+
+        var globalEntries = store.GetAllEntries().Where(e => e.Weapons.Count > 0).ToList();
+        byEntry = ResolveEntryByName(weaponName, globalEntries);
+        if (byEntry?.Weapons.Count > 0) return byEntry.Weapons.ToList();
+
+        return null;
     }
 
     // ---------------------------------------------------------------------------
@@ -133,20 +152,17 @@ public class NameResolver
         return null;
     }
 
-    private WeaponProfileData? ResolveWeapon(string weaponName, List<WeaponProfileData> candidates, string context)
+    private WeaponProfileData? ResolveWeaponByProfile(string weaponName, List<WeaponProfileData> candidates)
     {
         if (candidates.Count == 0) return null;
 
-        // 1. Override
         if (_overrides.TryGetValue(weaponName, out var overrideName))
             weaponName = overrideName;
 
-        // 2. Exact
         var exact = candidates.FirstOrDefault(w =>
             string.Equals(w.Name, weaponName, StringComparison.OrdinalIgnoreCase));
         if (exact != null) return exact;
 
-        // 3. Count-stripped
         var stripped = CountPrefixRegex.Replace(weaponName, "");
         if (stripped != weaponName)
         {
@@ -155,7 +171,6 @@ public class NameResolver
             if (exact != null) return exact;
         }
 
-        // 4. Fuzzy
         var best = candidates
             .Select(w => (weapon: w, score: Fuzz.TokenSortRatio(weaponName, w.Name)))
             .Where(x => x.score >= FuzzyThreshold)
@@ -164,14 +179,55 @@ public class NameResolver
 
         if (best.weapon != null)
         {
-            _logger.LogWarning(
-                "[Weapon/{Context}] Fuzzy matched '{Input}' -> '{Match}' (score: {Score})",
-                context, weaponName, best.weapon.Name, best.score);
+            _logger.LogWarning("[Weapon] Fuzzy matched '{Input}' -> '{Match}' (score: {Score})",
+                weaponName, best.weapon.Name, best.score);
             return best.weapon;
         }
 
-        _logger.LogWarning("[Weapon/{Context}] Could not resolve '{Name}'", context, weaponName);
         return null;
+    }
+
+    private CatalogueEntry? ResolveEntryByName(string name, List<CatalogueEntry> candidates)
+    {
+        if (candidates.Count == 0) return null;
+
+        if (_overrides.TryGetValue(name, out var overrideName))
+            name = overrideName;
+
+        var exact = candidates.FirstOrDefault(e =>
+            string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (exact != null) return exact;
+
+        var stripped = CountPrefixRegex.Replace(name, "");
+        if (stripped != name)
+        {
+            exact = candidates.FirstOrDefault(e =>
+                string.Equals(e.Name, stripped, StringComparison.OrdinalIgnoreCase));
+            if (exact != null) return exact;
+        }
+
+        var best = candidates
+            .Select(e => (entry: e, score: Fuzz.TokenSortRatio(name, e.Name)))
+            .Where(x => x.score >= FuzzyThreshold)
+            .OrderByDescending(x => x.score)
+            .FirstOrDefault();
+
+        if (best.entry != null)
+        {
+            _logger.LogWarning("[Weapon/entry] Fuzzy matched '{Input}' -> '{Match}' (score: {Score})",
+                name, best.entry.Name, best.score);
+            return best.entry;
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<CatalogueEntry> FlattenEntry(CatalogueEntry entry)
+    {
+        yield return entry;
+        foreach (var child in entry.ChildEntries)
+            foreach (var desc in FlattenEntry(child))
+                yield return desc;
     }
 
     // ---------------------------------------------------------------------------

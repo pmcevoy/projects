@@ -149,34 +149,52 @@ public class Enricher
 
         foreach (var weapon in grouped)
         {
-            var data = _resolver.ResolveWeapon(weapon.Name, unitEntry, modelEntry, _store);
-            if (data == null)
+            var profiles = _resolver.ResolveWeaponProfiles(weapon.Name, unitEntry, modelEntry, _store);
+            if (profiles == null || profiles.Count == 0)
             {
                 _logger.LogWarning("Could not resolve weapon '{Name}' for unit/model context", weapon.Name);
                 continue;
             }
 
-            // A weapon name in BSData can match multiple profiles (multi-mode weapon)
-            // We've resolved a single data record per profile name, so each is a variant.
-            // BSData stores variants as separate profile elements with the same "parent" weapon.
-            // For simplicity: treat each resolved WeaponProfileData as one variant.
-            var variant = BuildVariantProfile(data, "default");
+            var variantProfiles = profiles.Count == 1
+                ? [BuildVariantProfile(profiles[0], "default")]
+                : profiles
+                    .Select(p => BuildVariantProfile(p, ExtractVariantName(p.Name, weapon.Name)))
+                    .ToList();
 
-            bool isMelee = data.TypeName == "Melee Weapons"
-                || data.Range.Equals("Melee", StringComparison.OrdinalIgnoreCase);
-
-            int rangeInches = ParseRange(data.Range);
+            var first = profiles[0];
+            bool isMelee = first.TypeName == "Melee Weapons"
+                || first.Range.Equals("Melee", StringComparison.OrdinalIgnoreCase);
 
             result.Add(new WeaponProfile
             {
                 WeaponName = weapon.Name,
                 Type = isMelee ? "Melee" : "Ranged",
-                Range = rangeInches,
-                Profiles = [variant]
+                Range = ParseRange(first.Range),
+                Profiles = variantProfiles
             });
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Derives a short variant label from a BSData profile name.
+    /// E.g. "➤ Hellforged weapons - strike" with entry "Hellforged weapons" → "strike".
+    /// </summary>
+    private static string ExtractVariantName(string profileName, string weaponEntryName)
+    {
+        // Strip leading BSData arrow prefix characters
+        var trimmed = profileName.TrimStart().TrimStart('➤', '►', '●', '•').Trim();
+
+        // Strip the weapon entry name prefix, leaving just the variant part
+        if (trimmed.StartsWith(weaponEntryName, StringComparison.OrdinalIgnoreCase))
+        {
+            var remainder = trimmed[weaponEntryName.Length..].TrimStart(' ', '-').Trim();
+            if (!string.IsNullOrEmpty(remainder)) return remainder;
+        }
+
+        return trimmed.Length > 0 ? trimmed : profileName;
     }
 
     private static WeaponVariantProfile BuildVariantProfile(WeaponProfileData data, string variantName)
