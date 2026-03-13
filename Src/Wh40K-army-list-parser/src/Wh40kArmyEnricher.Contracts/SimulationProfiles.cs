@@ -1,0 +1,200 @@
+using YamlDotNet.Core;
+using YamlDotNet.Core.Events;
+using YamlDotNet.Serialization;
+
+namespace Wh40kArmyEnricher.Contracts;
+
+// ---------------------------------------------------------------------------
+// Scalar value that can be an integer or a string (e.g. attacks: 4 or "D6").
+// Registered via the serialiser builder — no attribute needed.
+// ---------------------------------------------------------------------------
+
+public readonly struct ScalarValue
+{
+    private readonly int? _int;
+    private readonly string? _str;
+
+    public ScalarValue(int value) { _int = value; _str = null; }
+    public ScalarValue(string value) { _int = null; _str = value; }
+
+    public bool IsInt => _int.HasValue;
+    public int IntValue => _int ?? 0;
+    public string StringValue => _str ?? "";
+
+    public static implicit operator ScalarValue(int v) => new(v);
+    public static implicit operator ScalarValue(string v) => new(v);
+
+    public override string ToString() => _int.HasValue ? _int.Value.ToString() : _str ?? "";
+}
+
+/// <summary>
+/// YamlDotNet type converter for <see cref="ScalarValue"/>.
+/// Emits integers as plain scalars and strings as double-quoted scalars.
+/// </summary>
+public class ScalarValueConverter : IYamlTypeConverter
+{
+    public bool Accepts(Type type) => type == typeof(ScalarValue);
+
+    public object ReadYaml(IParser parser, Type type, ObjectDeserializer rootDeserializer)
+    {
+        var scalar = parser.Consume<Scalar>();
+        return int.TryParse(scalar.Value, out var i) ? new ScalarValue(i) : new ScalarValue(scalar.Value);
+    }
+
+    public void WriteYaml(IEmitter emitter, object? value, Type type, ObjectSerializer serializer)
+    {
+        var sv = value is ScalarValue s ? s : new ScalarValue(0);
+        if (sv.IsInt)
+            emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, sv.IntValue.ToString(),
+                ScalarStyle.Plain, true, false));
+        else
+            emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, sv.StringValue,
+                ScalarStyle.DoubleQuoted, false, false));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Weapon abilities block
+// ---------------------------------------------------------------------------
+
+public record WeaponAbilities
+{
+    public bool Torrent { get; init; }
+    public bool Blast { get; init; }
+    public int Melta { get; init; }           // 0 = not present
+    public int RapidFire { get; init; }       // 0 = not present
+    public int SustainedHits { get; init; }   // 0 = not present
+    public bool LethalHits { get; init; }
+    public bool DevastatingWounds { get; init; }
+    public bool TwinLinked { get; init; }
+    public Dictionary<string, int> Anti { get; init; } = new();  // keyword -> critical wound threshold
+}
+
+// ---------------------------------------------------------------------------
+// Weapon variant (e.g. plasma standard vs supercharge)
+// ---------------------------------------------------------------------------
+
+public record WeaponVariantProfile
+{
+    public string Variant { get; init; } = "default";
+    public ScalarValue Attacks { get; init; } = new(1);
+    public int Skill { get; init; }       // raw int, implies N+
+    public int Strength { get; init; }
+    public int Ap { get; init; }          // negative integer matching game value
+    public ScalarValue Damage { get; init; } = new(1);
+    public WeaponAbilities Abilities { get; init; } = new();
+}
+
+// ---------------------------------------------------------------------------
+// A weapon entry (may have multiple variant profiles)
+// ---------------------------------------------------------------------------
+
+public record WeaponProfile
+{
+    public string WeaponName { get; init; } = "";
+    public string Type { get; init; } = "Melee";   // "Melee" | "Ranged"
+    public int Range { get; init; }                 // 0 = melee, inches otherwise
+    public List<WeaponVariantProfile> Profiles { get; init; } = new();
+}
+
+// ---------------------------------------------------------------------------
+// A distinct model type within a unit
+// ---------------------------------------------------------------------------
+
+public record ModelProfile
+{
+    public string ModelName { get; init; } = "";
+    public int Count { get; init; }
+    public List<WeaponProfile> Weapons { get; init; } = new();
+}
+
+// ---------------------------------------------------------------------------
+// Re-roll options (set per simulation run, not per weapon)
+// ---------------------------------------------------------------------------
+
+public record RerollOptions
+{
+    public bool HitRerollOnes { get; init; }
+    public bool HitRerollAll { get; init; }
+    public bool WoundRerollOnes { get; init; }
+    public bool WoundRerollAll { get; init; }
+}
+
+// ---------------------------------------------------------------------------
+// Ability (special rule captured from BSData)
+// ---------------------------------------------------------------------------
+
+public record AbilityProfile
+{
+    public string Name { get; init; } = "";
+    public string Text { get; init; } = "";
+}
+
+// ---------------------------------------------------------------------------
+// Attacker profile
+// ---------------------------------------------------------------------------
+
+public record AttackerProfile
+{
+    public string Name { get; init; } = "";
+    public string Faction { get; init; } = "";
+    public int ModelCount { get; init; }
+    public List<string> Keywords { get; init; } = new();
+    public RerollOptions Rerolls { get; init; } = new();
+    public int CriticalHitsOn { get; init; } = 6;
+    public List<ModelProfile> Models { get; init; } = new();
+    public List<AbilityProfile> Abilities { get; init; } = new();
+    public List<string> Enhancements { get; init; } = new();
+}
+
+// ---------------------------------------------------------------------------
+// Defender profile
+// ---------------------------------------------------------------------------
+
+public record DefenderProfile
+{
+    public string Name { get; init; } = "";
+    public string Faction { get; init; } = "";
+    public int ModelCount { get; init; }
+    public int Toughness { get; init; }
+    public int Save { get; init; }                   // raw int, implies N+
+    public int? InvulnerableSave { get; init; }      // null if absent
+    public int Wounds { get; init; }
+    public int? FeelNoPain { get; init; }            // null if absent
+    public List<string> Keywords { get; init; } = new();
+    public List<AbilityProfile> Abilities { get; init; } = new();
+}
+
+// ---------------------------------------------------------------------------
+// Simulation defaults
+// ---------------------------------------------------------------------------
+
+public record SimulationDefaults
+{
+    public bool WithinHalfRange { get; init; }
+    public int Runs { get; init; } = 10000;
+}
+
+// ---------------------------------------------------------------------------
+// A single attacker/defender pairing
+// ---------------------------------------------------------------------------
+
+public record Pairing
+{
+    public string SimulationId { get; init; } = "";
+    public AttackerProfile Attacker { get; init; } = new();
+    public DefenderProfile Defender { get; init; } = new();
+}
+
+// ---------------------------------------------------------------------------
+// Full matchup output file
+// ---------------------------------------------------------------------------
+
+public record PairingFile
+{
+    public string AttackerArmy { get; init; } = "";
+    public string DefenderArmy { get; init; } = "";
+    public string GeneratedUtc { get; init; } = "";
+    public SimulationDefaults SimulationDefaults { get; init; } = new();
+    public List<Pairing> Pairings { get; init; } = new();
+}

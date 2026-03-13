@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<catalogue id="test-bt-001" name="Test Black Templars" revision="1" battleScribeVersion="2.03"
+           xmlns="http://www.battlescribe.net/schema/catalogueSchema">
+  <selectionEntries>
+    <selectionEntry id="se-ai-squad" name="Assault Intercessor Squad" type="unit">
+      <profiles>
+        <profile id="prof-ai-squad-unit" name="Assault Intercessor Squad" typeName="Unit">
+          <characteristics>
+            <characteristic name="M">3"</characteristic>
+            <characteristic name="T">4</characteristic>
+            <characteristic name="Sv">3+</characteristic>
+            <characteristic name="W">2</characteristic>
+            <characteristic name="Ld">6+</characteristic>
+            <characteristic name="OC">2</characteristic>
+          </characteristics>
+        </profile>
+      </profiles>
+      <categoryLinks>
+        <categoryLink id="cl-infantry" name="INFANTRY" hidden="false" targetId="ct-infantry" primary="false"/>
+        <categoryLink id="cl-core" name="CORE" hidden="false" targetId="ct-core" primary="false"/>
+        <categoryLink id="cl-adeptus" name="ADEPTUS ASTARTES" hidden="false" targetId="ct-adeptus" primary="false"/>
+      </categoryLinks>
+      <selectionEntries>
+        <selectionEntry id="se-ai-sgt" name="Assault Intercessor Sergeant" type="model">
+          <profiles>
+            <profile id="prof-ai-sgt-unit" name="Assault Intercessor Sergeant" typeName="Unit">
+              <characteristics>
+                <characteristic name="M">3"</characteristic>
+                <characteristic name="T">4</characteristic>
+                <characteristic name="Sv">3+</characteristic>
+                <characteristic name="W">2</characteristic>
+                <characteristic name="Ld">6+</characteristic>
+                <characteristic name="OC">2</characteristic>
+              </characteristics>
+            </profile>
+            <profile id="prof-plasma-pistol" name="Plasma pistol" typeName="Ranged Weapons">
+              <characteristics>
+                <characteristic name="Range">12"</characteristic>
+                <characteristic name="A">1</characteristic>
+                <characteristic name="BS">3+</characteristic>
+                <characteristic name="S">7</characteristic>
+                <characteristic name="AP">-2</characteristic>
+                <characteristic name="D">1</characteristic>
+                <characteristic name="Keywords">Pistol</characteristic>
+              </characteristics>
+            </profile>
+            <profile id="prof-power-fist" name="Power fist" typeName="Melee Weapons">
+              <characteristics>
+                <characteristic name="Range">Melee</characteristic>
+                <characteristic name="A">3</characteristic>
+                <characteristic name="WS">3+</characteristic>
+                <characteristic name="S">8</characteristic>
+                <characteristic name="AP">-2</characteristic>
+                <characteristic name="D">2</characteristic>
+                <characteristic name="Keywords">-</characteristic>
+              </characteristics>
+            </profile>
+          </profiles>
+        </selectionEntry>
+        <selectionEntry id="se-ai-marine" name="Assault Intercessor" type="model">
+          <profiles>
+            <profile id="prof-ai-marine-unit" name="Assault Intercessor" typeName="Unit">
+              <characteristics>
+                <characteristic name="M">3"</characteristic>
+                <characteristic name="T">4</characteristic>
+                <characteristic name="Sv">3+</characteristic>
+                <characteristic name="W">2</characteristic>
+                <characteristic name="Ld">6+</characteristic>
+                <characteristic name="OC">2</characteristic>
+              </characteristics>
+            </profile>
+            <profile id="prof-chainsword" name="Astartes chainsword" typeName="Melee Weapons">
+              <characteristics>
+                <characteristic name="Range">Melee</characteristic>
+                <characteristic name="A">4</characteristic>
+                <characteristic name="WS">3+</characteristic>
+                <characteristic name="S">4</characteristic>
+                <characteristic name="AP">-1</characteristic>
+                <characteristic name="D">1</characteristic>
+                <characteristic name="Keywords">-</characteristic>
+              </characteristics>
+            </profile>
+            <profile id="prof-heavy-bolt-pistol" name="Heavy bolt pistol" typeName="Ranged Weapons">
+              <characteristics>
+                <characteristic name="Range">18"</characteristic>
+                <characteristic name="A">1</characteristic>
+                <characteristic name="BS">3+</characteristic>
+                <characteristic name="S">4</characteristic>
+                <characteristic name="AP">-1</characteristic>
+                <characteristic name="D">1</characteristic>
+                <characteristic name="Keywords">-</characteristic>
+              </characteristics>
+            </profile>
+          </profiles>
+        </selectionEntry>
+      </selectionEntries>
+    </selectionEntry>
+    <selectionEntry id="se-castellan" name="Castellan" type="unit">
+      <profiles>
+        <profile id="prof-castellan-unit" name="Castellan" typeName="Unit">
+          <characteristics>
+            <characteristic name="M">3"</characteristic>
+            <characteristic name="T">4</characteristic>
+            <characteristic name="Sv">3+</characteristic>
+            <characteristic name="W">5</characteristic>
+            <characteristic name="Ld">6+</characteristic>
+            <characteristic name="OC">1</characteristic>
+          </characteristics>
+        </profile>
+        <profile id="prof-combi-weapon" name="Combi-weapon" typeName="Ranged Weapons">
+          <characteristics>
+            <characteristic name="Range">24"</characteristic>
+            <characteristic name="A">2</characteristic>
+            <characteristic name="BS">3+</characteristic>
+            <characteristic name="S">4</characteristic>
+            <characteristic name="AP">0</characteristic>
+            <characteristic name="D">1</characteristic>
+            <characteristic name="Keywords">Rapid Fire 1</characteristic>
+          </characteristics>
+        </profile>
+        <profile id="prof-mcp-weapon" name="Master-crafted power weapon" typeName="Melee Weapons">
+          <characteristics>
+            <characteristic name="Range">Melee</characteristic>
+            <characteristic name="A">4</characteristic>
+            <characteristic name="WS">2+</characteristic>
+            <characteristic name="S">5</characteristic>
+            <characteristic name="AP">-2</characteristic>
+            <characteristic name="D">2</characteristic>
+            <characteristic name="Keywords">-</characteristic>
+          </characteristics>
+        </profile>
+        <profile id="prof-invuln-ability" name="Sigismund's Seal" typeName="Abilities">
+          <characteristics>
+            <characteristic name="Description">This model has a 4++ invulnerable save.</characteristic>
+          </characteristics>
+        </profile>
+      </profiles>
+      <categoryLinks>
+        <categoryLink id="cl-cast-infantry" name="INFANTRY" hidden="false" targetId="ct-infantry" primary="false"/>
+        <categoryLink id="cl-cast-char" name="CHARACTER" hidden="false" targetId="ct-char" primary="false"/>
+      </categoryLinks>
+    </selectionEntry>
+  </selectionEntries>
+</catalogue>
