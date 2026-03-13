@@ -49,7 +49,7 @@ public class ScalarValueConverter : IYamlTypeConverter
                 ScalarStyle.Plain, true, false));
         else
             emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, sv.StringValue,
-                ScalarStyle.DoubleQuoted, false, false));
+                ScalarStyle.DoubleQuoted, false, true));
     }
 }
 

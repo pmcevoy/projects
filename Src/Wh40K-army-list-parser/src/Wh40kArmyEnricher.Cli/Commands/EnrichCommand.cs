@@ -51,10 +51,6 @@ public static class EnrichCommand
 
             await store.InitialiseAsync();
 
-            // Determine which catalogue to load from faction name
-            var catalogueFilename = GuessCatalogueFilename(army.Faction, army.GameSystem);
-            await store.LoadCatalogueAsync(catalogueFilename);
-
             var enricher = new Enricher(store, nameResolver, enricherLogger);
             var enriched = enricher.Enrich(army);
 
@@ -79,22 +75,4 @@ public static class EnrichCommand
         return cmd;
     }
 
-    private static string GuessCatalogueFilename(string faction, string gameSystem)
-    {
-        // Map common faction names to BSData file conventions
-        return faction.Trim() switch
-        {
-            "Black Templars" => "Imperium - Black Templars.cat",
-            "Space Marines" => "Imperium - Space Marines.cat",
-            "Death Guard" => "Chaos - Death Guard.cat",
-            "Chaos Space Marines" => "Chaos - Chaos Space Marines.cat",
-            "Tyranids" => "Tyranids - Tyranids.cat",
-            "Necrons" => "Necrons - Necrons.cat",
-            "Orks" => "Orks - Orks.cat",
-            "Tau Empire" or "T'au Empire" => "T'au Empire - T'au Empire.cat",
-            "Aeldari" => "Aeldari - Aeldari.cat",
-            "Drukhari" => "Aeldari - Drukhari.cat",
-            _ => $"{gameSystem} - {faction}.cat"
-        };
-    }
 }

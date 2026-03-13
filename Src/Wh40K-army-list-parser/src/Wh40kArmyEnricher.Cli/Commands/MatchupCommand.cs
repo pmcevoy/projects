@@ -48,10 +48,6 @@ public static class MatchupCommand
             var store = new CatalogueStore(fetcher, catalogueParser, storeLogger, forceRefresh: refresh);
             await store.InitialiseAsync();
 
-            // Load catalogues for both armies
-            await store.LoadCatalogueAsync(GuessCatalogueFilename(attackerArmy.Faction, attackerArmy.GameSystem));
-            await store.LoadCatalogueAsync(GuessCatalogueFilename(defenderArmy.Faction, defenderArmy.GameSystem));
-
             var enricher = new Enricher(store, nameResolver, enricherLogger);
             var enrichedAttackers = enricher.Enrich(attackerArmy);
             var enrichedDefenders = enricher.Enrich(defenderArmy);
@@ -121,19 +117,5 @@ public static class MatchupCommand
     private static string SanitiseName(string name) =>
         Regex.Replace(name.ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_');
 
-    private static string GuessCatalogueFilename(string faction, string gameSystem) =>
-        faction.Trim() switch
-        {
-            "Black Templars" => "Imperium - Black Templars.cat",
-            "Space Marines" => "Imperium - Space Marines.cat",
-            "Death Guard" => "Chaos - Death Guard.cat",
-            "Chaos Space Marines" => "Chaos - Chaos Space Marines.cat",
-            "Tyranids" => "Tyranids - Tyranids.cat",
-            "Necrons" => "Necrons - Necrons.cat",
-            "Orks" => "Orks - Orks.cat",
-            "Tau Empire" or "T'au Empire" => "T'au Empire - T'au Empire.cat",
-            "Aeldari" => "Aeldari - Aeldari.cat",
-            "Drukhari" => "Aeldari - Drukhari.cat",
-            _ => $"{gameSystem} - {faction}.cat"
-        };
+
 }
