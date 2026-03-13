@@ -12,7 +12,7 @@ public class ArmyListParser
     private const char WeaponBullet = '\u25E6';  // ◦
 
     private static readonly Regex PointsHeaderRegex =
-        new(@"^(.+?)\s+\((\d[\d,]*)\s+Points?\)$", RegexOptions.Compiled);
+        new(@"^(.+?)\s+\((\d[\d,]*)\s+Points?\)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Regex CountPrefixRegex =
         new(@"^(\d+)x\s+(.+)$", RegexOptions.Compiled);
@@ -46,8 +46,9 @@ public class ArmyListParser
             var l = lines[metaIdx].Trim();
             if (l.Length == 0) { metaIdx++; continue; }
             if (SectionHeadings.Contains(l)) break;
-            // Stop if we hit something that looks like a unit header (has "(N Points)")
-            if (PointsHeaderRegex.IsMatch(l) && !l.Contains(",")) break;
+            // Stop at a force-size line like "Strike Force (2,000 Points)" or "Incursion (1000 points)".
+            // Advance metaIdx so this line is not re-processed as a unit header.
+            if (PointsHeaderRegex.IsMatch(l)) { metaIdx++; break; }
             metaLines.Add(l);
             metaIdx++;
             if (metaLines.Count == 4) break;
@@ -55,6 +56,9 @@ public class ArmyListParser
         if (metaLines.Count >= 1) gameSystem = metaLines[0];
         if (metaLines.Count >= 2) faction = metaLines[1];
         if (metaLines.Count >= 3) detachment = metaLines[2];
+        // For standalone factions (e.g. Death Guard) there is no separate game-system line,
+        // so the one metadata line we parsed IS the faction.
+        if (string.IsNullOrEmpty(faction)) faction = gameSystem;
 
         // Find start of section/unit content
         int bodyStart = metaIdx;

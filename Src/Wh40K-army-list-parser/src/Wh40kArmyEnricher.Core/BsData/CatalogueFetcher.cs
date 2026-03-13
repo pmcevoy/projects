@@ -80,6 +80,13 @@ public class CatalogueFetcher : ICatalogueFetcher
         return doc.RootElement[0].GetProperty("sha").GetString() ?? "";
     }
 
+    public async Task<string> FetchRawAsync(string url, CancellationToken ct = default)
+    {
+        var response = await _http.GetAsync(url, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync(ct);
+    }
+
     private async Task DownloadAsync(string filename, string localPath, string shaPath, CancellationToken ct)
     {
         var url = RawBaseUrl + Uri.EscapeDataString(filename);

@@ -22,6 +22,9 @@ public class NameResolverTests
         fetcher
             .Setup(f => f.FetchAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => File.OpenRead(FixturePath));
+        fetcher
+            .Setup(f => f.FetchRawAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("[]");
 
         // Simulate pre-initialised store by loading the fixture directly
         var store = new TestCatalogueStore(fetcher.Object, _catalogueParser,

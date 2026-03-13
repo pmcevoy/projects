@@ -32,6 +32,9 @@ public class EnrichPipelineTests
         fetcher
             .Setup(f => f.FetchAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => File.OpenRead(SnippetPath));
+        fetcher
+            .Setup(f => f.FetchRawAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("[]");
 
         var store = new CatalogueStore(
             fetcher.Object, catalogueParser,
