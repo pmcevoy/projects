@@ -100,14 +100,32 @@ public class CatalogueStore
 
     private async Task<List<string>> GetAllCatFilenamesAsync(CancellationToken ct)
     {
+        // Use a cached file list so we never hit the GitHub Contents API on every run.
+        // The cache is only bypassed when forceRefresh is true.
+        var cacheFile = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".wh40k-enricher", "cache", "catalogue-list.json");
+
+        if (!_forceRefresh && File.Exists(cacheFile))
+        {
+            _logger.LogDebug("Using cached catalogue list");
+            var cached = await File.ReadAllTextAsync(cacheFile, ct);
+            return JsonSerializer.Deserialize<List<string>>(cached) ?? [];
+        }
+
         try
         {
+            _logger.LogInformation("Fetching catalogue list from GitHub");
             var json = await _fetcher.FetchRawAsync(GitHubContentsApi, ct);
             using var doc = JsonDocument.Parse(json);
-            return doc.RootElement.EnumerateArray()
+            var names = doc.RootElement.EnumerateArray()
                 .Select(item => item.GetProperty("name").GetString() ?? "")
                 .Where(name => name.EndsWith(".cat", StringComparison.OrdinalIgnoreCase))
                 .ToList();
+
+            Directory.CreateDirectory(Path.GetDirectoryName(cacheFile)!);
+            await File.WriteAllTextAsync(cacheFile, JsonSerializer.Serialize(names), ct);
+            return names;
         }
         catch (Exception ex)
         {

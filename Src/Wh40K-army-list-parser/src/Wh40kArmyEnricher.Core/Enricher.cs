@@ -16,6 +16,8 @@ public class Enricher
     private static readonly Regex SustainedHitsRegex = new(@"Sustained\s+Hits?\s+(\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex MeltaRegex = new(@"Melta\s+(\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex AntiRegex = new(@"Anti-([\w][\w\s]*?)\s+(\d+)\+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex InvulnRegex = new(@"(\d)\+\+(?!\+)", RegexOptions.Compiled);
+    private static readonly Regex FnpRegex = new(@"(\d)\+\+\+", RegexOptions.Compiled);
 
     private readonly CatalogueStore _store;
     private readonly NameResolver _resolver;
@@ -68,6 +70,9 @@ public class Enricher
 
             // Use model's own statline if available, otherwise use unit statline
             var statline = bsModel.Statline ?? unitEntry.Statline;
+
+            // Apply invuln/FNP granted by selected ability upgrades (e.g. Shield Dome)
+            statline = ApplySelectedAbilityUpgrades(statline, modelEntry.Weapons);
 
             // The first model's statline is used for defender profile (representative)
             if (defenderStatline == null && statline != null)
@@ -128,6 +133,50 @@ public class Enricher
             Attacker = attacker,
             Defender = defender
         };
+    }
+
+    // ---------------------------------------------------------------------------
+    // Ability-upgrade enrichment (invuln / FNP from selected non-weapon entries)
+    // ---------------------------------------------------------------------------
+
+    private UnitStatline? ApplySelectedAbilityUpgrades(
+        UnitStatline? statline, IReadOnlyList<WeaponEntry> selectedEntries)
+    {
+        if (statline == null) return null;
+
+        int? invuln = statline.InvulnerableSave;
+        int? fnp = statline.FeelNoPain;
+
+        foreach (var entry in selectedEntries)
+        {
+            // Look for catalogue entries with this name that have abilities but no weapon profiles
+            var abilityEntry = _store.GetAllEntries().FirstOrDefault(e =>
+                string.Equals(e.Name, entry.Name, StringComparison.OrdinalIgnoreCase)
+                && e.Weapons.Count == 0
+                && e.Abilities.Count > 0);
+
+            if (abilityEntry == null) continue;
+
+            foreach (var ability in abilityEntry.Abilities)
+            {
+                var text = ability.Text + " " + ability.Name;
+                if (invuln == null)
+                {
+                    var m = InvulnRegex.Match(text);
+                    if (m.Success) invuln = int.Parse(m.Groups[1].Value);
+                }
+                if (fnp == null)
+                {
+                    var m = FnpRegex.Match(text);
+                    if (m.Success) fnp = int.Parse(m.Groups[1].Value);
+                }
+            }
+        }
+
+        if (invuln == statline.InvulnerableSave && fnp == statline.FeelNoPain)
+            return statline;
+
+        return statline with { InvulnerableSave = invuln, FeelNoPain = fnp };
     }
 
     // ---------------------------------------------------------------------------

@@ -32,12 +32,15 @@ public class NameResolver
 
     public CatalogueEntry? ResolveUnit(string displayName, CatalogueStore store)
     {
-        // BSData inconsistently uses type="unit" and type="model" for full unit datasheets.
-        // A reliable indicator of a full datasheet is the presence of a statline.
+        // BSData uses type="unit" for multi-model squads (statline is on child models, not the
+        // squad entry itself) and type="model" for single-model datasheets (e.g. vehicles/drones)
+        // where the statline IS on the entry. Include all type="unit" entries plus type="model"
+        // entries that have their own statline.
         var candidates = store.GetAllEntries()
-            .Where(e => e.Statline != null
-                && (string.Equals(e.EntryType, "unit", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(e.EntryType, "model", StringComparison.OrdinalIgnoreCase)))
+            .Where(e =>
+                string.Equals(e.EntryType, "unit", StringComparison.OrdinalIgnoreCase)
+                || (string.Equals(e.EntryType, "model", StringComparison.OrdinalIgnoreCase)
+                    && e.Statline != null))
             .ToList();
         return Resolve(displayName, candidates, "unit");
     }
