@@ -309,174 +309,116 @@ Output is YAML. Use `YamlDotNet` with `CamelCaseNamingConvention` so C# property
 
 ---
 
+### Unit Profile (full schema)
+
+A single `UnitProfile` record carries both offensive and defensive data. The `Pairing.Attacker` / `Pairing.Defender` field names encode the role; the profile type itself does not differ between roles. This eliminates the duplication of identity fields (name, faction, keywords, abilities) that would arise from separate attacker/defender types.
+
+```yaml
+name: "Crusader Squad"           # Unit display name from army list
+faction: "Black Templars"
+modelCount: 20                   # Total models in the unit
+keywords:                        # Unit-level keywords from BSData categoryLinks
+  - INFANTRY
+  - CORE
+  - ADEPTUS ASTARTES
+abilities:                       # Unit special rules from BSData; not yet consumed by sim
+  - name: "Righteous Zeal"
+    text: "..."
+enhancements: []                 # Enhancement names from army list
+
+# --- Offensive stats ---
+rerolls:                         # Army/detachment-level re-roll auras; set per simulation run
+  hitRerollOnes: false
+  hitRerollAll: false
+  woundRerollOnes: false
+  woundRerollAll: false
+criticalHitsOn: 6                # Normally 6; some abilities lower this
+models:                          # One entry per distinct model type in the unit
+  - modelName: "Sword Brother"
+    count: 1
+    weapons:
+      - weaponName: "Hellforged weapons"
+        type: Melee
+        range: 0
+        profiles:
+          - variant: strike      # Derived from "➤ Hellforged weapons - strike"
+            attacks: 4
+            skill: 3
+            strength: 8
+            ap: -2               # Negative integer matching game value
+            damage: 2
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0           # 0 = not present; integer = bonus damage within half range
+              rapidFire: 0       # 0 = not present; integer = bonus attacks at half range
+              sustainedHits: 0   # 0 = not present; integer = bonus hits on Critical Hit
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}           # keyword -> criticalWoundThreshold map
+          - variant: sweep       # Derived from "➤ Hellforged weapons - sweep"
+            attacks: 8
+            skill: 3
+            strength: 6
+            ap: -1
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+      - weaponName: "Pyre pistol"
+        type: Ranged
+        range: 12
+        profiles:
+          - variant: default
+            attacks: "D6"        # Variable attacks stored as string when not a fixed integer
+            skill: 3
+            strength: 4
+            ap: 0
+            damage: 1
+            abilities:
+              torrent: true      # Torrent: auto-hits, skip hit roll entirely
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+
+# --- Defensive stats ---
+toughness: 4
+save: 3                          # Raw integer; implies 3+
+invulnerableSave: null           # null if absent; integer if present (e.g. 4 = 4++)
+wounds: 2                        # Wounds per model
+feelNoPain: null                 # null if absent; integer if present (e.g. 5 = 5+++)
+```
+
 ### `enrich` command output
 
-The `enrich` command outputs a list of unit pairings — one per unit in the army, each containing both the attacker and defender profile for that unit. This allows reviewing the full enriched data for a single army.
+The `enrich` command outputs a flat list of `UnitProfile` objects — one per unit in the army. Each unit appears exactly once with all its data.
 
 ```yaml
-- simulationId: assault_intercessor_squad
-  attacker:
-    name: "Assault Intercessor Squad"
-    faction: "Black Templars"
-    modelCount: 5
-    keywords: [INFANTRY, CORE, ADEPTUS ASTARTES, TACTICUS]
-    rerolls:
-      hitRerollOnes: false
-      hitRerollAll: false
-      woundRerollOnes: false
-      woundRerollAll: false
-    criticalHitsOn: 6
-    models:
-      - modelName: "Assault Intercessor Sergeant"
-        count: 1
-        weapons:
-          - weaponName: "Heavy bolt pistol"
-            type: Ranged
-            range: 18
-            profiles:
-              - variant: default
-                attacks: 1
-                skill: 3
-                strength: 4
-                ap: -1
-                damage: 1
-                abilities:
-                  torrent: false
-                  blast: false
-                  melta: 0
-                  rapidFire: 0
-                  sustainedHits: 0
-                  lethalHits: false
-                  devastatingWounds: false
-                  twinLinked: false
-                  anti: {}
-    abilities:
-      - name: "Shock Assault"
-        text: "..."
-    enhancements: []
-  defender:
-    name: "Assault Intercessor Squad"
-    faction: "Black Templars"
-    modelCount: 5
-    toughness: 4
-    save: 3
-    invulnerableSave: null
-    wounds: 2
-    feelNoPain: null
-    keywords: [INFANTRY, CORE, ADEPTUS ASTARTES, TACTICUS]
-    abilities:
-      - name: "Shock Assault"
-        text: "..."
-```
-
-### Attacker Profile (full schema)
-
-```yaml
-attacker:
-  name: "Crusader Squad"           # Unit display name from army list
+- name: "Assault Intercessor Squad"
   faction: "Black Templars"
-  modelCount: 20                   # Total models in the unit
-  keywords:                        # Unit-level keywords from BSData categoryLinks
-    - INFANTRY
-    - CORE
-    - ADEPTUS ASTARTES
-  rerolls:                         # Army/detachment-level re-roll auras; set per simulation run
-    hitRerollOnes: false
-    hitRerollAll: false
-    woundRerollOnes: false
-    woundRerollAll: false
-  criticalHitsOn: 6                # Normally 6; some abilities lower this (e.g. Sustained Hits)
-  models:                          # One entry per distinct model type in the unit
-    - modelName: "Sword Brother"
-      count: 1
-      weapons:
-        - weaponName: "Hellforged weapons"
-          type: Melee
-          range: 0
-          profiles:
-            - variant: strike     # Derived from "➤ Hellforged weapons - strike"
-              attacks: 4
-              skill: 3
-              strength: 8
-              ap: -2
-              damage: 2
-              abilities:
-                torrent: false
-                blast: false
-                melta: 0
-                rapidFire: 0
-                sustainedHits: 0
-                lethalHits: false
-                devastatingWounds: false
-                twinLinked: false
-                anti: {}
-            - variant: sweep      # Derived from "➤ Hellforged weapons - sweep"
-              attacks: 8
-              skill: 3
-              strength: 6
-              ap: -1
-              damage: 1
-              abilities:
-                torrent: false
-                blast: false
-                melta: 0
-                rapidFire: 0
-                sustainedHits: 0
-                lethalHits: false
-                devastatingWounds: false
-                twinLinked: false
-                anti: {}
-        - weaponName: "Pyre pistol"
-          type: Ranged
-          range: 12
-          profiles:
-            - variant: default
-              attacks: "D6"         # Variable attacks stored as string when not a fixed integer
-              skill: 3
-              strength: 4
-              ap: 0
-              damage: 1
-              abilities:
-                torrent: true       # Torrent: auto-hits, skip hit roll entirely
-                blast: false
-                melta: 0
-                rapidFire: 0
-                sustainedHits: 0
-                lethalHits: false
-                devastatingWounds: false
-                twinLinked: false
-                anti: {}
-  abilities:                        # Unit special rules from BSData; not yet consumed by sim
-    - name: "Righteous Zeal"
-      text: "..."
-  enhancements: []                  # Enhancement names from army list
+  modelCount: 5
+  # ... full UnitProfile as above
+- name: "Crusader Squad"
+  faction: "Black Templars"
+  # ...
 ```
 
-### Defender Profile (full schema)
+### Pairing File (`matchup` command output)
 
-```yaml
-defender:
-  name: "Plague Marines"
-  faction: "Death Guard"
-  modelCount: 7
-  toughness: 5
-  save: 3                           # Raw integer; implies 3+
-  invulnerableSave: null            # null if no invuln; integer if present (e.g. 4 = 4++)
-  wounds: 2                         # Wounds per model
-  feelNoPain: null                  # null if none; integer if present (e.g. 5 = 5+++)
-  keywords:
-    - INFANTRY
-    - CHAOS
-    - NURGLE
-    - HERETIC ASTARTES
-  abilities:
-    - name: "Plague-ridden"
-      text: "..."
-```
-
-### Pairing File (matchup output)
-
-One YAML file per matchup containing all requested pairings. The simulation project reads this file to enumerate and execute runs.
+One YAML file per matchup containing all requested pairings. Both `attacker` and `defender` are full `UnitProfile` objects. The simulation project reads this file to enumerate and execute runs.
 
 ```yaml
 attackerArmy: "Iron Canticle (Black Templars)"
@@ -488,14 +430,9 @@ simulationDefaults:
 pairings:
   - simulationId: "bt_crusader_squad_vs_dg_plague_marines"
     attacker:
-      # full attacker profile as above, inlined
+      # full UnitProfile (offensive + defensive data for the attacking unit)
     defender:
-      # full defender profile as above, inlined
-  - simulationId: "bt_assault_intercessors_vs_dg_plague_marines"
-    attacker:
-      # ...
-    defender:
-      # ...
+      # full UnitProfile (offensive + defensive data for the defending unit)
 ```
 
 The Monte Carlo simulation project should deserialise the pairing file using matching C# record types defined in `Wh40kArmyEnricher.Contracts`, using `YamlDotNet` with the same `CamelCaseNamingConvention`.
@@ -507,7 +444,7 @@ The Monte Carlo simulation project should deserialise the pairing file using mat
 Built with `System.CommandLine`. Two subcommands:
 
 ```
-# Enrich a single army list and write profiles (both attacker + defender per unit)
+# Enrich a single army list — outputs a flat list of UnitProfile objects (one per unit)
 army-enricher enrich <army-list.txt> [--output <path>] [--refresh-cache] [--dry-run]
 
 # Enrich two armies and generate all pairings
@@ -534,7 +471,7 @@ army-enricher matchup attacker.txt defender.txt \
 - **Non-weapon `◦` entries.** The army export uses `◦` bullets for both weapons and ability upgrades (e.g. Shield Dome). When an entry cannot be resolved as a weapon, check whether it resolves to an ability-only catalogue entry. If so, apply any invuln/FNP it grants to the model statline and skip it silently — do not emit a warning.
 - **Keywords.** Parse the `Keywords` characteristic as a comma-separated list, trimming whitespace and normalising `-` (no keywords) to an empty list. Keywords such as `Blast`, `Torrent`, `Pistol`, `Indirect Fire`, `Lethal Hits`, `Sustained Hits X`, `Devastating Wounds` directly affect simulation logic.
 - **Unit abilities.** Capture all `profile[@typeName='Abilities']` entries by name and text even if the simulation does not yet consume them — they will be needed for future rule modelling.
-- **`simulation_id` generation.** For `enrich` output: lowercase unit name, spaces/punctuation to underscores. For `matchup` output: prefixed with faction abbreviation (e.g. `bt_` for Black Templars, `dg_` for Death Guard), attacker and defender slugs joined with `_vs_`.
+- **`simulation_id` generation** (`matchup` output only). Prefixed with faction abbreviation (e.g. `bt_` for Black Templars, `dg_` for Death Guard), attacker and defender name slugs joined with `_vs_` (e.g. `bt_crusader_squad_vs_dg_plague_marines`). The `enrich` command does not use simulation IDs — it outputs a plain list of unit profiles.
 
 ---
 

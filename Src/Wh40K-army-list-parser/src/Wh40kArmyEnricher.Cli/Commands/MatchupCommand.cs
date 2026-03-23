@@ -55,12 +55,12 @@ public static class MatchupCommand
             // Apply unit filters
             var filteredAttackers = attackerUnits.Length > 0
                 ? enrichedAttackers.Where(e => attackerUnits.Any(f =>
-                    e.Attacker.Name.Contains(f, StringComparison.OrdinalIgnoreCase))).ToList()
+                    e.Profile.Name.Contains(f, StringComparison.OrdinalIgnoreCase))).ToList()
                 : enrichedAttackers.ToList();
 
             var filteredDefenders = defenderUnits.Length > 0
                 ? enrichedDefenders.Where(e => defenderUnits.Any(f =>
-                    e.Defender.Name.Contains(f, StringComparison.OrdinalIgnoreCase))).ToList()
+                    e.Profile.Name.Contains(f, StringComparison.OrdinalIgnoreCase))).ToList()
                 : enrichedDefenders.ToList();
 
             // Build all pairings
@@ -72,10 +72,10 @@ public static class MatchupCommand
                     pairings.Add(new Pairing
                     {
                         SimulationId = BuildSimulationId(
-                            attackerArmy.Faction, atk.Attacker.Name,
-                            defenderArmy.Faction, def.Defender.Name),
-                        Attacker = atk.Attacker,
-                        Defender = def.Defender
+                            attackerArmy.Faction, atk.Profile.Name,
+                            defenderArmy.Faction, def.Profile.Name),
+                        Attacker = atk.Profile,
+                        Defender = def.Profile
                     });
                 }
             }

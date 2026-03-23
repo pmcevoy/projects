@@ -9,6 +9,5 @@ namespace Wh40kArmyEnricher.Core.Models;
 public record EnrichedUnit
 {
     public UnitEntry ArmyListEntry { get; init; } = null!;
-    public AttackerProfile Attacker { get; init; } = new();
-    public DefenderProfile Defender { get; init; } = new();
+    public UnitProfile Profile { get; init; } = new();
 }

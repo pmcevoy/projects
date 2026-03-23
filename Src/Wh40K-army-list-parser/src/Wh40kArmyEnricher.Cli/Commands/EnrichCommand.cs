@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.CommandLine;
@@ -66,13 +65,8 @@ public static class EnrichCommand
             var outPath = output?.FullName
                 ?? Path.ChangeExtension(armyListFile.FullName, ".enriched.yaml");
 
-            var pairings = enriched.Select(e => new Pairing
-            {
-                SimulationId = Regex.Replace(e.Attacker.Name.ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_'),
-                Attacker = e.Attacker,
-                Defender = e.Defender
-            }).ToList();
-            var yaml = YamlSerialiser.Serialise(pairings);
+            var profiles = enriched.Select(e => e.Profile).ToList();
+            var yaml = YamlSerialiser.Serialise(profiles);
             await File.WriteAllTextAsync(outPath, yaml);
             logger.LogInformation("Written to {Path}", outPath);
 

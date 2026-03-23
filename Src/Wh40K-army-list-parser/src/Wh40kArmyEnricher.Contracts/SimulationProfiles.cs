@@ -131,38 +131,32 @@ public record AbilityProfile
 }
 
 // ---------------------------------------------------------------------------
-// Attacker profile
+// Unit profile — used for both attacker and defender roles in a pairing.
+// The Pairing.Attacker / Pairing.Defender fields encode the role; the profile
+// itself carries all offensive and defensive data for the unit.
 // ---------------------------------------------------------------------------
 
-public record AttackerProfile
+public record UnitProfile
 {
+    // Identity
     public string Name { get; init; } = "";
     public string Faction { get; init; } = "";
     public int ModelCount { get; init; }
     public List<string> Keywords { get; init; } = new();
+    public List<AbilityProfile> Abilities { get; init; } = new();
+    public List<string> Enhancements { get; init; } = new();
+
+    // Offensive stats
     public RerollOptions Rerolls { get; init; } = new();
     public int CriticalHitsOn { get; init; } = 6;
     public List<ModelProfile> Models { get; init; } = new();
-    public List<AbilityProfile> Abilities { get; init; } = new();
-    public List<string> Enhancements { get; init; } = new();
-}
 
-// ---------------------------------------------------------------------------
-// Defender profile
-// ---------------------------------------------------------------------------
-
-public record DefenderProfile
-{
-    public string Name { get; init; } = "";
-    public string Faction { get; init; } = "";
-    public int ModelCount { get; init; }
+    // Defensive stats
     public int Toughness { get; init; }
-    public int Save { get; init; }                   // raw int, implies N+
-    public int? InvulnerableSave { get; init; }      // null if absent
+    public int Save { get; init; }               // raw int, implies N+
+    public int? InvulnerableSave { get; init; }  // null if absent
     public int Wounds { get; init; }
-    public int? FeelNoPain { get; init; }            // null if absent
-    public List<string> Keywords { get; init; } = new();
-    public List<AbilityProfile> Abilities { get; init; } = new();
+    public int? FeelNoPain { get; init; }        // null if absent
 }
 
 // ---------------------------------------------------------------------------
@@ -182,8 +176,8 @@ public record SimulationDefaults
 public record Pairing
 {
     public string SimulationId { get; init; } = "";
-    public AttackerProfile Attacker { get; init; } = new();
-    public DefenderProfile Defender { get; init; } = new();
+    public UnitProfile Attacker { get; init; } = new();
+    public UnitProfile Defender { get; init; } = new();
 }
 
 // ---------------------------------------------------------------------------

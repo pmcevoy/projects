@@ -83,10 +83,10 @@ public class EnrichPipelineTests
     {
         var (enriched, _) = await RunPipelineAsync();
         var squad = enriched.FirstOrDefault(e =>
-            e.Defender.Name.Contains("Assault Intercessor", StringComparison.OrdinalIgnoreCase));
+            e.Profile.Name.Contains("Assault Intercessor", StringComparison.OrdinalIgnoreCase));
 
         squad.Should().NotBeNull();
-        squad!.Defender.Toughness.Should().Be(4);
+        squad!.Profile.Toughness.Should().Be(4);
     }
 
     [Fact]
@@ -94,10 +94,10 @@ public class EnrichPipelineTests
     {
         var (enriched, _) = await RunPipelineAsync();
         var squad = enriched.FirstOrDefault(e =>
-            e.Defender.Name.Contains("Assault Intercessor", StringComparison.OrdinalIgnoreCase));
+            e.Profile.Name.Contains("Assault Intercessor", StringComparison.OrdinalIgnoreCase));
 
         squad.Should().NotBeNull();
-        squad!.Defender.Save.Should().Be(3);
+        squad!.Profile.Save.Should().Be(3);
     }
 
     [Fact]
@@ -105,10 +105,10 @@ public class EnrichPipelineTests
     {
         var (enriched, _) = await RunPipelineAsync();
         var squad = enriched.FirstOrDefault(e =>
-            e.Defender.Name.Contains("Assault Intercessor", StringComparison.OrdinalIgnoreCase));
+            e.Profile.Name.Contains("Assault Intercessor", StringComparison.OrdinalIgnoreCase));
 
         squad.Should().NotBeNull();
-        squad!.Defender.Wounds.Should().Be(2);
+        squad!.Profile.Wounds.Should().Be(2);
     }
 
     // ---------------------------------------------------------------------------
@@ -120,11 +120,11 @@ public class EnrichPipelineTests
     {
         var (enriched, _) = await RunPipelineAsync();
         var squad = enriched.FirstOrDefault(e =>
-            e.Attacker.Name.Contains("Assault Intercessor", StringComparison.OrdinalIgnoreCase));
+            e.Profile.Name.Contains("Assault Intercessor", StringComparison.OrdinalIgnoreCase));
 
         squad.Should().NotBeNull();
 
-        var chainsword = squad!.Attacker.Models
+        var chainsword = squad!.Profile.Models
             .SelectMany(m => m.Weapons)
             .FirstOrDefault(w => w.WeaponName.Contains("chainsword", StringComparison.OrdinalIgnoreCase));
 
@@ -142,10 +142,10 @@ public class EnrichPipelineTests
     {
         var (enriched, _) = await RunPipelineAsync();
         var squad = enriched.FirstOrDefault(e =>
-            e.Attacker.Name.Contains("Assault Intercessor", StringComparison.OrdinalIgnoreCase));
+            e.Profile.Name.Contains("Assault Intercessor", StringComparison.OrdinalIgnoreCase));
 
         squad.Should().NotBeNull();
-        squad!.Attacker.Keywords.Should().Contain("INFANTRY");
+        squad!.Profile.Keywords.Should().Contain("INFANTRY");
     }
 
     // ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ public class EnrichPipelineTests
     public async Task Pipeline_YamlOutput_IsWellFormed()
     {
         var (enriched, _) = await RunPipelineAsync();
-        var yaml = YamlSerialiser.Serialise(enriched.Select(e => e.Attacker).ToList());
+        var yaml = YamlSerialiser.Serialise(enriched.Select(e => e.Profile).ToList());
 
         yaml.Should().NotBeNullOrWhiteSpace();
         yaml.Should().Contain("name:");

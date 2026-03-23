@@ -54,8 +54,7 @@ public class Enricher
             return new EnrichedUnit
             {
                 ArmyListEntry = unit,
-                Attacker = new AttackerProfile { Name = unit.Name, Faction = faction },
-                Defender = new DefenderProfile { Name = unit.Name, Faction = faction }
+                Profile = new UnitProfile { Name = unit.Name, Faction = faction }
             };
         }
 
@@ -92,46 +91,34 @@ public class Enricher
 
         int totalModels = unit.Models.Sum(m => m.Count);
 
-        var attacker = new AttackerProfile
+        var abilities = unitEntry.Abilities.Select(a => new AbilityProfile
+        {
+            Name = a.Name,
+            Text = a.Text
+        }).ToList();
+
+        var profile = new UnitProfile
         {
             Name = unit.Name,
             Faction = faction,
             ModelCount = totalModels,
             Keywords = unitEntry.Keywords.ToList(),
+            Abilities = abilities,
+            Enhancements = unit.Enhancements.ToList(),
             Rerolls = new RerollOptions(),
             CriticalHitsOn = 6,
             Models = modelProfiles,
-            Abilities = unitEntry.Abilities.Select(a => new AbilityProfile
-            {
-                Name = a.Name,
-                Text = a.Text
-            }).ToList(),
-            Enhancements = unit.Enhancements.ToList()
-        };
-
-        var defender = new DefenderProfile
-        {
-            Name = unit.Name,
-            Faction = faction,
-            ModelCount = totalModels,
             Toughness = defenderStatline?.Toughness ?? 4,
             Save = defenderStatline?.Save ?? 7,
             InvulnerableSave = defenderStatline?.InvulnerableSave,
             Wounds = defenderWounds,
-            FeelNoPain = defenderStatline?.FeelNoPain,
-            Keywords = unitEntry.Keywords.ToList(),
-            Abilities = unitEntry.Abilities.Select(a => new AbilityProfile
-            {
-                Name = a.Name,
-                Text = a.Text
-            }).ToList()
+            FeelNoPain = defenderStatline?.FeelNoPain
         };
 
         return new EnrichedUnit
         {
             ArmyListEntry = unit,
-            Attacker = attacker,
-            Defender = defender
+            Profile = profile
         };
     }
 
