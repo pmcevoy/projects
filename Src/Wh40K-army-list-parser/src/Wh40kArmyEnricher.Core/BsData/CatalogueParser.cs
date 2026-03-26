@@ -76,12 +76,11 @@ public class CatalogueParser
             id,
             depth: 0);
 
-        // Also include entries from sharedSelectionEntryGroups (wargear option groups)
+        // Also include entries from sharedSelectionEntryGroups (wargear option groups).
+        // Use deep traversal so nested selectionEntryGroups within groups are also included.
         var sharedGroupEntries = root.Element(Ns + "sharedSelectionEntryGroups")
             ?.Elements(Ns + "selectionEntryGroup")
-            .SelectMany(grp => ParseSelectionEntries(
-                grp.Element(Ns + "selectionEntries"),
-                sharedProfiles, sharedEntries, id, depth: 0))
+            .SelectMany(grp => ParseSelectionEntryGroupDeep(grp, sharedProfiles, sharedEntries, id, depth: 0))
             .ToList() ?? [];
 
         // Also parse root-level entryLinks — faction catalogues use these to link parent-catalogue
@@ -161,6 +160,37 @@ public class CatalogueParser
             .ToList();
     }
 
+    /// <summary>
+    /// Recursively collects all selectionEntry/entryLink children from a selectionEntryGroup,
+    /// traversing any nested selectionEntryGroups within it at arbitrary depth.
+    /// This handles structures like: Wargear > Turret Weapon > Heavy Laser Destroyer.
+    /// </summary>
+    private List<CatalogueEntry> ParseSelectionEntryGroupDeep(
+        XElement group,
+        Dictionary<string, XElement> sharedProfiles,
+        Dictionary<string, XElement> sharedEntries,
+        string catalogueId,
+        int depth)
+    {
+        var result = new List<CatalogueEntry>();
+
+        // Direct entries in this group
+        result.AddRange(ParseSelectionEntries(
+            group.Element(Ns + "selectionEntries"),
+            sharedProfiles, sharedEntries, catalogueId, depth));
+
+        // Recurse into nested selectionEntryGroups (no extra depth increment — groups are not entries)
+        foreach (var nested in group.Element(Ns + "selectionEntryGroups")
+                                    ?.Elements(Ns + "selectionEntryGroup")
+                                    ?? Enumerable.Empty<XElement>())
+        {
+            result.AddRange(ParseSelectionEntryGroupDeep(
+                nested, sharedProfiles, sharedEntries, catalogueId, depth));
+        }
+
+        return result;
+    }
+
     private CatalogueEntry ParseEntry(
         XElement el,
         Dictionary<string, XElement> sharedProfiles,
@@ -194,12 +224,13 @@ public class CatalogueParser
                 el.Element(Ns + "selectionEntries"), sharedProfiles, sharedEntries, catalogueId, depth + 1);
             children.AddRange(directChildren);
 
-            // selectionEntryGroups — wargear/option groups whose entries become children
+            // selectionEntryGroups — wargear/option groups whose entries become children.
+            // Use deep traversal so nested selectionEntryGroups within groups are also included
+            // (e.g. Repulsor Executioner: Wargear > Turret Weapon > Heavy Laser Destroyer).
             var groupChildren = el.Element(Ns + "selectionEntryGroups")
                 ?.Elements(Ns + "selectionEntryGroup")
-                .SelectMany(grp => ParseSelectionEntries(
-                    grp.Element(Ns + "selectionEntries"),
-                    sharedProfiles, sharedEntries, catalogueId, depth + 1))
+                .SelectMany(grp => ParseSelectionEntryGroupDeep(
+                    grp, sharedProfiles, sharedEntries, catalogueId, depth + 1))
                 .ToList() ?? [];
             children.AddRange(groupChildren);
 

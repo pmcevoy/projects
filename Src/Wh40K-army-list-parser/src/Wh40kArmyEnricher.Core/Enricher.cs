@@ -188,7 +188,15 @@ public class Enricher
             var profiles = _resolver.ResolveWeaponProfiles(weapon.Name, unitEntry, modelEntry, _store);
             if (profiles == null || profiles.Count == 0)
             {
-                _logger.LogWarning("Could not resolve weapon '{Name}' for unit/model context", weapon.Name);
+                // Suppress warning for ability-only entries (e.g. Shield Dome) — these appear
+                // as ◦ bullets in the army list alongside weapons but have no weapon profiles.
+                // Their invuln/FNP grants are handled by ApplySelectedAbilityUpgrades.
+                var isAbilityOnly = _store.GetAllEntries().Any(e =>
+                    string.Equals(e.Name, weapon.Name, StringComparison.OrdinalIgnoreCase)
+                    && e.Weapons.Count == 0
+                    && e.Abilities.Count > 0);
+                if (!isAbilityOnly)
+                    _logger.LogWarning("Could not resolve weapon '{Name}' for unit/model context", weapon.Name);
                 continue;
             }
 

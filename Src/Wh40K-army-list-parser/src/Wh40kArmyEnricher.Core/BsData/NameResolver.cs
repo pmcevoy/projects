@@ -42,7 +42,10 @@ public class NameResolver
                 || (string.Equals(e.EntryType, "model", StringComparison.OrdinalIgnoreCase)
                     && e.Statline != null))
             .ToList();
-        return Resolve(displayName, candidates, "unit");
+        var result = Resolve(displayName, candidates, "unit");
+        if (result == null)
+            _logger.LogWarning("[unit] Could not resolve '{Name}'", displayName);
+        return result;
     }
 
     // ---------------------------------------------------------------------------
@@ -56,9 +59,30 @@ public class NameResolver
         var result = Resolve(displayName, localCandidates, "model (local)");
         if (result != null) return result;
 
+        // BSData names loadout variants with a suffix: "Initiate w/Bolt Rifle", "Neophyte w/Shotgun".
+        // The army list uses only the base name ("Initiate", "Neophyte"). A prefix match finds the
+        // correct variant — all variants of the same model share the same statline.
+        result = FindByPrefix(displayName, localCandidates);
+        if (result != null)
+        {
+            _logger.LogDebug("[model] Prefix matched '{Input}' -> '{Match}'", displayName, result.Name);
+            return result;
+        }
+
         // Fall back to global model entries
         var globalCandidates = store.GetAllEntriesOfType("model").ToList();
-        return Resolve(displayName, globalCandidates, "model (global)");
+        result = Resolve(displayName, globalCandidates, "model (global)");
+        if (result != null) return result;
+
+        result = FindByPrefix(displayName, globalCandidates);
+        if (result != null)
+        {
+            _logger.LogDebug("[model] Prefix matched '{Input}' -> '{Match}' (global)", displayName, result.Name);
+            return result;
+        }
+
+        _logger.LogWarning("[model] Could not resolve '{Name}'", displayName);
+        return null;
     }
 
     // ---------------------------------------------------------------------------
@@ -151,7 +175,6 @@ public class NameResolver
             return best.entry;
         }
 
-        _logger.LogWarning("[{Context}] Could not resolve '{Name}'", context, displayName);
         return null;
     }
 
@@ -236,6 +259,14 @@ public class NameResolver
     // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
+
+    private static CatalogueEntry? FindByPrefix(string displayName, List<CatalogueEntry> candidates)
+    {
+        return candidates.FirstOrDefault(e =>
+            e.Name.Length > displayName.Length
+            && e.Name.StartsWith(displayName, StringComparison.OrdinalIgnoreCase)
+            && !char.IsLetterOrDigit(e.Name[displayName.Length]));
+    }
 
     private static IEnumerable<CatalogueEntry> FlattenModels(CatalogueEntry unit)
     {
