@@ -199,7 +199,7 @@ public class Enricher
                     .ToList();
 
             var first = profiles[0];
-            bool isMelee = first.TypeName == "Melee Weapons"
+            bool isMelee = string.Equals(first.TypeName, "Melee Weapons", StringComparison.OrdinalIgnoreCase)
                 || first.Range.Equals("Melee", StringComparison.OrdinalIgnoreCase);
 
             result.Add(new WeaponProfile

@@ -84,13 +84,21 @@ public class CatalogueParser
                 sharedProfiles, sharedEntries, id, depth: 0))
             .ToList() ?? [];
 
+        // Also parse root-level entryLinks — faction catalogues use these to link parent-catalogue
+        // entries and add faction-specific weapon/profile overrides directly on the link element.
+        // e.g. "Black Templars Repulsor Executioner" entryLink adds "Heavy Laser Destroyer" profile.
+        var rootLinkEntries = root.Element(Ns + "entryLinks")
+            ?.Elements(Ns + "entryLink")
+            .Select(e => ParseEntry(e, sharedProfiles, sharedEntries, id, depth: 0))
+            .ToList() ?? [];
+
         return new CatalogueData
         {
             Id = id,
             Name = name,
             IsGameSystem = isGst,
             CatalogueLinks = catalogueLinks,
-            Entries = entries.Concat(sharedTopEntries).Concat(sharedGroupEntries).ToList()
+            Entries = entries.Concat(sharedTopEntries).Concat(sharedGroupEntries).Concat(rootLinkEntries).ToList()
         };
     }
 
@@ -145,7 +153,10 @@ public class CatalogueParser
     {
         if (container == null) return [];
 
-        return container.Elements(Ns + "selectionEntry")
+        // Process both selectionEntry and entryLink elements — entryLinks carry faction-specific
+        // profile overrides on the link element itself and must not be silently ignored.
+        return container.Elements()
+            .Where(e => e.Name == Ns + "selectionEntry" || e.Name == Ns + "entryLink")
             .Select(e => ParseEntry(e, sharedProfiles, sharedEntries, catalogueId, depth))
             .ToList();
     }
@@ -309,7 +320,8 @@ public class CatalogueParser
             .Where(p =>
             {
                 var tn = (string?)p.Attribute("typeName") ?? "";
-                return tn == "Ranged Weapons" || tn == "Melee Weapons";
+                return string.Equals(tn, "Ranged Weapons", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(tn, "Melee Weapons", StringComparison.OrdinalIgnoreCase);
             })
             .Select(p =>
             {
