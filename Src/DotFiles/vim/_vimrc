@@ -15,6 +15,7 @@ set hlsearch
 set lines=100 columns=200
 
 filetype plugin on
+syntax on
 
 set tabstop=4
 set shiftwidth=4
@@ -27,9 +28,18 @@ set nocindent
 set relativenumber
 set hlsearch
 
+"Enable syntax folding for XML files, but start with foldsopen
+let g:xml_syntax_folding = 1
+autocmd FileType xml setlocal foldmethod=syntax
+autocmd FileType xml :%foldopen!
+
 autocmd FileType ps1 setlocal indentexpr= indentkeys=
+
 "Highlight end-of-line whitespace
 autocmd BufRead,BufNewFile * match Error /\s\+$/
 
 "Map // to search for selected text. From https://vim.fandom.com/wiki/Search_for_visually_selected_text#Simple
 vnoremap // y/\V<C-R>=escape(@",'/\')<CR><CR>
+
+"Add support for % to jump between xml/html tags
+packadd! matchit
