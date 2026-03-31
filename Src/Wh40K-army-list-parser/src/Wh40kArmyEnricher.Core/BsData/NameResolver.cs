@@ -169,7 +169,7 @@ public class NameResolver
 
         if (best.entry != null)
         {
-            _logger.LogWarning(
+            _logger.LogInformation(
                 "[{Context}] Fuzzy matched '{Input}' -> '{Match}' (score: {Score})",
                 context, displayName, best.entry.Name, best.score);
             return best.entry;
