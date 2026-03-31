@@ -34,6 +34,7 @@ Wh40kArmyEnricher/
 │   │   ├── Parser/
 │   │   │   └── ArmyListParser.cs           # Parses raw .txt export from the Warhammer app
 │   │   ├── BsData/
+│   │   │   ├── ICatalogueFetcher.cs        # Abstraction for HTTP fetch + disk cache (mockable)
 │   │   │   ├── CatalogueFetcher.cs         # Downloads/caches .cat files from BSData GitHub
 │   │   │   ├── CatalogueParser.cs          # Parses .cat XML into in-memory model
 │   │   │   ├── CatalogueStore.cs           # Holds all loaded catalogues
@@ -186,10 +187,10 @@ BSData 10e uses a more complex nesting than earlier editions. The important cont
 
 Within each `selectionEntry`, child entries live in:
 - `<selectionEntries>` — direct child model/upgrade entries
-- `<selectionEntryGroups>` — wargear option groups (e.g. weapon choices, equipment like Shield Dome); **must be traversed** to reach nested weapon/upgrade entries
-- `<entryLinks>` — references to `<sharedSelectionEntries>` by `targetId`
+- `<selectionEntryGroups>` — wargear option groups (e.g. weapon choices, equipment like Shield Dome); **must be traversed recursively** — groups can themselves contain nested `<selectionEntryGroups>` (double nesting observed in practice, e.g. Repulsor Executioner → Wargear → Turret Weapon → Heavy Laser Destroyer)
+- `<entryLinks>` — references to `<sharedSelectionEntries>` by `targetId`; also appear at root catalogue level as faction-specific entry overrides
 
-Parse to a depth of at least 6 to cover the deepest nesting observed in practice.
+Parse `<selectionEntryGroups>` recursively (not just one level deep) to reach all nested entries. Stop at depth 6 to prevent pathological recursion.
 
 ```xml
 <!-- Squad unit — statline is on child model entries, NOT the squad entry itself -->
@@ -268,10 +269,11 @@ Parse to a depth of at least 6 to cover the deepest nesting observed in practice
 Army list display names are generally identical to BSData `name` attributes but edge cases exist (pluralisation, punctuation differences, case differences, etc.). All string comparisons use `StringComparison.OrdinalIgnoreCase`.
 
 Resolution order:
-1. **Exact match** — `string.Equals(a, b, StringComparison.OrdinalIgnoreCase)` after trimming whitespace
-2. **Count-stripped match** — strip leading `\d+x\s+` prefix with a regex, then exact match
-3. **Fuzzy match** — use `FuzzySharp.Fuzz.TokenSortRatio(a, b)` with a threshold of 85. Log every fuzzy match at `Warning` level: input name, matched BSData name, score
-4. **Manual override** — load `name_overrides.json` from the working directory at startup; maps `"display name" -> "BSData selectionEntry name"` and takes precedence over all automatic matching
+1. **Manual override** — load `name_overrides.json` from the working directory at startup; maps `"display name" -> "BSData selectionEntry name"` and takes precedence over all automatic matching
+2. **Exact match** — `string.Equals(a, b, StringComparison.OrdinalIgnoreCase)` after trimming whitespace
+3. **Count-stripped match** — strip leading `\d+x\s+` prefix with a regex, then exact match
+4. **Fuzzy match** — use `FuzzySharp.Fuzz.TokenSortRatio(a, b)` with a threshold of 85. Log every fuzzy match at `Warning` level: input name, matched BSData name, score
+5. **Prefix match** (model resolution only) — BSData names loadout variants with a suffix, e.g. `"Initiate w/Bolt Rifle"`, `"Initiate w/Chainsword & Heavy Bolt Pistol"`. The army list uses only the base name `"Initiate"`. Match any candidate whose name starts with the display name followed by a non-alphanumeric character. Logged at `Debug` level. This is applied to both local (within-unit) and global model candidates, after the four steps above.
 
 **Unit name matching scope:**
 - Search across ALL loaded catalogues (no need to specify a faction catalogue — everything is pre-loaded)
@@ -495,3 +497,4 @@ army-enricher matchup attacker.txt defender.txt \
 - Register `HttpClient` via `IHttpClientFactory` in DI; set a `User-Agent` header identifying this tool — the GitHub API rejects requests without one
 - Keep the record types in `Wh40kArmyEnricher.Contracts` in sync with the Monte Carlo simulation project's deserialisation expectations. Both projects use `YamlDotNet` with `CamelCaseNamingConvention`. If both projects live in separate solutions, publish `Contracts` as a local NuGet package or use a git submodule
 - Static classes cannot be used as type parameters for `ILogger<T>` — use `ILoggerFactory.CreateLogger("Name")` for loggers inside static command classes
+- All `typeName` comparisons (e.g. `"Ranged Weapons"`, `"Melee Weapons"`, `"Unit"`) **must use `StringComparison.OrdinalIgnoreCase`** — case variation has been observed in the wild and silently drops profiles if compared with `==`
