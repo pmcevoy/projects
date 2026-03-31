@@ -7,6 +7,7 @@ call plug#begin()
 "https://github.com/junegunn/vim-plug?tab=readme-ov-file#usage
 Plug 'morhetz/gruvbox'
 Plug 'pprovost/vim-ps1'
+Plug 'pedrohdz/vim-yaml-folds'
 call plug#end()
 
 colorscheme gruvbox
@@ -34,6 +35,10 @@ autocmd FileType xml setlocal foldmethod=syntax
 autocmd FileType xml :%foldopen!
 
 autocmd FileType ps1 setlocal indentexpr= indentkeys=
+
+"YAML setup: https://www.arthurkoziel.com/setting-up-vim-for-yaml/
+"YAML files need space indents
+autocmd FileType yaml setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab foldlevel=1
 
 "Highlight end-of-line whitespace
 autocmd BufRead,BufNewFile * match Error /\s\+$/
