@@ -191,10 +191,14 @@ public class Enricher
                 // Suppress warning for ability-only entries (e.g. Shield Dome) — these appear
                 // as ◦ bullets in the army list alongside weapons but have no weapon profiles.
                 // Their invuln/FNP grants are handled by ApplySelectedAbilityUpgrades.
+                // Suppress warning if the name matches either an entry name or an ability
+                // profile name within an entry that has no weapons. The latter handles cases
+                // like "Icon of Despair (Aura)" where the BSData entry is named "Icon of Despair"
+                // but the ability profile inside it is named "Icon of Despair (Aura)".
                 var isAbilityOnly = _store.GetAllEntries().Any(e =>
-                    string.Equals(e.Name, weapon.Name, StringComparison.OrdinalIgnoreCase)
-                    && e.Weapons.Count == 0
-                    && e.Abilities.Count > 0);
+                    e.Weapons.Count == 0
+                    && (string.Equals(e.Name, weapon.Name, StringComparison.OrdinalIgnoreCase)
+                        || e.Abilities.Any(a => string.Equals(a.Name, weapon.Name, StringComparison.OrdinalIgnoreCase))));
                 if (!isAbilityOnly)
                     _logger.LogWarning("Could not resolve weapon '{Name}' for unit/model context", weapon.Name);
                 continue;
