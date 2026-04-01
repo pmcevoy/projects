@@ -229,6 +229,37 @@ public class ArmyListParserTests
     }
 
     // ---------------------------------------------------------------------------
+    // Total model counts (sum of ModelEntry.Count across all model types in a unit)
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void Parse_AssaultIntercessorSquad_TotalModelCount()
+    {
+        var army = _parser.Parse(FixtureText);
+        var squad = army.Units.First(u => u.Name == "Assault Intercessor Squad");
+
+        squad.Models.Sum(m => m.Count).Should().Be(5); // 1 Sgt + 4 Assault Intercessors
+    }
+
+    [Fact]
+    public void Parse_CrusaderSquad_TotalModelCount()
+    {
+        var army = _parser.Parse(FixtureText);
+        var squad = army.Units.Single(u => u.Name == "Crusader Squad");
+
+        squad.Models.Sum(m => m.Count).Should().Be(20); // 1 Sword Brother + 11 Initiates + 8 Neophytes
+    }
+
+    [Fact]
+    public void Parse_ChaplainGrimaldus_TotalModelCount()
+    {
+        var army = _parser.Parse(FixtureText);
+        var unit = army.Units.Single(u => u.Name == "Chaplain Grimaldus");
+
+        unit.Models.Sum(m => m.Count).Should().Be(4); // 1 Grimaldus + 3 Cenobyte Servitors
+    }
+
+    // ---------------------------------------------------------------------------
     // Points
     // ---------------------------------------------------------------------------
 

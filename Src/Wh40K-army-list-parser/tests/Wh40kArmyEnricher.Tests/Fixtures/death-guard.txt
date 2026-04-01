@@ -1,0 +1,109 @@
+battle 3 (2010 points)
+
+Death Guard
+Strike Force (2000 points)
+Virulent Vectorium
+
+
+CHARACTERS
+
+Biologus Putrifier (60 points)
+  • 1x Hyper blight grenades
+    1x Injector pistol
+    1x Plague knives
+
+Lord of Contagion (145 points)
+  • 1x Manreaper
+  • Enhancement: Furnace of Plagues
+
+Lord of Contagion (130 points)
+  • 1x Manreaper
+  • Enhancement: Daemon Weapon of Nurgle
+
+Mortarion (380 points)
+  • Warlord
+  • 1x Lantern
+    1x Rotwind
+    1x Silence
+
+
+BATTLELINE
+
+Plague Marines (95 points)
+  • 1x Plague Champion
+    • 1x Plasma gun
+      1x Power fist
+  • 4x Plague Marine
+    • 1x Blight launcher
+      1x Heavy plague weapon
+      1x Meltagun
+      4x Plague knives
+      1x Plague spewer
+
+Plague Marines (95 points)
+  • 1x Plague Champion
+    • 1x Plasma gun
+      1x Power fist
+  • 4x Plague Marine
+    • 1x Blight launcher
+      1x Heavy plague weapon
+      1x Meltagun
+      4x Plague knives
+      1x Plague spewer
+
+
+DEDICATED TRANSPORTS
+
+Chaos Rhino (85 points)
+  • 1x Armoured tracks
+    1x Combi-bolter
+    1x Havoc launcher
+
+
+OTHER DATASHEETS
+
+Deathshroud Terminators (160 points)
+  • 1x Deathshroud Champion
+    • 1x Icon of Despair (Aura)
+      1x Manreaper
+      2x Plaguespurt gauntlet
+  • 2x Deathshroud Terminator
+    • 2x Manreaper
+      2x Plaguespurt gauntlet
+
+Deathshroud Terminators (160 points)
+  • 1x Deathshroud Champion
+    • 1x Icon of Despair (Aura)
+      1x Manreaper
+      2x Plaguespurt gauntlet
+  • 2x Deathshroud Terminator
+    • 2x Manreaper
+      2x Plaguespurt gauntlet
+
+Foetid Bloat-Drone with Heavy Blight Launcher (120 points)
+  • 1x Heavy blight launcher
+    1x Plague probe
+
+Foetid Bloat-Drone with Heavy Blight Launcher (120 points)
+  • 1x Heavy blight launcher
+    1x Plague probe
+
+Foetid Bloat-Drone with Heavy Blight Launcher (120 points)
+  • 1x Heavy blight launcher
+    1x Plague probe
+
+Plagueburst Crawler (210 points)
+  • 1x Armoured tracks
+    2x Entropy cannon
+    1x Heavy slugger
+    1x Plagueburst mortar
+
+Poxwalkers (65 points)
+  • 10x Poxwalker
+    • 10x Improvised weapon
+
+Poxwalkers (65 points)
+  • 10x Poxwalker
+    • 10x Improvised weapon
+
+Exported with App Version: v1.49.0 (114), Data Version: v757
