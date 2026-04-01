@@ -2,7 +2,7 @@
 
 ## Overview
 
-A .NET 8 CLI tool that parses Warhammer 40,000 (10th Edition) army list text exports, resolves each unit and weapon against the [BSData/wh40k-10e](https://github.com/BSData/wh40k-10e) catalogue files, and enriches the list with full statlines and weapon profiles. Output is YAML compatible with a separate Monte Carlo simulation project.
+A .NET 8 CLI tool that parses Warhammer 40K army list exports, resolves units/weapons against BSData catalogues, and produces enriched YAML profiles for Monte Carlo simulation. See CLAUDE.md for the full specification.
 
 ---
 
@@ -17,6 +17,8 @@ Wh40kArmyEnricher.sln
 └── tests/
     └── Wh40kArmyEnricher.Tests/           # Unit, resolver, and integration tests
 ```
+
+Full annotated file tree with per-file comments in CLAUDE.md § Repository Layout.
 
 ---
 
@@ -41,13 +43,7 @@ Key types:
 | `Pairing` | One attacker/defender pairing with a `simulationId` |
 | `PairingFile` | Full `matchup` output: both army names, UTC timestamp, simulation defaults, list of pairings |
 
-**Key design decisions in the schema:**
-- `ap` is a negative integer (e.g. `-2`) matching the actual game value.
-- `save`, `skill`, `invulnerableSave`, `feelNoPain` are raw integers without the `+` suffix.
-- `weapons` is always a list, even for single-weapon models.
-- Rerolls live at the unit level, not per weapon.
-- `range: 0` means melee; `range: N` means N inches.
-- `rapidFire: 0` and `melta: 0` are sentinels meaning "not present".
+Schema design decisions (AP sign convention, sentinel values, reroll placement, etc.) are documented in CLAUDE.md § Output Profiles Schema.
 
 ---
 
@@ -57,26 +53,19 @@ The core library. Contains all parsing, resolution, and enrichment logic.
 
 #### `Parser/ArmyListParser.cs`
 
-Parses the plain-text export from the Warhammer app into an `ArmyList` record.
+Parses the plain-text export from the Warhammer app into an `ArmyList` record. Handles both the iOS and Android export formats. For full format specifications see CLAUDE.md § Data Sources.
 
-Input format key points:
-- Line 0: `Army Name (N Points)` — case-insensitive on "Points"
-- Metadata block: game system, faction, detachment (1–4 lines; sub-factions have more)
-- Force-size lines (`N Points`) appear in the metadata and are consumed, not treated as unit headers
-- Sections: `CHARACTERS`, `BATTLELINE`, `DEDICATED TRANSPORTS`, `OTHER DATASHEETS`, etc.
-- Unit: `Name (N Points)`
-- `•` (U+2022) bullets: model entries or weapons
-- `◦` (U+25E6) bullets: weapons or ability upgrades (e.g. Shield Dome)
-- `4x` count prefixes on models and weapons
-- U+2019 RIGHT SINGLE QUOTATION MARK in names like "Emperor's Champion"
+**Parsing implementation:**
 
-Parsing state machine:
-1. Extract army header
-2. Consume metadata block (detect and skip force-size lines)
-3. For each section → for each unit → collect bullet lines
-4. Detect bullet mode:
-   - **Model mode**: `•` introduces a model, `◦` are that model's weapons
-   - **Weapon mode**: both `•` and `◦` are weapons of an implicit single model
+`ClassifyBulletLine()` normalises both formats into `(int Level, bool IsBullet, string Content)`:
+- Level 0 = model (or single-model unit item); Level 1 = weapon or continuation
+- `IsBullet` = `true` only when a `•` character is present; bare Android continuation lines have `IsBullet = false`
+
+Model mode detection:
+- A unit is in **model mode** (distinct sub-models) when ≥ 1 Level-1 item has `IsBullet = true`
+- Single-model units with only continuation weapon lines are in **weapon mode** — the unit name is also the model name
+
+Android detachment scan: after the force-size metadata break, if `detachment` is still empty, scan forward for the next non-empty, non-points-header line.
 
 Output domain model:
 ```
@@ -98,38 +87,22 @@ Abstraction and implementation for downloading and caching BSData files.
 
 #### `BsData/CatalogueParser.cs`
 
-Parses BSData `.cat` (plain XML) and `.catz` (raw deflate-compressed XML) files.
+Parses BSData `.cat` (plain XML) and `.catz` (raw deflate-compressed XML) files into `CatalogueEntry` objects. XML namespace: `http://www.battlescribe.net/schema/catalogueSchema`.
 
-XML namespace: `http://www.battlescribe.net/schema/catalogueSchema`
-
-Entry collection strategy — parses all of the following at every depth level:
-- `<selectionEntries>` and `<sharedSelectionEntries>` — unit, model, upgrade entries
-- `<sharedSelectionEntryGroups>` — wargear option groups (weapon choices, ability upgrades)
-- `<entryLinks>` — faction-specific overrides pointing to entries in parent catalogues
-- `<selectionEntryGroups>` nested recursively within entries (stops at depth 6)
-
-Profile extraction per entry:
-- `typeName="Unit"` → statline: M, T, Sv, W, Ld, OC
-- `typeName="Ranged Weapons"` → Range, A, BS, S, AP, D, Keywords
-- `typeName="Melee Weapons"` → Range (always "Melee"), A, WS, S, AP, D, Keywords
-- `typeName="Abilities"` → Name + Description text
-- `<categoryLink>` → unit keywords (INFANTRY, CORE, etc.)
-- Ability text is scanned for `\d\+\+(?!\+)` (invuln) and `\d\+\+\+` (FNP) and applied to the statline
-
-`.catz` decompression:
-```csharp
-using var deflate = new DeflateStream(rawStream, CompressionMode.Decompress);
-var doc = await XDocument.LoadAsync(deflate, ...);
-```
+Entry collection and profile extraction follow the BSData XML structure specified in CLAUDE.md § BattleScribe Data Files. Key implementation notes:
+- All `typeName` comparisons use `StringComparison.OrdinalIgnoreCase` (case variation observed in the wild)
+- `<selectionEntryGroups>` are traversed recursively to depth 6
+- Ability text is scanned with `\d\+\+(?!\+)` (invuln) and `\d\+\+\+` (FNP) and applied to the statline
+- `.catz` files are decompressed with `DeflateStream` (raw deflate, not ZLibStream/GZipStream)
 
 #### `BsData/CatalogueStore.cs`
 
 Eagerly loads all BSData catalogues into memory on startup.
 
-Initialization sequence:
+Initialization sequence (download-everything strategy — rationale in CLAUDE.md § BattleScribe Data Files):
 1. Load game system root (`Warhammer 40,000.gst`)
 2. Fetch file listing from GitHub Contents API → cache to `catalogue-list.json`
-3. Download and parse all ~46 `.cat` files (~35 MB total)
+3. Download and parse all `.cat` files
 4. Hold all entries in memory for the duration of the run
 
 Public API:
@@ -143,24 +116,9 @@ Individual catalogue failures are logged as warnings; loading continues.
 
 Matches army list display names to BSData catalogue entries using multi-pass resolution.
 
-Resolution pipeline (applied in order):
+Implements a 5-step resolution pipeline: override → exact → count-stripped → fuzzy → prefix. Full algorithm and thresholds in CLAUDE.md § Name Matching Strategy.
 
-| Step | Strategy |
-|------|----------|
-| 1 | **Manual override** — `name_overrides.json` in working directory |
-| 2 | **Exact match** — case-insensitive `OrdinalIgnoreCase` |
-| 3 | **Count-stripped match** — strip `\d+x\s+` prefix, then exact match |
-| 4 | **Fuzzy match** — FuzzySharp `TokenSortRatio ≥ 85`; logged at Warning level |
-| 5 | **Prefix match** — for model variants (e.g. "Initiate" matches "Initiate w/Bolt Rifle") |
-
-Resolution scopes:
-- **Unit**: all `type="unit"` entries + all `type="model"` entries with a statline, across all catalogues
-- **Model**: child entries of the matched unit first (with prefix fallback); then global `type="model"` entries
-- **Weapon**: profile-name search within unit/model scope first, then globally; fallback to entry-name search (for multi-profile weapons like "Hellforged weapons" whose profiles are named "- strike" / "- sweep")
-
-Non-weapon entries (ability upgrades like Shield Dome) resolve to entries with no weapon profiles and are silently ignored.
-
-"Could not resolve" warnings are only emitted after all fallbacks are exhausted.
+Searches are scoped to unit → model → weapon with global fallback; ability-only entries are silently filtered. "Could not resolve" warnings are only emitted after all fallbacks are exhausted.
 
 #### `Enricher.cs`
 
@@ -190,6 +148,10 @@ Utility for consistent `YamlDotNet` serializer configuration:
 - `CamelCaseNamingConvention` (C# `InvulnerableSave` → YAML `invulnerableSave`)
 - `ScalarValueConverter` for integer/string union (`ScalarValue`)
 - Null omission on serialisation
+- `.DisableAliases()` — suppresses YAML anchor/alias symbols
+- `LiteralBlockScalarEmitter` — custom `ChainedEventEmitter` that forces `|` (literal) block scalar style for multi-line strings
+
+See CLAUDE.md § NuGet Dependencies for the YamlDotNet v16 API gotchas and rationale behind these choices.
 
 ---
 
@@ -207,18 +169,15 @@ Services registered as singletons:
 
 #### `Commands/EnrichCommand.cs`
 
-`enrich <army-list.txt> [--output <path>] [--refresh-cache] [--dry-run]`
-
 Enriches a single army and writes a flat YAML list of `UnitProfile` objects — one per unit.
 
 #### `Commands/MatchupCommand.cs`
 
-`matchup <attacker.txt> <defender.txt> [--output <path>] [--refresh-cache] [--attacker-unit <name>] [--defender-unit <name>]`
-
 Enriches two armies, applies optional unit name filters, and writes a `PairingFile` containing all attacker/defender combinations (Cartesian product of filtered units).
 
-`simulationId` generation: `{factionAbbrev}_{unitSlug}_vs_{factionAbbrev}_{unitSlug}`
-e.g. `bt_crusader_squad_vs_dg_plague_marines`
+`simulationId` format: `{factionAbbrev}_{unitSlug}_vs_{factionAbbrev}_{unitSlug}` (e.g. `bt_crusader_squad_vs_dg_plague_marines`)
+
+Full CLI signatures in CLAUDE.md § CLI Interface.
 
 ---
 
@@ -229,7 +188,7 @@ e.g. `bt_crusader_squad_vs_dg_plague_marines`
 ```
 Text file
   → ArmyListParser.Parse()          — produces ArmyList
-  → CatalogueStore.InitialiseAsync() — downloads/caches ~46 .cat files
+  → CatalogueStore.InitialiseAsync() — downloads/caches all .cat files
   → Enricher.Enrich(armyList)       — resolves units/models/weapons, builds UnitProfiles
   → YamlSerialiser.Serialise()      — serialises List<UnitProfile>
   → Output file
@@ -298,8 +257,9 @@ Input: "Initiate"
 | Setting | Mechanism | Default |
 |---------|-----------|---------|
 | Cache directory | `CatalogueFetcher` constructor parameter | `~/.wh40k-enricher/cache/` |
-| Name overrides | `name_overrides.json` in working directory | _(none)_ |
+| Name overrides | `name_overrides.json` in **CLI working directory** | _(none — file is optional)_ |
 | Fuzzy match threshold | Constant in `NameResolver` | `85` |
+| Fuzzy match log level | Score-conditional in `NameResolver` | Info if ≥ 90, Warning if < 90 |
 | Force cache refresh | `--refresh-cache` CLI flag | `false` |
 | Logging level | DI setup in `Program.cs` | `Information` |
 
@@ -307,12 +267,9 @@ Input: "Initiate"
 
 ## Testing
 
-| Category | Location | Approach |
-|----------|----------|---------|
-| Parser unit tests | `tests/.../Parser/` | Assert section categorisation, model counts, weapon names, enhancements against sample `.txt` fixture |
-| Catalogue parser tests | `tests/.../BsData/CatalogueParserTests.cs` | XML snippet fixtures; no live HTTP calls; `ICatalogueFetcher` mocked with Moq |
-| Resolver unit tests | `tests/.../BsData/NameResolverTests.cs` | Exact, count-stripped, fuzzy, prefix, override, not-found |
-| Integration tests | `tests/.../Integration/EnrichPipelineTests.cs` | Full enrichment pipeline against sample Black Templars export with live (or recorded) BSData fetch |
+Tests are organised into Parser (`ArmyListParserTests.cs` for iOS, `ArmyListParserAndroidTests.cs` for Android), BsData (`CatalogueParserTests.cs`, `NameResolverTests.cs`), and Integration (`EnrichPipelineTests.cs`). No live HTTP calls in unit tests — `ICatalogueFetcher` is mocked with Moq; XML fixture snippets are used for catalogue parser tests.
+
+See CLAUDE.md § Testing for coverage requirements and specific assertions.
 
 ---
 

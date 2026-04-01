@@ -53,9 +53,10 @@ Wh40kArmyEnricher/
         ├── Wh40kArmyEnricher.Tests.csproj
         ├── Fixtures/
         │   ├── black-templars-sample.txt
-        │   └── death-guard-sample.txt          # Obtain from your buddy
+        │   └── death-guard.txt                 # Android app export format (Death Guard)
         ├── Parser/
-        │   └── ArmyListParserTests.cs
+        │   ├── ArmyListParserTests.cs           # iOS format (Black Templars)
+        │   └── ArmyListParserAndroidTests.cs    # Android format (Death Guard)
         ├── BsData/
         │   ├── CatalogueParserTests.cs          # Uses saved .cat XML snippets, no live calls
         │   └── NameResolverTests.cs
@@ -83,6 +84,8 @@ Wh40kArmyEnricher/
 - `YamlDotNet` 16.x — YAML serialisation of output profiles (use the serialiser/deserialiser API with a `NamingConvention` of `CamelCaseNamingConvention` to match the schema below)
   - **Important:** v16 `IYamlTypeConverter` uses `ReadYaml(IParser, Type, ObjectDeserializer)` / `WriteYaml(IEmitter, object?, Type, ObjectSerializer)` — the signatures differ from v15 and earlier
   - For custom scalar converters emitting double-quoted strings, `isQuotedImplicit` must be `true` and `tag` must be empty; setting both implicit flags to `false` with an empty tag throws at runtime
+  - Call `.DisableAliases()` on `SerializerBuilder` — without this, YamlDotNet emits YAML anchor/alias symbols (`&o1`, `*o3`) when it detects shared object references (e.g. default `RerollOptions` instances)
+  - Multi-line ability text uses `|` (literal block scalar) style, not `>` (folded). Folded style doubles newlines in the file. Implement a `LiteralBlockScalarEmitter : ChainedEventEmitter` that sets `ScalarStyle.Literal` for any string value containing `\n`, and register it with `.WithEventEmitter(next => new LiteralBlockScalarEmitter(next))`
 - `FuzzySharp` — fuzzy name matching (token-sort ratio) for resolving display names to BSData entries
 - No third-party XML library needed — use `System.Xml.Linq` (LINQ to XML / `XDocument`) which handles the namespace-qualified BSData schema cleanly
 
@@ -102,7 +105,22 @@ The GitHub Contents API listing (`GET https://api.github.com/repos/BSData/wh40k-
 
 ### 1. Army List Text Export (Input)
 
-The Warhammer app exports a structured plain-text format. Key properties:
+The Warhammer app exports a structured plain-text format. Two distinct format variants exist depending on the platform:
+
+#### iOS format (reference: `black-templars-sample.txt`)
+- `•` (U+2022) at column 0 = model entry in a squad
+- `◦` (U+25E6) at column 0 = weapon or ability upgrade belonging to the current model
+- Enhancement line: `◦ Enhancements: <name>`
+- Metadata order: game system / faction / detachment / force-size
+
+#### Android format (reference: `death-guard.txt`)
+- `  •` (2 spaces + bullet) = model in a squad, **or** first weapon of a single-model unit
+- `    •` (4 spaces + bullet) = first weapon belonging to a squad model
+- `    <text>` (4+ spaces, no bullet) = continuation weapons (additional weapons for the same model)
+- Enhancement line: `  • Enhancement: <name>` (singular, on a bullet line)
+- Metadata order: faction / force-size / detachment (detachment appears **after** the force-size line)
+
+#### Common properties (both formats)
 - Army name and total points on the first line: `Iron Canticle (1970 Points)`
 - Faction metadata block before the first section heading. The number of metadata lines varies by faction:
   - Sub-factions (e.g. Black Templars): 3 lines — game system / faction / detachment type, preceded by a force-size line (`Incursion (1000 Points)`)
@@ -111,11 +129,16 @@ The Warhammer app exports a structured plain-text format. Key properties:
 - Points values in the header use `Points` (capital P) for some factions and `points` (lower case) for others — the regex must use `RegexOptions.IgnoreCase`
 - Sections delimited by ALL-CAPS category headings: `CHARACTERS`, `BATTLELINE`, `DEDICATED TRANSPORTS`, `OTHER DATASHEETS`
 - Each unit begins with its name and points cost: `Assault Intercessor Squad (75 Points)`
-- Models are indented with `•` (U+2022); weapons/wargear with `◦` (U+25E6)
-  - **`◦` items are not always weapons** — ability upgrades such as "Shield Dome" also appear as `◦` bullets. These will fail weapon resolution; handle them as ability/wargear entries rather than warning loudly
-- Enhancements listed as `◦ Enhancements: <name>` under the unit they apply to
+- **Items listed alongside weapons are not always weapons** — ability upgrades such as "Shield Dome" also appear as bullets. These will fail weapon resolution; handle them as ability/wargear entries rather than warning loudly
 - Count prefixes like `4x` precede model and weapon names
 - Unit names may use U+2019 RIGHT SINGLE QUOTATION MARK (`'`) rather than ASCII apostrophe (`'`) — e.g. "Emperor's Champion"
+
+#### Parser implementation notes
+- `ClassifyBulletLine()` normalises both formats into a `(int Level, bool IsBullet, string Content)` tuple
+  - Level 0 = model (or single-model unit item); Level 1 = weapon or continuation
+  - `IsBullet` is `true` only when a `•` character is present on that line (not for bare continuation lines)
+- **Model mode detection:** a unit is in model mode (has distinct sub-models) only when at least one Level-1 item has `IsBullet == true`. Bare continuation lines (Level 1, no bullet) do not trigger model mode.
+- **Android detachment scan:** after the force-size line break, if `detachment` is still empty, scan forward for the next non-empty, non-points-header line and treat it as the detachment.
 
 Parsed domain model — use C# `record` types:
 
@@ -146,7 +169,7 @@ record ModelEntry(
 record WeaponEntry(string Name, int Count);
 ```
 
-See `tests/Fixtures/black-templars-sample.txt` for the reference export.
+See `tests/Fixtures/black-templars-sample.txt` for the iOS reference export and `tests/Fixtures/death-guard.txt` for the Android reference export.
 
 ### 2. BattleScribe Data Files (`.cat` XML)
 
@@ -272,7 +295,7 @@ Resolution order:
 1. **Manual override** — load `name_overrides.json` from the working directory at startup; maps `"display name" -> "BSData selectionEntry name"` and takes precedence over all automatic matching
 2. **Exact match** — `string.Equals(a, b, StringComparison.OrdinalIgnoreCase)` after trimming whitespace
 3. **Count-stripped match** — strip leading `\d+x\s+` prefix with a regex, then exact match
-4. **Fuzzy match** — use `FuzzySharp.Fuzz.TokenSortRatio(a, b)` with a threshold of 85. Log every fuzzy match at `Warning` level: input name, matched BSData name, score
+4. **Fuzzy match** — use `FuzzySharp.Fuzz.TokenSortRatio(a, b)` with a threshold of 85. Log fuzzy matches at `Information` level if score ≥ 90, `Warning` level if score < 90: include input name, matched BSData name, and score
 5. **Prefix match** (model resolution only) — BSData names loadout variants with a suffix, e.g. `"Initiate w/Bolt Rifle"`, `"Initiate w/Chainsword & Heavy Bolt Pistol"`. The army list uses only the base name `"Initiate"`. Match any candidate whose name starts with the display name followed by a non-alphanumeric character. Logged at `Debug` level. This is applied to both local (within-unit) and global model candidates, after the four steps above.
 
 **Unit name matching scope:**
@@ -287,7 +310,7 @@ Resolution order:
 **Weapon name matching scope:**
 - Search weapon profile names within model/unit scope first, then globally
 - **Fallback: search by entry name.** Some weapons have profiles named differently from the entry (e.g., "Hellforged weapons" entry has profiles named "➤ Hellforged weapons - strike" / "- sweep"). If profile-name search fails, find an entry whose name matches and return all its weapon profiles as variants
-- Non-weapon entries (ability upgrades like "Shield Dome") will appear in the army list alongside weapons. If an army list item resolves to an entry with no weapon profiles, treat it silently as a non-weapon entry rather than warning
+- Non-weapon entries (ability upgrades like "Shield Dome") will appear in the army list alongside weapons. If an army list item resolves to an entry with no weapon profiles, treat it silently as a non-weapon entry rather than warning. The ability-only check must match **either** the catalogue entry name **or** any ability profile name within that entry (e.g. entry `"Icon of Despair"` contains a profile named `"Icon of Despair (Aura)"` — the army list may reference either name)
 
 ---
 
@@ -466,11 +489,11 @@ army-enricher matchup attacker.txt defender.txt \
 ## Key Behaviours & Rules
 
 - **Never hard-code statlines.** All stat values must originate from BSData XML. If a unit cannot be resolved after fuzzy matching, emit a structured warning to stderr and skip that unit — do not guess or substitute default values.
-- **Warn on fuzzy matches.** Log input name, matched BSData name, and similarity score at `Warning` level. Consider writing a `resolution_report.json` alongside the main output that lists every match decision for review.
+- **Warn on fuzzy matches.** Log input name, matched BSData name, and similarity score. Use `Warning` level for scores 85–89 (needs human review); use `Information` level for scores ≥ 90 (near-exact, likely correct). Consider writing a `resolution_report.json` alongside the main output that lists every match decision for review.
 - **Invulnerable saves and FNP.** Parse with regex `\d\+\+(?!\+)` for invuln and `\d\+\+\+` for FNP. Check both the unit/model entry's own ability text AND any selected ability upgrades listed in the army export (e.g. Shield Dome). Set to `null` when absent.
 - **Multi-wound models.** Capture `W` per model type (`selectionEntry[@type='model']`), not per unit — essential for simulation accuracy when a unit contains models with different wound counts.
 - **Weapons with multiple profiles.** Some weapons have multiple `<profile>` children (e.g. plasma supercharge, Hellforged weapons strike/sweep). Capture all variants in the `profiles` array with a `variant` label derived from the profile `name` attribute. Strip BSData's `➤ ` prefix and the weapon entry name from profile names to get a clean variant label.
-- **Non-weapon `◦` entries.** The army export uses `◦` bullets for both weapons and ability upgrades (e.g. Shield Dome). When an entry cannot be resolved as a weapon, check whether it resolves to an ability-only catalogue entry. If so, apply any invuln/FNP it grants to the model statline and skip it silently — do not emit a warning.
+- **Non-weapon entries.** The army export uses bullet characters for both weapons and ability upgrades (e.g. Shield Dome). When an entry cannot be resolved as a weapon, check whether it resolves to a catalogue entry with no weapon profiles. If so, apply any invuln/FNP it grants to the model statline and skip it silently — do not emit a warning. The check must match either the entry name or any ability profile name within that entry (e.g. `"Icon of Despair"` entry contains profile `"Icon of Despair (Aura)"`).
 - **Keywords.** Parse the `Keywords` characteristic as a comma-separated list, trimming whitespace and normalising `-` (no keywords) to an empty list. Keywords such as `Blast`, `Torrent`, `Pistol`, `Indirect Fire`, `Lethal Hits`, `Sustained Hits X`, `Devastating Wounds` directly affect simulation logic.
 - **Unit abilities.** Capture all `profile[@typeName='Abilities']` entries by name and text even if the simulation does not yet consume them — they will be needed for future rule modelling.
 - **`simulation_id` generation** (`matchup` output only). Prefixed with faction abbreviation (e.g. `bt_` for Black Templars, `dg_` for Death Guard), attacker and defender name slugs joined with `_vs_` (e.g. `bt_crusader_squad_vs_dg_plague_marines`). The `enrich` command does not use simulation IDs — it outputs a plain list of unit profiles.
@@ -479,7 +502,9 @@ army-enricher matchup attacker.txt defender.txt \
 
 ## Testing
 
-- **Parser unit tests:** exercise `ArmyListParser` against `black-templars-sample.txt`; assert section categorisation, model counts, weapon names, enhancements
+- **Parser unit tests:** exercise `ArmyListParser` against both fixture files:
+  - `ArmyListParserTests.cs` — iOS format (Black Templars); assert section categorisation, model counts, weapon names, enhancements, total model counts per unit
+  - `ArmyListParserAndroidTests.cs` — Android format (Death Guard); same assertions plus Android-specific metadata order and enhancement format
 - **Catalogue parser unit tests:** use saved XML fixture snippets checked into `tests/Fixtures/`; do not make live network calls in unit tests; mock `ICatalogueFetcher` with Moq
 - **Resolver unit tests:** test exact match, count-stripped match, fuzzy match at threshold boundary, override file resolution, and not-found behaviour
 - **Integration test:** run the full enrichment pipeline against the sample Black Templars export with a live (or WireMock-recorded) BSData fetch; assert `Assault Intercessor` has `T=4`, `Sv=3+`, `W=2`; assert `Astartes chainsword` has `AP=-1`
@@ -498,3 +523,5 @@ army-enricher matchup attacker.txt defender.txt \
 - Keep the record types in `Wh40kArmyEnricher.Contracts` in sync with the Monte Carlo simulation project's deserialisation expectations. Both projects use `YamlDotNet` with `CamelCaseNamingConvention`. If both projects live in separate solutions, publish `Contracts` as a local NuGet package or use a git submodule
 - Static classes cannot be used as type parameters for `ILogger<T>` — use `ILoggerFactory.CreateLogger("Name")` for loggers inside static command classes
 - All `typeName` comparisons (e.g. `"Ranged Weapons"`, `"Melee Weapons"`, `"Unit"`) **must use `StringComparison.OrdinalIgnoreCase`** — case variation has been observed in the wild and silently drops profiles if compared with `==`
+- `name_overrides.json` must be present in the **current working directory** when `army-enricher.exe` is invoked — not relative to the executable. Example entry: `{ "Deathshroud Champion": "Deathshroud Terminator Champion" }`. The file is optional; if absent, resolution proceeds without overrides.
+- `dotnet test` only builds the test project and its transitive dependencies — it does **not** build the CLI project. Use `dotnet build Wh40kArmyEnricher.sln` to update `army-enricher.exe`.
