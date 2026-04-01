@@ -169,9 +169,11 @@ public class NameResolver
 
         if (best.entry != null)
         {
-            _logger.LogInformation(
-                "[{Context}] Fuzzy matched '{Input}' -> '{Match}' (score: {Score})",
-                context, displayName, best.entry.Name, best.score);
+            var msg = "[{Context}] Fuzzy matched '{Input}' -> '{Match}' (score: {Score})";
+            if (best.score >= 90)
+                _logger.LogInformation(msg, context, displayName, best.entry.Name, best.score);
+            else
+                _logger.LogWarning(msg, context, displayName, best.entry.Name, best.score);
             return best.entry;
         }
 
@@ -205,8 +207,11 @@ public class NameResolver
 
         if (best.weapon != null)
         {
-            _logger.LogWarning("[Weapon] Fuzzy matched '{Input}' -> '{Match}' (score: {Score})",
-                weaponName, best.weapon.Name, best.score);
+            var msg = "[Weapon] Fuzzy matched '{Input}' -> '{Match}' (score: {Score})";
+            if (best.score >= 90)
+                _logger.LogInformation(msg, weaponName, best.weapon.Name, best.score);
+            else
+                _logger.LogWarning(msg, weaponName, best.weapon.Name, best.score);
             return best.weapon;
         }
 
@@ -240,8 +245,11 @@ public class NameResolver
 
         if (best.entry != null)
         {
-            _logger.LogWarning("[Weapon/entry] Fuzzy matched '{Input}' -> '{Match}' (score: {Score})",
-                name, best.entry.Name, best.score);
+            var msg = "[Weapon/entry] Fuzzy matched '{Input}' -> '{Match}' (score: {Score})";
+            if (best.score >= 90)
+                _logger.LogInformation(msg, name, best.entry.Name, best.score);
+            else
+                _logger.LogWarning(msg, name, best.entry.Name, best.score);
             return best.entry;
         }
 
