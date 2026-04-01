@@ -1,7 +1,7 @@
-test1000 (2365 points)
+battle 3 (2010 points)
 
 Death Guard
-Incursion (1000 points)
+Strike Force (2000 points)
 Virulent Vectorium
 
 
@@ -12,25 +12,16 @@ Biologus Putrifier (60 points)
     1x Injector pistol
     1x Plague knives
 
-Daemon Prince of Nurgle (215 points)
-  • 1x Hellforged weapons
-    1x Infernal cannon
-  • Enhancement: Revolting Regeneration
-
-Foul Blightspawn (75 points)
-  • 1x Close combat weapon
-    1x Plague sprayer
-
-Lord of Contagion (130 points)
-  • Warlord
-  • 1x Manreaper
-  • Enhancement: Daemon Weapon of Nurgle
-
 Lord of Contagion (145 points)
   • 1x Manreaper
   • Enhancement: Furnace of Plagues
 
+Lord of Contagion (130 points)
+  • 1x Manreaper
+  • Enhancement: Daemon Weapon of Nurgle
+
 Mortarion (380 points)
+  • Warlord
   • 1x Lantern
     1x Rotwind
     1x Silence
@@ -66,7 +57,6 @@ DEDICATED TRANSPORTS
 Chaos Rhino (85 points)
   • 1x Armoured tracks
     1x Combi-bolter
-    1x Combi-weapon
     1x Havoc launcher
 
 
@@ -76,7 +66,7 @@ Deathshroud Terminators (160 points)
   • 1x Deathshroud Champion
     • 1x Icon of Despair (Aura)
       1x Manreaper
-      1x Plaguespurt gauntlet
+      2x Plaguespurt gauntlet
   • 2x Deathshroud Terminator
     • 2x Manreaper
       2x Plaguespurt gauntlet
@@ -85,7 +75,7 @@ Deathshroud Terminators (160 points)
   • 1x Deathshroud Champion
     • 1x Icon of Despair (Aura)
       1x Manreaper
-      1x Plaguespurt gauntlet
+      2x Plaguespurt gauntlet
   • 2x Deathshroud Terminator
     • 2x Manreaper
       2x Plaguespurt gauntlet
@@ -116,8 +106,4 @@ Poxwalkers (65 points)
   • 10x Poxwalker
     • 10x Improvised weapon
 
-Poxwalkers (65 points)
-  • 10x Poxwalker
-    • 10x Improvised weapon
-
-Exported with App Version: v1.47.0 (110), Data Version: v743
+Exported with App Version: v1.49.0 (114), Data Version: v757
