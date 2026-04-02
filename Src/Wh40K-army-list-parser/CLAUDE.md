@@ -490,7 +490,10 @@ army-enricher matchup attacker.txt defender.txt \
 
 - **Never hard-code statlines.** All stat values must originate from BSData XML. If a unit cannot be resolved after fuzzy matching, emit a structured warning to stderr and skip that unit — do not guess or substitute default values.
 - **Warn on fuzzy matches.** Log input name, matched BSData name, and similarity score. Use `Warning` level for scores 85–89 (needs human review); use `Information` level for scores ≥ 90 (near-exact, likely correct). Consider writing a `resolution_report.json` alongside the main output that lists every match decision for review.
-- **Invulnerable saves and FNP.** Parse with regex `\d\+\+(?!\+)` for invuln and `\d\+\+\+` for FNP. Check both the unit/model entry's own ability text AND any selected ability upgrades listed in the army export (e.g. Shield Dome). Set to `null` when absent.
+- **Invulnerable saves and FNP.** BSData 10e does **not** use `4++`/`5+++` game shorthand in ability text. Two storage patterns exist:
+  1. **Ability text** — `"4+ invulnerable save"` (regex `(\d)\+\+? invulnerable`) and `"Feel No Pain 5+"` (regex `Feel No Pain (\d)\+`)
+  2. **infoLinks** — `<infoLink name="Invulnerable Save" type="profile">` pointing to a shared profile whose Description is just `"4+"`, and `<infoLink name="Feel No Pain" type="rule">` with `<modifier type="append" value="5+" field="name"/>` encoding the threshold
+  Both patterns are extracted by `CatalogueParser.ExtractInvulnFnp()` and stored on `CatalogueEntry.EntryInvulnerableSave` / `EntryFeelNoPain` regardless of whether a statline is present. The `Enricher` applies unit-level values to child model statlines (squad-type unit entries have null statlines). Set to `null` when absent.
 - **Multi-wound models.** Capture `W` per model type (`selectionEntry[@type='model']`), not per unit — essential for simulation accuracy when a unit contains models with different wound counts.
 - **Weapons with multiple profiles.** Some weapons have multiple `<profile>` children (e.g. plasma supercharge, Hellforged weapons strike/sweep). Capture all variants in the `profiles` array with a `variant` label derived from the profile `name` attribute. Strip BSData's `➤ ` prefix and the weapon entry name from profile names to get a clean variant label.
 - **Non-weapon entries.** The army export uses bullet characters for both weapons and ability upgrades (e.g. Shield Dome). When an entry cannot be resolved as a weapon, check whether it resolves to a catalogue entry with no weapon profiles. If so, apply any invuln/FNP it grants to the model statline and skip it silently — do not emit a warning. The check must match either the entry name or any ability profile name within that entry (e.g. `"Icon of Despair"` entry contains profile `"Icon of Despair (Aura)"`).
@@ -525,3 +528,85 @@ army-enricher matchup attacker.txt defender.txt \
 - All `typeName` comparisons (e.g. `"Ranged Weapons"`, `"Melee Weapons"`, `"Unit"`) **must use `StringComparison.OrdinalIgnoreCase`** — case variation has been observed in the wild and silently drops profiles if compared with `==`
 - `name_overrides.json` must be present in the **current working directory** when `army-enricher.exe` is invoked — not relative to the executable. Example entry: `{ "Deathshroud Champion": "Deathshroud Terminator Champion" }`. The file is optional; if absent, resolution proceeds without overrides.
 - `dotnet test` only builds the test project and its transitive dependencies — it does **not** build the CLI project. Use `dotnet build Wh40kArmyEnricher.sln` to update `army-enricher.exe`.
+
+---
+
+## Planned: Leader Attachments & AttachedUnit (not yet implemented)
+
+This section records agreed design decisions for the next major feature. **Do not implement until instructed.**
+
+### Background
+
+In Warhammer 40K 10th edition, CHARACTER units with the `Leader` ability can attach to eligible Bodyguard units. The Leader unit (which may include retinue models with different statlines, e.g. Chaplain Grimaldus + Cenobyte Servitors) physically joins the Bodyguard, combining into a single combat unit. Leaders provide conditional buffs to the Bodyguard unit.
+
+### Layer separation
+
+- **`UnitProfile`** — pure enriched output from the army list. One per unit listed in the export. Indivisible. No knowledge of attachments. Gains one new field: `leadingAbilities`.
+- **`AttachedUnit`** — simulation-layer composition. Not produced by the enricher directly; constructed by `LeaderResolver` from enriched profiles. Used in pairing files.
+
+### Changes to `UnitProfile`
+
+Add `leadingAbilities: AbilityProfile[]` — populated at enrichment time by filtering the unit's abilities whose text **starts with** `"While this model is leading a unit"`. These abilities only apply when the unit is acting as a leader; they must not be applied when simulating the unit standalone. All other abilities remain in `abilities`.
+
+### `AttachedUnit` type (in `Wh40kArmyEnricher.Contracts`)
+
+```csharp
+record AttachedUnit(
+    UnitProfile Bodyguard,
+    IReadOnlyList<UnitProfile> Leaders,    // 0–2; each may contain retinue models
+    IReadOnlyList<string> EffectiveKeywords,  // union of all keywords
+    RerollOptions EffectiveRerolls,           // merged from leaders' leadingAbilities
+    int EffectiveCritHitsOn,                  // minimum across all leading ability grants
+    IReadOnlyList<AbilityProfile> EffectiveAbilities, // see merge rules below
+    IReadOnlyList<string> Notes               // warnings, assumptions, overrides
+);
+```
+
+**Effective property merge rules:**
+- `effectiveKeywords` — union of bodyguard + all leader keywords (a leader with `PSYKER` makes the whole unit targetable by Anti-Psyker weapons)
+- `effectiveRerolls` — OR of all leaders' `leadingAbilities` re-roll grants
+- `effectiveCritHitsOn` — minimum across grants; default 6
+- `effectiveAbilities` — **unit-wide** abilities ("this unit" / "models in this unit") are unioned; **individual** abilities (see known list below) require all models to have them — attaching a leader without an individual ability removes it from the combined unit
+
+**Known individual abilities (intersection semantics):**
+`Stealth`, `Infiltrate`, `Scouts N"`, `Deep Strike`, `Lone Operative` — and others as discovered. Abilities not on this list are treated as unit-wide.
+
+### Leader eligibility
+
+- Only units with the `CHARACTER` keyword are candidate leaders.
+- Leader eligibility is parsed from the `Leader` ability text: `"This model can be attached to the following units: X, Y, Z."` — extract the comma-separated unit list.
+- **Primary leaders** have the standard pattern above.
+- **Support leaders** (Lieutenants, Apothecaries, etc.) have text like `"...can be attached to a unit that already contains a Leader..."` — they can join a unit that already has a primary leader.
+- Generally 1 leader per unit; exceptions exist. Do **not** reject primary+primary combinations outright — instead add a note to the pairing: `"Second leader eligibility unverified — confirm manually"`.
+
+### `LeaderResolver` (new class in `Wh40kArmyEnricher.Core`)
+
+Responsibilities:
+1. Given a list of enriched `UnitProfile` objects (one army), identify all CHARACTER units.
+2. Parse each character's `Leader` ability text to extract eligible bodyguard unit names.
+3. Classify primary vs support leaders from ability text patterns.
+4. For each non-character unit, enumerate all valid 0-leader, 1-leader, and 2-leader combinations (where eligible).
+5. For each combination, compute the `AttachedUnit` effective properties and populate `Notes`.
+6. Parse re-roll and crit-hit grants from `leadingAbilities` using ability text patterns:
+   - `"re-roll hit rolls of 1"` → `hitRerollOnes: true`
+   - `"re-roll hit rolls"` (all) → `hitRerollAll: true`
+   - `"re-roll wound rolls of 1"` → `woundRerollOnes: true`
+   - `"re-roll wound rolls"` (all) → `woundRerollAll: true`
+   - `"Critical Hits are scored on a 5+"` → `criticalHitsOn: 5`
+
+### `Pairing` changes
+
+- `Attacker` changes from `UnitProfile` to `AttachedUnit`.
+- `Defender` remains `UnitProfile` — defenders are always plain units, never attached.
+- `simulationId` encodes leader names: `bt_sword_brethren_led_by_marshal_castellan_vs_dg_plague_marines`.
+- A baseline pairing (0 leaders) is always included alongside leader combinations.
+
+### `matchup` command changes
+
+- **Attacker side**: enumerate all `AttachedUnit` combinations from the attacking army (0-leader baseline + all valid 1-leader + all valid 2-leader combinations).
+- **Defender side**: if `--defender-unit` flag is present, use those units; otherwise present an interactive numbered list of defender units and prompt for selection.
+- `--defender-unit` remains repeatable and optional.
+
+### Retinue models
+
+When a CHARACTER unit contains retinue models (e.g. Chaplain Grimaldus + Cenobyte Servitors), the entire `UnitProfile` (with all its `ModelEntry` rows) attaches as a single leader. The retinue's models participate in the combined unit's attack pool and the CHARACTER model's buffs apply to the bodyguard. No special handling is needed — the existing multi-model `UnitProfile` structure already captures this correctly.
