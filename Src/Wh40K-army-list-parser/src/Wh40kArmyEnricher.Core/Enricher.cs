@@ -61,6 +61,7 @@ public class Enricher
         var modelProfiles = new List<ModelProfile>();
         var defenderStatline = unitEntry.Statline;
         int defenderWounds = defenderStatline?.Wounds ?? 1;
+        bool defenderStatlineSet = false; // tracks whether we've captured an enriched statline
 
         foreach (var modelEntry in unit.Models)
         {
@@ -88,9 +89,15 @@ public class Enricher
             // Apply invuln/FNP granted by selected ability upgrades (e.g. Shield Dome)
             statline = ApplySelectedAbilityUpgrades(statline, modelEntry.Weapons);
 
-            // The first model's statline is used for defender profile (representative)
-            if (defenderStatline == null && statline != null)
+            // Always capture the first model's fully-enriched statline as the representative
+            // defender statline. For single-model units (e.g. Impulsor), unitEntry.Statline is
+            // already non-null before the loop, so we must not gate this on == null — otherwise
+            // ability upgrades applied inside the loop (e.g. Shield Dome → 5+ invuln) would be lost.
+            if (!defenderStatlineSet && statline != null)
+            {
                 defenderStatline = statline;
+                defenderStatlineSet = true;
+            }
             if (statline != null)
                 defenderWounds = statline.Wounds;
 
