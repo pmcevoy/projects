@@ -28,28 +28,41 @@ public class CatalogueParser
 
     public async Task<CatalogueData> ParseAsync(Stream stream, string filename, CancellationToken ct = default)
     {
-        XDocument doc;
+        var doc = await LoadDocumentAsync(stream, filename, ct);
+        return ParseDocument(doc);
+    }
+
+    /// <summary>
+    /// Loads a stream (plain XML or raw-deflate .catz) into an XDocument without parsing entries.
+    /// Used by <see cref="CatalogueStore"/> for the first pass of two-pass cross-catalogue loading.
+    /// </summary>
+    public async Task<XDocument> LoadDocumentAsync(Stream stream, string filename, CancellationToken ct = default)
+    {
         if (filename.EndsWith(".catz", StringComparison.OrdinalIgnoreCase))
         {
             // Raw deflate (no zlib or gzip header)
             await using var deflate = new DeflateStream(stream, CompressionMode.Decompress);
-            doc = await XDocument.LoadAsync(deflate, LoadOptions.None, ct);
+            return await XDocument.LoadAsync(deflate, LoadOptions.None, ct);
         }
-        else
-        {
-            doc = await XDocument.LoadAsync(stream, LoadOptions.None, ct);
-        }
-
-        return ParseDocument(doc);
+        return await XDocument.LoadAsync(stream, LoadOptions.None, ct);
     }
 
-    public CatalogueData Parse(XDocument doc) => ParseDocument(doc);
+    /// <summary>
+    /// Extracts the id→element shared profile map from a document root.
+    /// Used by <see cref="CatalogueStore"/> to build a global cross-catalogue profile dictionary.
+    /// </summary>
+    public Dictionary<string, XElement> GetSharedProfiles(XDocument doc)
+        => BuildSharedProfileMap(doc.Root!);
+
+    /// <summary>Parses a pre-loaded XDocument, optionally with cross-catalogue shared profiles as fallback.</summary>
+    public CatalogueData Parse(XDocument doc, IReadOnlyDictionary<string, XElement>? externalProfiles = null)
+        => ParseDocument(doc, externalProfiles);
 
     // ---------------------------------------------------------------------------
     // Document-level parsing
     // ---------------------------------------------------------------------------
 
-    private CatalogueData ParseDocument(XDocument doc)
+    private CatalogueData ParseDocument(XDocument doc, IReadOnlyDictionary<string, XElement>? externalProfiles = null)
     {
         var root = doc.Root!;
         var rootTag = root.Name.LocalName; // "catalogue" or "gameSystem"
@@ -58,8 +71,14 @@ public class CatalogueParser
         var id = (string?)root.Attribute("id") ?? "";
         var name = (string?)root.Attribute("name") ?? "";
 
-        // Build shared profile map for the whole document (used when resolving profileLinks)
-        var sharedProfiles = BuildSharedProfileMap(root);
+        // Build local shared profile map for this document.
+        // Merge with any cross-catalogue external profiles so infoLinks that reference shared
+        // profiles in other catalogues (e.g. Black Templars → Space Marines "Invulnerable Save")
+        // can be resolved. Local entries always take precedence over external ones.
+        var localProfiles = BuildSharedProfileMap(root);
+        var sharedProfiles = externalProfiles != null && externalProfiles.Count > 0
+            ? MergeProfiles(externalProfiles, localProfiles)
+            : localProfiles;
         var sharedEntries = BuildSharedEntryMap(root);
 
         // Catalogue links
@@ -126,6 +145,16 @@ public class CatalogueParser
     // ---------------------------------------------------------------------------
     // Shared lookup maps
     // ---------------------------------------------------------------------------
+
+    private static Dictionary<string, XElement> MergeProfiles(
+        IReadOnlyDictionary<string, XElement> external,
+        Dictionary<string, XElement> local)
+    {
+        var merged = new Dictionary<string, XElement>(external);
+        foreach (var (id, element) in local)
+            merged[id] = element; // local entries override external
+        return merged;
+    }
 
     private Dictionary<string, XElement> BuildSharedProfileMap(XElement root)
     {

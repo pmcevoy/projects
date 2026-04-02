@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using Wh40kArmyEnricher.Core.Models;
 
@@ -42,16 +43,48 @@ public class CatalogueStore
         if (_initialised) return;
         _initialised = true;
 
-        // Load game system root
-        _logger.LogInformation("Loading game system file: {Filename}", GstFilename);
-        await LoadOneAsync(GstFilename, ct);
-
-        // Fetch the full file listing and download every .cat
         var catFilenames = await GetAllCatFilenamesAsync(ct);
-        _logger.LogInformation("Downloading {Count} catalogue files", catFilenames.Count);
+        var allFilenames = new List<string>(catFilenames.Count + 1) { GstFilename };
+        allFilenames.AddRange(catFilenames);
+        _logger.LogInformation("Loading {Count} catalogue files", allFilenames.Count);
 
-        foreach (var filename in catFilenames)
-            await LoadOneAsync(filename, ct);
+        // Pass 1: load every XML document and build a global shared-profile map.
+        // This allows cross-catalogue infoLink resolution — for example, Black Templars units
+        // reference the "Invulnerable Save" shared profile defined in Imperium - Space Marines.cat.
+        var documents = new List<(string Filename, XDocument Doc)>(allFilenames.Count);
+        var globalProfiles = new Dictionary<string, XElement>();
+
+        foreach (var filename in allFilenames)
+        {
+            try
+            {
+                var stream = await _fetcher.FetchAsync(filename, _forceRefresh, ct);
+                var doc = await _parser.LoadDocumentAsync(stream, filename, ct);
+                documents.Add((filename, doc));
+                foreach (var (id, profile) in _parser.GetSharedProfiles(doc))
+                    globalProfiles.TryAdd(id, profile); // first-loaded wins on ID collision
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not load catalogue '{Filename}' — skipping", filename);
+            }
+        }
+
+        // Pass 2: parse each document using the complete global profile map so cross-catalogue
+        // infoLink references resolve correctly.
+        foreach (var (filename, doc) in documents)
+        {
+            try
+            {
+                var catalogue = _parser.Parse(doc, globalProfiles);
+                _loaded[catalogue.Id] = catalogue;
+                _logger.LogDebug("Loaded '{Name}'", catalogue.Name);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not parse catalogue '{Filename}' — skipping", filename);
+            }
+        }
 
         _logger.LogInformation("Catalogue store ready: {Count} catalogues loaded", _loaded.Count);
     }
@@ -82,21 +115,6 @@ public class CatalogueStore
     // ---------------------------------------------------------------------------
     // Private helpers
     // ---------------------------------------------------------------------------
-
-    private async Task LoadOneAsync(string filename, CancellationToken ct)
-    {
-        try
-        {
-            var stream = await _fetcher.FetchAsync(filename, _forceRefresh, ct);
-            var catalogue = await _parser.ParseAsync(stream, filename, ct);
-            _loaded[catalogue.Id] = catalogue;
-            _logger.LogDebug("Loaded '{Name}'", catalogue.Name);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Could not load catalogue '{Filename}' — skipping", filename);
-        }
-    }
 
     private async Task<List<string>> GetAllCatFilenamesAsync(CancellationToken ct)
     {
