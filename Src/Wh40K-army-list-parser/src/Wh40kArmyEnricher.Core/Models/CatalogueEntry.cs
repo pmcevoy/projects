@@ -9,6 +9,14 @@ public record CatalogueEntry
     public string EntryType { get; init; } = "";
     public string CatalogueId { get; init; } = "";
     public UnitStatline? Statline { get; init; }
+    /// <summary>
+    /// Invulnerable save parsed from ability text or infoLinks on this entry, independent of
+    /// whether a statline exists. Used by the Enricher to apply unit-level invuln/FNP to
+    /// child model statlines in squad-type entries (which have null Statlines in BSData).
+    /// </summary>
+    public int? EntryInvulnerableSave { get; init; }
+    /// <inheritdoc cref="EntryInvulnerableSave"/>
+    public int? EntryFeelNoPain { get; init; }
     public IReadOnlyList<WeaponProfileData> Weapons { get; init; } = [];
     public IReadOnlyList<AbilityData> Abilities { get; init; } = [];
     public IReadOnlyList<CatalogueEntry> ChildEntries { get; init; } = [];

@@ -16,8 +16,8 @@ public class Enricher
     private static readonly Regex SustainedHitsRegex = new(@"Sustained\s+Hits?\s+(\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex MeltaRegex = new(@"Melta\s+(\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex AntiRegex = new(@"Anti-([\w][\w\s]*?)\s+(\d+)\+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex InvulnRegex = new(@"(\d)\+\+(?!\+)", RegexOptions.Compiled);
-    private static readonly Regex FnpRegex = new(@"(\d)\+\+\+", RegexOptions.Compiled);
+    private static readonly Regex InvulnRegex = new(@"(\d)\+\+? invulnerable", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex FnpRegex = new(@"Feel No Pain (\d)\+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private readonly CatalogueStore _store;
     private readonly NameResolver _resolver;
@@ -69,6 +69,21 @@ public class Enricher
 
             // Use model's own statline if available, otherwise use unit statline
             var statline = bsModel.Statline ?? unitEntry.Statline;
+
+            // Apply unit-level invuln/FNP from the unit entry's own ability text.
+            // Squad-type unit entries (type="unit") have null statlines in BSData, so
+            // CatalogueParser skips ability text scanning for them — we do it here instead.
+            statline = ApplyAbilitiesInvulnFnp(statline, unitEntry.Abilities);
+
+            // Apply unit-level invuln/FNP sourced from infoLinks (e.g. FNP on Death Guard units
+            // stored as <infoLink name="Feel No Pain"> with a modifier, not in ability text).
+            if (statline != null)
+            {
+                if (unitEntry.EntryInvulnerableSave.HasValue && statline.InvulnerableSave == null)
+                    statline = statline with { InvulnerableSave = unitEntry.EntryInvulnerableSave };
+                if (unitEntry.EntryFeelNoPain.HasValue && statline.FeelNoPain == null)
+                    statline = statline with { FeelNoPain = unitEntry.EntryFeelNoPain };
+            }
 
             // Apply invuln/FNP granted by selected ability upgrades (e.g. Shield Dome)
             statline = ApplySelectedAbilityUpgrades(statline, modelEntry.Weapons);
@@ -125,6 +140,35 @@ public class Enricher
     // ---------------------------------------------------------------------------
     // Ability-upgrade enrichment (invuln / FNP from selected non-weapon entries)
     // ---------------------------------------------------------------------------
+
+    private static UnitStatline? ApplyAbilitiesInvulnFnp(
+        UnitStatline? statline, IReadOnlyList<AbilityData> abilities)
+    {
+        if (statline == null || abilities.Count == 0) return statline;
+
+        int? invuln = statline.InvulnerableSave;
+        int? fnp = statline.FeelNoPain;
+
+        foreach (var ability in abilities)
+        {
+            var text = ability.Text + " " + ability.Name;
+            if (invuln == null)
+            {
+                var m = InvulnRegex.Match(text);
+                if (m.Success) invuln = int.Parse(m.Groups[1].Value);
+            }
+            if (fnp == null)
+            {
+                var m = FnpRegex.Match(text);
+                if (m.Success) fnp = int.Parse(m.Groups[1].Value);
+            }
+        }
+
+        if (invuln == statline.InvulnerableSave && fnp == statline.FeelNoPain)
+            return statline;
+
+        return statline with { InvulnerableSave = invuln, FeelNoPain = fnp };
+    }
 
     private UnitStatline? ApplySelectedAbilityUpgrades(
         UnitStatline? statline, IReadOnlyList<WeaponEntry> selectedEntries)

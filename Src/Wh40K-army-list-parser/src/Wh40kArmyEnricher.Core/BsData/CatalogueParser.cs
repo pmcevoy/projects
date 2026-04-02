@@ -14,8 +14,13 @@ public class CatalogueParser
     private static readonly XNamespace Ns =
         "http://www.battlescribe.net/schema/catalogueSchema";
 
-    private static readonly Regex InvulnRegex = new(@"(\d)\+\+(?!\+)", RegexOptions.Compiled);
-    private static readonly Regex FnpRegex = new(@"(\d)\+\+\+", RegexOptions.Compiled);
+    // BSData 10e stores invuln as "4+ invulnerable save" (single +) in ability text,
+    // not the "4++" game shorthand. Match one or two + signs before the word "invulnerable".
+    private static readonly Regex InvulnTextRegex = new(@"(\d)\+\+? invulnerable", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // FNP appears as "Feel No Pain 5+" in ability text (never as "5+++" in 10e BSData).
+    private static readonly Regex FnpTextRegex = new(@"Feel No Pain (\d)\+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // Simple N+ value parser for infoLink-derived values (Description = "4+" or modifier value = "5+").
+    private static readonly Regex StatValueRegex = new(@"^(\d)\+", RegexOptions.Compiled);
 
     // ---------------------------------------------------------------------------
     // Public API
@@ -210,10 +215,18 @@ public class CatalogueParser
         var abilities = ParseAbilities(allProfiles);
         var keywords = ParseKeywords(el);
 
-        // Enrich statline with invuln / FNP found in ability text
+        // Extract invuln / FNP from ability text AND infoLinks (two distinct storage patterns in 10e).
+        // Store on the entry regardless of whether a statline exists — squad-type entries
+        // (type="unit") have null statlines, so the Enricher applies these to child model statlines.
+        var (entryInvuln, entryFnp) = ExtractInvulnFnp(el, sharedProfiles, abilities);
+
+        // Also apply directly to the statline when one is present (single-model / upgrade entries)
         if (statline != null)
         {
-            statline = EnrichStatlineFromAbilities(statline, abilities);
+            if (entryInvuln.HasValue && statline.InvulnerableSave == null)
+                statline = statline with { InvulnerableSave = entryInvuln };
+            if (entryFnp.HasValue && statline.FeelNoPain == null)
+                statline = statline with { FeelNoPain = entryFnp };
         }
 
         // Child entries: direct selectionEntries + selectionEntryGroups + entryLinks
@@ -257,6 +270,8 @@ public class CatalogueParser
             EntryType = type,
             CatalogueId = catalogueId,
             Statline = statline,
+            EntryInvulnerableSave = entryInvuln,
+            EntryFeelNoPain = entryFnp,
             Weapons = weapons,
             Abilities = abilities,
             ChildEntries = children,
@@ -310,35 +325,75 @@ public class CatalogueParser
         };
     }
 
-    private static UnitStatline EnrichStatlineFromAbilities(UnitStatline statline, IReadOnlyList<AbilityData> abilities)
+    /// <summary>
+    /// Extracts invulnerable save and FNP values from both ability text profiles and
+    /// infoLink elements on a selection entry. BSData 10e uses two patterns:
+    /// 1. Inline ability text: "4+ invulnerable save" / "Feel No Pain 5+"
+    /// 2. infoLink name="Invulnerable Save" type="profile" → shared profile Description = "4+"
+    ///    infoLink name="Feel No Pain" type="rule" → modifier value = "5+"
+    /// </summary>
+    private static (int? invuln, int? fnp) ExtractInvulnFnp(
+        XElement entry,
+        Dictionary<string, XElement> sharedProfiles,
+        IReadOnlyList<AbilityData> abilities)
     {
         int? invuln = null;
         int? fnp = null;
 
+        // Pattern 1: ability text
         foreach (var ability in abilities)
         {
             var text = ability.Text + " " + ability.Name;
-
             if (invuln == null)
             {
-                var m = new Regex(@"(\d)\+\+(?!\+)").Match(text);
+                var m = InvulnTextRegex.Match(text);
                 if (m.Success) invuln = int.Parse(m.Groups[1].Value);
             }
-
             if (fnp == null)
             {
-                var m = new Regex(@"(\d)\+\+\+").Match(text);
+                var m = FnpTextRegex.Match(text);
                 if (m.Success) fnp = int.Parse(m.Groups[1].Value);
             }
         }
 
-        if (invuln == null && fnp == null) return statline;
-
-        return statline with
+        // Pattern 2: infoLinks
+        foreach (var link in entry.Element(Ns + "infoLinks")?.Elements(Ns + "infoLink")
+                               ?? Enumerable.Empty<XElement>())
         {
-            InvulnerableSave = invuln ?? statline.InvulnerableSave,
-            FeelNoPain = fnp ?? statline.FeelNoPain
-        };
+            var linkName = (string?)link.Attribute("name") ?? "";
+            var linkType = (string?)link.Attribute("type") ?? "";
+            var targetId = (string?)link.Attribute("targetId") ?? "";
+
+            // Invuln via shared "Invulnerable Save" profile — Description is just "4+"
+            if (invuln == null
+                && string.Equals(linkName, "Invulnerable Save", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(linkType, "profile", StringComparison.OrdinalIgnoreCase)
+                && sharedProfiles.TryGetValue(targetId, out var invulnProfile))
+            {
+                var chars = GetCharacteristics(invulnProfile);
+                var desc = chars.GetValueOrDefault("Description", "").Trim();
+                var m = StatValueRegex.Match(desc);
+                if (m.Success) invuln = int.Parse(m.Groups[1].Value);
+            }
+
+            // FNP via "Feel No Pain" rule link — value comes from modifier appended to link name
+            if (fnp == null
+                && string.Equals(linkName, "Feel No Pain", StringComparison.OrdinalIgnoreCase))
+            {
+                var modifier = link.Element(Ns + "modifiers")?.Elements(Ns + "modifier")
+                    .FirstOrDefault(mod =>
+                        string.Equals((string?)mod.Attribute("type"), "append", StringComparison.OrdinalIgnoreCase)
+                        && string.Equals((string?)mod.Attribute("field"), "name", StringComparison.OrdinalIgnoreCase));
+                if (modifier != null)
+                {
+                    var value = ((string?)modifier.Attribute("value") ?? "").Trim();
+                    var m = StatValueRegex.Match(value);
+                    if (m.Success) fnp = int.Parse(m.Groups[1].Value);
+                }
+            }
+        }
+
+        return (invuln, fnp);
     }
 
     // ---------------------------------------------------------------------------
