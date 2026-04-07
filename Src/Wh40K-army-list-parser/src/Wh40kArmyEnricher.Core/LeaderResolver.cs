@@ -32,7 +32,8 @@ public class LeaderResolver
     private static readonly Regex WoundRerollAllRegex =
         new(@"re-?roll (?:all )?wound rolls\b(?! of 1)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex CritHitsOnRegex =
-        new(@"Critical Hits? are scored on a (\d)\+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        new(@"Critical Hits? are scored on a (\d)\+|unmodified Hit roll of (\d)\+ scores a Critical Hit",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // Abilities that require every model in the unit to have them (intersection semantics).
     // Attaching a leader who lacks one of these removes it from the combined unit.
@@ -131,18 +132,45 @@ public class LeaderResolver
         bool woundRerollOnes = false, woundRerollAll = false;
         int critHitsOn = bodyguard.CriticalHitsOn;
         var grantedAbilities = new List<AbilityProfile>();
+        var abilityNotes = new List<string>();
 
         foreach (var leader in leaders)
         {
             foreach (var ability in leader.LeadingAbilities)
             {
                 var t = ability.Text;
-                if (HitRerollOnesRegex.IsMatch(t)) hitRerollOnes = true;
-                if (HitRerollAllRegex.IsMatch(t)) hitRerollAll = true;
-                if (WoundRerollOnesRegex.IsMatch(t)) woundRerollOnes = true;
-                if (WoundRerollAllRegex.IsMatch(t)) woundRerollAll = true;
+                var source = $"{leader.Name} / {ability.Name}";
+
+                if (HitRerollOnesRegex.IsMatch(t) && !hitRerollOnes)
+                {
+                    hitRerollOnes = true;
+                    abilityNotes.Add($"hitRerollOnes set by {source}");
+                }
+                if (HitRerollAllRegex.IsMatch(t) && !hitRerollAll)
+                {
+                    hitRerollAll = true;
+                    abilityNotes.Add($"hitRerollAll set by {source}");
+                }
+                if (WoundRerollOnesRegex.IsMatch(t) && !woundRerollOnes)
+                {
+                    woundRerollOnes = true;
+                    abilityNotes.Add($"woundRerollOnes set by {source}");
+                }
+                if (WoundRerollAllRegex.IsMatch(t) && !woundRerollAll)
+                {
+                    woundRerollAll = true;
+                    abilityNotes.Add($"woundRerollAll set by {source}");
+                }
                 var cm = CritHitsOnRegex.Match(t);
-                if (cm.Success) critHitsOn = Math.Min(critHitsOn, int.Parse(cm.Groups[1].Value));
+                if (cm.Success)
+                {
+                    var threshold = int.Parse(cm.Groups[1].Success ? cm.Groups[1].Value : cm.Groups[2].Value);
+                    if (threshold < critHitsOn)
+                    {
+                        abilityNotes.Add($"criticalHitsOn reduced from {critHitsOn} to {threshold} by {source}");
+                        critHitsOn = threshold;
+                    }
+                }
                 grantedAbilities.Add(ability);
             }
         }
@@ -174,7 +202,7 @@ public class LeaderResolver
             EffectiveRerolls = rerolls,
             EffectiveCritHitsOn = critHitsOn,
             EffectiveAbilities = effectiveAbilities,
-            Notes = extraNotes.ToList()
+            Notes = [.. extraNotes, .. abilityNotes]
         };
     }
 
