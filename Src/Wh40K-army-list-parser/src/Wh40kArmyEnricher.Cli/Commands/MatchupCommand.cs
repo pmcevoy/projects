@@ -158,7 +158,7 @@ public static class MatchupCommand
         string atkFaction, AttachedUnit attacker,
         string defFaction, UnitProfile defender)
     {
-        var bodyguardSlug = Slug(attacker.Bodyguard.Name);
+        var bodyguardSlug = Slug(attacker.Bodyguard);
         string atkSlug;
         if (attacker.Leaders.Count == 0)
         {
@@ -166,20 +166,19 @@ public static class MatchupCommand
         }
         else
         {
-            var leaderSlug = string.Join("_and_", attacker.Leaders.Select(l => Slug(l.Name)));
+            var leaderSlug = string.Join("_and_", attacker.Leaders.Select(Slug));
             atkSlug = $"{bodyguardSlug}_led_by_{leaderSlug}";
         }
 
-        return $"{Abbrev(atkFaction)}_{atkSlug}_{attacker.Bodyguard.ArmyListIndex}" +
-               $"_vs_{Abbrev(defFaction)}_{Slug(defender.Name)}_{defender.ArmyListIndex}";
+        return $"{Abbrev(atkFaction)}_{atkSlug}_vs_{Abbrev(defFaction)}_{Slug(defender)}";
     }
 
     private static string Abbrev(string faction) => string.Concat(
         faction.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                .Select(w => w[0].ToString().ToLowerInvariant()));
 
-    private static string Slug(string name) =>
-        Regex.Replace(name.ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_');
+    private static string Slug(UnitProfile unit) =>
+        $"{Regex.Replace(unit.Name.ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_')}_{unit.ArmyListIndex}";
 
     private static string SanitiseName(string name) =>
         Regex.Replace(name.ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_');
