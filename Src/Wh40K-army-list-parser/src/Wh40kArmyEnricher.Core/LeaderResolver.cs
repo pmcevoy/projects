@@ -35,6 +35,11 @@ public class LeaderResolver
         new(@"Critical Hits? are scored on a (\d)\+|unmodified Hit roll of (\d)\+ scores a Critical Hit",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // Weapon stat modifier: "add N to the {stats} characteristic(s) of melee/ranged/all weapons"
+    private static readonly Regex WeaponModifierRegex =
+        new(@"add (\d+) to the ([\w\s]+?) characteristics? of (melee|ranged|all) weapons",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     // Abilities that require every model in the unit to have them (intersection semantics).
     // Attaching a leader who lacks one of these removes it from the combined unit.
     private static readonly HashSet<string> IndividualAbilities =
@@ -47,6 +52,8 @@ public class LeaderResolver
         UnitProfile Unit,
         bool IsSupport,
         IReadOnlyList<string> EligibleBodyguards);
+
+    private sealed record WeaponModifier(int Delta, string Stat, string WeaponFilter);
 
     // ---------------------------------------------------------------------------
     // Public API
@@ -187,6 +194,28 @@ public class LeaderResolver
             WoundRerollAll  = bodyguard.Rerolls.WoundRerollAll  || woundRerollAll
         };
 
+        // Weapon stat modifiers from leading abilities (e.g. +1 Attacks and Strength to melee weapons).
+        // Build a modified copy of the bodyguard's models only if at least one modifier applies.
+        var modifiedModels = bodyguard.Models.ToList();
+        bool weaponsModified = false;
+        foreach (var leader in leaders)
+        {
+            foreach (var ability in leader.LeadingAbilities)
+            {
+                var mods = ParseWeaponModifiers(ability.Text);
+                if (mods.Count == 0) continue;
+                var (newModels, modNotes) = ApplyWeaponModifiers(modifiedModels, mods,
+                    $"{leader.Name} / {ability.Name}");
+                if (modNotes.Count > 0)
+                {
+                    modifiedModels = newModels;
+                    weaponsModified = true;
+                    abilityNotes.AddRange(modNotes);
+                }
+            }
+        }
+        var effectiveBodyguard = weaponsModified ? bodyguard with { Models = modifiedModels } : bodyguard;
+
         // Abilities: bodyguard base, minus individual abilities that any leader lacks,
         // plus all leading abilities granted by the attached leaders.
         var effectiveAbilities = bodyguard.Abilities
@@ -196,7 +225,7 @@ public class LeaderResolver
 
         return new AttachedUnit
         {
-            Bodyguard = bodyguard,
+            Bodyguard = effectiveBodyguard,
             Leaders = leaders.ToList(),
             EffectiveKeywords = [.. keywords],
             EffectiveRerolls = rerolls,
@@ -261,6 +290,115 @@ public class LeaderResolver
     // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
+
+    // ---------------------------------------------------------------------------
+    // Weapon modifier parsing and application
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Extracts weapon stat modifiers from a leading ability text.
+    /// Handles "add N to the Attacks and Strength characteristic of melee weapons" and
+    /// similar patterns. Splits compound stat lists like "Attacks and Strength" into
+    /// individual <see cref="WeaponModifier"/> entries.
+    /// </summary>
+    private static List<WeaponModifier> ParseWeaponModifiers(string text)
+    {
+        var result = new List<WeaponModifier>();
+        foreach (Match m in WeaponModifierRegex.Matches(text))
+        {
+            int delta = int.Parse(m.Groups[1].Value);
+            string filter = m.Groups[3].Value.ToLowerInvariant();
+            var stats = m.Groups[2].Value
+                .Split([" and ", ","], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            foreach (var stat in stats)
+                result.Add(new WeaponModifier(delta, stat.Trim(), filter));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Applies a list of <see cref="WeaponModifier"/> entries to each matching weapon profile
+    /// across all model entries, returning a new model list and a note per change.
+    /// </summary>
+    private static (List<ModelProfile> Models, List<string> Notes) ApplyWeaponModifiers(
+        IReadOnlyList<ModelProfile> models,
+        IReadOnlyList<WeaponModifier> modifiers,
+        string source)
+    {
+        var notes = new List<string>();
+        var newModels = new List<ModelProfile>();
+
+        foreach (var model in models)
+        {
+            var newWeapons = new List<WeaponProfile>();
+            foreach (var weapon in model.Weapons)
+            {
+                bool isMelee = weapon.Type.Equals("Melee", StringComparison.OrdinalIgnoreCase);
+                var applicable = modifiers
+                    .Where(m => m.WeaponFilter == "all"
+                        || (m.WeaponFilter == "melee" && isMelee)
+                        || (m.WeaponFilter == "ranged" && !isMelee))
+                    .ToList();
+
+                if (applicable.Count == 0) { newWeapons.Add(weapon); continue; }
+
+                var newProfiles = weapon.Profiles
+                    .Select(p => applicable.Aggregate(p, (acc, mod) =>
+                        ApplyStat(acc, mod, weapon.WeaponName, source, notes)))
+                    .ToList();
+                newWeapons.Add(weapon with { Profiles = newProfiles });
+            }
+            newModels.Add(model with { Weapons = newWeapons });
+        }
+
+        return (newModels, notes);
+    }
+
+    /// <summary>
+    /// Applies a single <see cref="WeaponModifier"/> to one <see cref="WeaponVariantProfile"/>.
+    /// Appends a note to <paramref name="notes"/> if a change was made or could not be made.
+    /// Supported stats: Attacks, Strength, Damage. AP and Skill are not modified (game semantics
+    /// for those stats differ from a simple numeric delta).
+    /// </summary>
+    private static WeaponVariantProfile ApplyStat(
+        WeaponVariantProfile profile, WeaponModifier mod,
+        string weaponName, string source, List<string> notes)
+    {
+        var label = profile.Variant == "default"
+            ? $"'{weaponName}'"
+            : $"'{weaponName}' ({profile.Variant})";
+
+        switch (mod.Stat.ToLowerInvariant())
+        {
+            case "attacks":
+                if (profile.Attacks.IsInt)
+                {
+                    var newVal = profile.Attacks.IntValue + mod.Delta;
+                    notes.Add($"Attacks of {label} increased by {mod.Delta} to {newVal} [{source}]");
+                    return profile with { Attacks = new ScalarValue(newVal) };
+                }
+                notes.Add($"Attacks of {label} could not be modified (variable '{profile.Attacks}') [{source}]");
+                return profile;
+
+            case "strength":
+                var newStr = profile.Strength + mod.Delta;
+                notes.Add($"Strength of {label} increased by {mod.Delta} to {newStr} [{source}]");
+                return profile with { Strength = newStr };
+
+            case "damage":
+                if (profile.Damage.IsInt)
+                {
+                    var newDmg = profile.Damage.IntValue + mod.Delta;
+                    notes.Add($"Damage of {label} increased by {mod.Delta} to {newDmg} [{source}]");
+                    return profile with { Damage = new ScalarValue(newDmg) };
+                }
+                notes.Add($"Damage of {label} could not be modified (variable '{profile.Damage}') [{source}]");
+                return profile;
+
+            default:
+                return profile;
+        }
+    }
 
     private static bool IsCharacter(UnitProfile u) =>
         u.Keywords.Any(k => k.Equals("CHARACTER", StringComparison.OrdinalIgnoreCase));

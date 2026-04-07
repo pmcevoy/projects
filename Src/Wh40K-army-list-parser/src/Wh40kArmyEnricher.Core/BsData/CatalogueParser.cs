@@ -22,6 +22,13 @@ public class CatalogueParser
     // Simple N+ value parser for infoLink-derived values (Description = "4+" or modifier value = "5+").
     private static readonly Regex StatValueRegex = new(@"^(\d)\+", RegexOptions.Compiled);
 
+    // Normalises Unicode space-separator characters (U+00A0 non-breaking space, thin space, etc.)
+    // to regular ASCII space. BSData XML sometimes uses U+00A0 inside ability text.
+    private static readonly Regex UnicodeSpaceRegex = new(@"\p{Z}", RegexOptions.Compiled);
+
+    private static string NormalizeXmlText(string? value) =>
+        string.IsNullOrEmpty(value) ? "" : UnicodeSpaceRegex.Replace(value, " ").Trim();
+
     // ---------------------------------------------------------------------------
     // Public API
     // ---------------------------------------------------------------------------
@@ -233,7 +240,7 @@ public class CatalogueParser
         int depth)
     {
         var id = (string?)el.Attribute("id") ?? "";
-        var name = (string?)el.Attribute("name") ?? "";
+        var name = NormalizeXmlText((string?)el.Attribute("name"));
         var type = (string?)el.Attribute("type") ?? "";
 
         // Collect all profiles for this entry (direct + via profileLinks)
@@ -444,7 +451,7 @@ public class CatalogueParser
                 var typeName = (string?)p.Attribute("typeName") ?? "";
                 return new WeaponProfileData
                 {
-                    Name = (string?)p.Attribute("name") ?? "",
+                    Name = NormalizeXmlText((string?)p.Attribute("name")),
                     TypeName = typeName,
                     Range = chars.GetValueOrDefault("Range", ""),
                     Attacks = chars.GetValueOrDefault("A", ""),
@@ -474,7 +481,7 @@ public class CatalogueParser
                 var chars = GetCharacteristics(p);
                 return new AbilityData
                 {
-                    Name = (string?)p.Attribute("name") ?? "",
+                    Name = NormalizeXmlText((string?)p.Attribute("name")),
                     Text = chars.GetValueOrDefault("Description",
                            chars.GetValueOrDefault("Effect",
                            chars.Values.FirstOrDefault() ?? ""))
@@ -506,7 +513,7 @@ public class CatalogueParser
             .Descendants(Ns + "characteristic")
             .ToDictionary(
                 c => (string?)c.Attribute("name") ?? "",
-                c => c.Value.Trim(),
+                c => NormalizeXmlText(c.Value),
                 StringComparer.OrdinalIgnoreCase);
     }
 
