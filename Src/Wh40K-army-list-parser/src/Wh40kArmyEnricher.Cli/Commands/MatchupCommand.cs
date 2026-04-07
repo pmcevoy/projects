@@ -52,35 +52,56 @@ public static class MatchupCommand
             var enrichedAttackers = enricher.Enrich(attackerArmy);
             var enrichedDefenders = enricher.Enrich(defenderArmy);
 
-            // Apply unit filters
-            var filteredAttackers = attackerUnits.Length > 0
-                ? enrichedAttackers.Where(e => attackerUnits.Any(f =>
-                    e.Profile.Name.Contains(f, StringComparison.OrdinalIgnoreCase))).ToList()
-                : enrichedAttackers.ToList();
+            // Build all AttachedUnit combinations for the attacker army
+            var leaderResolver = new LeaderResolver();
+            var allCombinations = leaderResolver.BuildAttachedUnits(
+                enrichedAttackers.Select(e => e.Profile).ToList());
 
-            var filteredDefenders = defenderUnits.Length > 0
-                ? enrichedDefenders.Where(e => defenderUnits.Any(f =>
-                    e.Profile.Name.Contains(f, StringComparison.OrdinalIgnoreCase))).ToList()
-                : enrichedDefenders.ToList();
+            // Filter attacker combinations by bodyguard name
+            var filteredCombinations = attackerUnits.Length > 0
+                ? allCombinations.Where(c => attackerUnits.Any(f =>
+                    c.Bodyguard.Name.Contains(f, StringComparison.OrdinalIgnoreCase))).ToList()
+                : allCombinations.ToList();
 
-            // Build all pairings
+            // Resolve defender units — flag, interactive prompt, or all
+            List<UnitProfile> filteredDefenders;
+            if (defenderUnits.Length > 0)
+            {
+                filteredDefenders = enrichedDefenders
+                    .Where(e => defenderUnits.Any(f =>
+                        e.Profile.Name.Contains(f, StringComparison.OrdinalIgnoreCase)))
+                    .Select(e => e.Profile)
+                    .ToList();
+            }
+            else if (!Console.IsInputRedirected)
+            {
+                filteredDefenders = PromptDefenderSelection(enrichedDefenders.Select(e => e.Profile).ToList());
+            }
+            else
+            {
+                // Non-interactive context (piped/scripted): use all defenders
+                filteredDefenders = enrichedDefenders.Select(e => e.Profile).ToList();
+            }
+
+            // Build all pairings (Cartesian product of combinations × defenders)
             var pairings = new List<Pairing>();
-            foreach (var atk in filteredAttackers)
+            foreach (var atk in filteredCombinations)
             {
                 foreach (var def in filteredDefenders)
                 {
                     pairings.Add(new Pairing
                     {
                         SimulationId = BuildSimulationId(
-                            attackerArmy.Faction, atk.Profile.Name,
-                            defenderArmy.Faction, def.Profile.Name),
-                        Attacker = atk.Profile,
-                        Defender = def.Profile
+                            attackerArmy.Faction, atk,
+                            defenderArmy.Faction, def),
+                        Attacker = atk,
+                        Defender = def
                     });
                 }
             }
 
-            logger.LogInformation("Generated {Count} pairings", pairings.Count);
+            logger.LogInformation("Generated {Count} pairings from {Combos} attacker combinations × {Defenders} defenders",
+                pairings.Count, filteredCombinations.Count, filteredDefenders.Count);
 
             var pairingFile = new PairingFile
             {
@@ -102,20 +123,64 @@ public static class MatchupCommand
         return cmd;
     }
 
-    private static string BuildSimulationId(string atkFaction, string atkUnit, string defFaction, string defUnit)
+    // ---------------------------------------------------------------------------
+    // Interactive defender selection
+    // ---------------------------------------------------------------------------
+
+    private static List<UnitProfile> PromptDefenderSelection(List<UnitProfile> defenders)
     {
-        static string Abbrev(string faction) => string.Concat(
-            faction.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                   .Select(w => w[0].ToString().ToLowerInvariant()));
+        Console.WriteLine();
+        Console.WriteLine("Select defender unit(s):");
+        for (int i = 0; i < defenders.Count; i++)
+        {
+            var d = defenders[i];
+            Console.WriteLine($"  {i + 1,3}. {d.Name}  (#{d.ArmyListIndex}, {d.ModelCount} models)");
+        }
+        Console.Write("\nEnter unit numbers separated by commas (or press Enter for all): ");
 
-        static string Slug(string name) =>
-            Regex.Replace(name.ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_');
+        var input = Console.ReadLine() ?? "";
+        if (string.IsNullOrWhiteSpace(input))
+            return defenders;
 
-        return $"{Abbrev(atkFaction)}_{Slug(atkUnit)}_vs_{Abbrev(defFaction)}_{Slug(defUnit)}";
+        return input
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => int.TryParse(s, out var n) && n >= 1 && n <= defenders.Count
+                ? defenders[n - 1] : null)
+            .OfType<UnitProfile>()
+            .ToList();
     }
+
+    // ---------------------------------------------------------------------------
+    // SimulationId
+    // ---------------------------------------------------------------------------
+
+    private static string BuildSimulationId(
+        string atkFaction, AttachedUnit attacker,
+        string defFaction, UnitProfile defender)
+    {
+        var bodyguardSlug = Slug(attacker.Bodyguard.Name);
+        string atkSlug;
+        if (attacker.Leaders.Count == 0)
+        {
+            atkSlug = bodyguardSlug;
+        }
+        else
+        {
+            var leaderSlug = string.Join("_and_", attacker.Leaders.Select(l => Slug(l.Name)));
+            atkSlug = $"{bodyguardSlug}_led_by_{leaderSlug}";
+        }
+
+        return $"{Abbrev(atkFaction)}_{atkSlug}_{attacker.Bodyguard.ArmyListIndex}" +
+               $"_vs_{Abbrev(defFaction)}_{Slug(defender.Name)}_{defender.ArmyListIndex}";
+    }
+
+    private static string Abbrev(string faction) => string.Concat(
+        faction.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+               .Select(w => w[0].ToString().ToLowerInvariant()));
+
+    private static string Slug(string name) =>
+        Regex.Replace(name.ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_');
 
     private static string SanitiseName(string name) =>
         Regex.Replace(name.ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_');
-
-
 }

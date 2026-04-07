@@ -1,0 +1,23 @@
+# Matchup pairing file — annotated YAML schema
+#
+# Produced by: army-enricher matchup <attacker.txt> <defender.txt>
+# Consumed by: Monte Carlo simulation project (Wh40kArmyEnricher.Contracts types)
+# Serialised with YamlDotNet CamelCaseNamingConvention.
+#
+# Both attacker and defender are full UnitProfile objects (see schema-unit-profile.yaml).
+# As of the leader-attachment feature, attacker becomes AttachedUnit (see schema-attached-unit.yaml).
+
+attackerArmy: "Iron Canticle (Black Templars)"
+defenderArmy: "Plague Horde (Death Guard)"
+generatedUtc: "2025-03-13T12:00:00Z"
+simulationDefaults:
+  withinHalfRange: false           # Applied to all pairings unless overridden; not a weapon property
+  runs: 10000                      # Default Monte Carlo iteration count
+pairings:
+  - simulationId: "bt_crusader_squad_vs_dg_plague_marines"
+    # simulationId format: {factionAbbrev}_{attackerSlug}_vs_{factionAbbrev}_{defenderSlug}
+    # With leaders: bt_sword_brethren_led_by_marshal_castellan_vs_dg_plague_marines
+    attacker:
+      # full UnitProfile (or AttachedUnit once leader feature is active)
+    defender:
+      # full UnitProfile — defenders are always plain units, never attached

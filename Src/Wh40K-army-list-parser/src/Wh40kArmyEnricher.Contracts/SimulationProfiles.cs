@@ -141,9 +141,18 @@ public record UnitProfile
     // Identity
     public string Name { get; init; } = "";
     public string Faction { get; init; } = "";
+    /// <summary>1-based position of this unit in the army list as parsed. Used to
+    /// disambiguate units that share a name (e.g. two Crusader Squads).</summary>
+    public int ArmyListIndex { get; init; }
     public int ModelCount { get; init; }
     public List<string> Keywords { get; init; } = new();
     public List<AbilityProfile> Abilities { get; init; } = new();
+    /// <summary>
+    /// Abilities whose text begins with "While this model is leading a unit …".
+    /// These only apply when this unit is acting as a leader in an <see cref="AttachedUnit"/>;
+    /// they must not be applied when simulating the unit standalone.
+    /// </summary>
+    public List<AbilityProfile> LeadingAbilities { get; init; } = new();
     public List<string> Enhancements { get; init; } = new();
 
     // Offensive stats
@@ -157,6 +166,30 @@ public record UnitProfile
     public int? InvulnerableSave { get; init; }  // null if absent
     public int Wounds { get; init; }
     public int? FeelNoPain { get; init; }        // null if absent
+}
+
+// ---------------------------------------------------------------------------
+// Attached unit — simulation-layer composition of a bodyguard + 0–2 leaders.
+// Produced by LeaderResolver, not by the Enricher directly.
+// ---------------------------------------------------------------------------
+
+public record AttachedUnit
+{
+    /// <summary>The non-CHARACTER bodyguard unit (or any standalone unit for the 0-leader baseline).</summary>
+    public UnitProfile Bodyguard { get; init; } = new();
+    /// <summary>0, 1, or 2 CHARACTER leader profiles attached to this unit.</summary>
+    public List<UnitProfile> Leaders { get; init; } = new();
+    /// <summary>Union of bodyguard + all leader keywords.</summary>
+    public List<string> EffectiveKeywords { get; init; } = new();
+    /// <summary>Merged re-roll grants from leaders' leadingAbilities (OR semantics).</summary>
+    public RerollOptions EffectiveRerolls { get; init; } = new();
+    /// <summary>Minimum crit-hit threshold across all leader grants; default 6.</summary>
+    public int EffectiveCritHitsOn { get; init; } = 6;
+    /// <summary>Bodyguard abilities plus leaders' leading abilities; individual abilities
+    /// (Stealth, Infiltrate, etc.) are removed if any leader lacks them.</summary>
+    public List<AbilityProfile> EffectiveAbilities { get; init; } = new();
+    /// <summary>Warnings and assumptions about this combination (e.g. unverified double-primary).</summary>
+    public List<string> Notes { get; init; } = new();
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +209,7 @@ public record SimulationDefaults
 public record Pairing
 {
     public string SimulationId { get; init; } = "";
-    public UnitProfile Attacker { get; init; } = new();
+    public AttachedUnit Attacker { get; init; } = new();
     public UnitProfile Defender { get; init; } = new();
 }
 

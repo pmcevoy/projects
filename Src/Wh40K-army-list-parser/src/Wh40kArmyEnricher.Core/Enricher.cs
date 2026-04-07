@@ -37,7 +37,7 @@ public class Enricher
     public IReadOnlyList<EnrichedUnit> Enrich(ArmyList army)
     {
         return army.Units
-            .Select(u => EnrichUnit(u, army.Faction))
+            .Select((u, i) => EnrichUnit(u, army.Faction, i + 1))
             .ToList();
     }
 
@@ -45,7 +45,7 @@ public class Enricher
     // Unit enrichment
     // ---------------------------------------------------------------------------
 
-    private EnrichedUnit EnrichUnit(UnitEntry unit, string faction)
+    private EnrichedUnit EnrichUnit(UnitEntry unit, string faction, int armyListIndex)
     {
         var unitEntry = _resolver.ResolveUnit(unit.Name, _store);
         if (unitEntry == null)
@@ -54,7 +54,7 @@ public class Enricher
             return new EnrichedUnit
             {
                 ArmyListEntry = unit,
-                Profile = new UnitProfile { Name = unit.Name, Faction = faction }
+                Profile = new UnitProfile { Name = unit.Name, Faction = faction, ArmyListIndex = armyListIndex }
             };
         }
 
@@ -113,19 +113,28 @@ public class Enricher
 
         int totalModels = unit.Models.Sum(m => m.Count);
 
-        var abilities = unitEntry.Abilities.Select(a => new AbilityProfile
+        const string LeadingPrefix = "While this model is leading a unit";
+        var allAbilities = unitEntry.Abilities.Select(a => new AbilityProfile
         {
             Name = a.Name,
             Text = a.Text
         }).ToList();
+        var abilities = allAbilities
+            .Where(a => !a.Text.StartsWith(LeadingPrefix, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var leadingAbilities = allAbilities
+            .Where(a => a.Text.StartsWith(LeadingPrefix, StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
         var profile = new UnitProfile
         {
             Name = unit.Name,
             Faction = faction,
+            ArmyListIndex = armyListIndex,
             ModelCount = totalModels,
             Keywords = unitEntry.Keywords.ToList(),
             Abilities = abilities,
+            LeadingAbilities = leadingAbilities,
             Enhancements = unit.Enhancements.ToList(),
             Rerolls = new RerollOptions(),
             CriticalHitsOn = 6,
