@@ -82,13 +82,19 @@ public class LeaderResolver
                     if (support.Unit != primary.Unit)
                         result.Add(Combine(bodyguard, [primary.Unit, support.Unit], []));
 
-            // 2-leader: two primaries (eligibility of the second is unverified)
+            // 2-leader: two primaries (eligibility of the second is unverified).
+            // Skip pairs where both leaders share the same unit name — two units of the same
+            // datasheet type cannot both attach to the same bodyguard.
             for (int i = 0; i < eligible.Count; i++)
                 for (int j = i + 1; j < eligible.Count; j++)
+                {
+                    if (eligible[i].Unit.Name.Equals(eligible[j].Unit.Name, StringComparison.OrdinalIgnoreCase))
+                        continue;
                     result.Add(Combine(
                         bodyguard,
                         [eligible[i].Unit, eligible[j].Unit],
                         ["Second leader eligibility unverified — confirm manually"]));
+                }
         }
 
         return result;
