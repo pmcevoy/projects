@@ -1,0 +1,911 @@
+attackerArmy: Iron Canticle
+defenderArmy: battle 3
+generatedUtc: 2026-04-07T13:17:52.9724078Z
+simulationDefaults:
+  withinHalfRange: false
+  runs: 10000
+pairings:
+- simulationId: bt_crusader_squad_11_vs_dg_mortarion_4
+  attacker:
+    bodyguard:
+      name: Crusader Squad
+      faction: Black Templars
+      armyListIndex: 11
+      modelCount: 10
+      keywords:
+      - INFANTRY
+      - BATTLELINE
+      - GRENADES
+      - IMPERIUM
+      - 'FACTION: ADEPTUS ASTARTES'
+      - 'FACTION: BLACK TEMPLARS'
+      - TACTICUS
+      - CRUSADER SQUAD
+      abilities:
+      - name: Righteous Zeal
+        text: "In your opponent's Shooting phase, each time an enemy unit has shot, if any models from this unit were destroyed as a result of those attacks, this unit can make a Righteous Zeal move. To do so, roll one D6 and add 2 to the result: models in this unit move a number of inches up to this result, but this unit must end that move as close as possible to the closest enemy unit (excluding ^^**Aircraft^^**). When doing so, those models can be moved within Engagement Range of that enemy unit. This unit cannot make a Righteous Zeal move while it is Battle-shocked or within Engagement Range of one or more enemy units, and can only make one Righteous Zeal move per phase."
+      leadingAbilities: []
+      enhancements: []
+      rerolls:
+        hitRerollOnes: false
+        hitRerollAll: false
+        woundRerollOnes: false
+        woundRerollAll: false
+      criticalHitsOn: 6
+      models:
+      - modelName: Sword Brother
+        count: 1
+        weapons:
+        - weaponName: Master-crafted power weapon
+          type: Melee
+          range: 0
+          profiles:
+          - variant: default
+            attacks: 5
+            skill: 2
+            strength: 4
+            ap: -2
+            damage: 2
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+        - weaponName: Pyre pistol
+          type: Ranged
+          range: 12
+          profiles:
+          - variant: default
+            attacks: "D6"
+            skill: 3
+            strength: 4
+            ap: 0
+            damage: 1
+            abilities:
+              torrent: true
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+      - modelName: Initiate
+        count: 5
+        weapons:
+        - weaponName: Astartes chainsword
+          type: Melee
+          range: 0
+          profiles:
+          - variant: default
+            attacks: 5
+            skill: 3
+            strength: 4
+            ap: -1
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+        - weaponName: Bolt pistol
+          type: Ranged
+          range: 12
+          profiles:
+          - variant: default
+            attacks: 1
+            skill: 4
+            strength: 4
+            ap: 0
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+        - weaponName: Close combat weapon
+          type: Melee
+          range: 0
+          profiles:
+          - variant: default
+            attacks: 3
+            skill: 2
+            strength: 3
+            ap: 0
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+        - weaponName: Heavy bolt pistol
+          type: Ranged
+          range: 12
+          profiles:
+          - variant: default
+            attacks: 1
+            skill: 3
+            strength: 4
+            ap: -1
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+        - weaponName: Power fist
+          type: Melee
+          range: 0
+          profiles:
+          - variant: default
+            attacks: 5
+            skill: 2
+            strength: 8
+            ap: -2
+            damage: 2
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+      - modelName: Neophyte
+        count: 4
+        weapons:
+        - weaponName: Astartes chainsword
+          type: Melee
+          range: 0
+          profiles:
+          - variant: default
+            attacks: 5
+            skill: 3
+            strength: 4
+            ap: -1
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+        - weaponName: Bolt pistol
+          type: Ranged
+          range: 12
+          profiles:
+          - variant: default
+            attacks: 1
+            skill: 4
+            strength: 4
+            ap: 0
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+      toughness: 4
+      save: 3
+      wounds: 2
+    leaders: []
+    effectiveKeywords:
+    - INFANTRY
+    - BATTLELINE
+    - GRENADES
+    - IMPERIUM
+    - 'FACTION: ADEPTUS ASTARTES'
+    - 'FACTION: BLACK TEMPLARS'
+    - TACTICUS
+    - CRUSADER SQUAD
+    effectiveRerolls:
+      hitRerollOnes: false
+      hitRerollAll: false
+      woundRerollOnes: false
+      woundRerollAll: false
+    effectiveCritHitsOn: 6
+    effectiveAbilities:
+    - name: Righteous Zeal
+      text: "In your opponent's Shooting phase, each time an enemy unit has shot, if any models from this unit were destroyed as a result of those attacks, this unit can make a Righteous Zeal move. To do so, roll one D6 and add 2 to the result: models in this unit move a number of inches up to this result, but this unit must end that move as close as possible to the closest enemy unit (excluding ^^**Aircraft^^**). When doing so, those models can be moved within Engagement Range of that enemy unit. This unit cannot make a Righteous Zeal move while it is Battle-shocked or within Engagement Range of one or more enemy units, and can only make one Righteous Zeal move per phase."
+    notes: []
+  defender:
+    name: Mortarion
+    faction: Death Guard
+    armyListIndex: 4
+    modelCount: 1
+    keywords:
+    - 'FACTION: DEATH GUARD'
+    - MONSTER
+    - PSYKER
+    - FLY
+    - CHARACTER
+    - EPIC HERO
+    - DAEMON
+    - GRENADES
+    - CHAOS
+    - NURGLE
+    - PRIMARCH
+    - MORTARION
+    abilities:
+    - name: Host of Plagues
+      text: At the end of your Movement phase, roll one D6 for each enemy unit within 6" of this model, adding 1 to the result if that unit is Afflicted; on a 3+, that enemy unit suffers D3 mortal wounds.
+    - name: Lord of the Death Guard
+      text: Once per turn, this model can use one of the Lord of the Death Guard abilties.
+    - name: 'Damaged: 1-6 wounds remaining'
+      text: While this model has 1-6 wounds remaining, each time this model makes an attack, subtract 1 from the Hit roll.
+    - name: Invulnerable Save
+      text: This model has a 4+ invulnerable save.
+    leadingAbilities: []
+    enhancements: []
+    rerolls:
+      hitRerollOnes: false
+      hitRerollAll: false
+      woundRerollOnes: false
+      woundRerollAll: false
+    criticalHitsOn: 6
+    models:
+    - modelName: Mortarion
+      count: 1
+      weapons:
+      - weaponName: Lantern
+        type: Ranged
+        range: 24
+        profiles:
+        - variant: default
+          attacks: 1
+          skill: 2
+          strength: 10
+          ap: -3
+          damage: 3
+          abilities:
+            torrent: false
+            blast: false
+            melta: 0
+            rapidFire: 0
+            sustainedHits: 0
+            lethalHits: false
+            devastatingWounds: false
+            twinLinked: false
+            anti: {}
+      - weaponName: Rotwind
+        type: Ranged
+        range: 24
+        profiles:
+        - variant: default
+          attacks: "D6+3"
+          skill: 2
+          strength: 7
+          ap: -2
+          damage: 1
+          abilities:
+            torrent: false
+            blast: true
+            melta: 0
+            rapidFire: 0
+            sustainedHits: 0
+            lethalHits: true
+            devastatingWounds: true
+            twinLinked: false
+            anti: {}
+      - weaponName: Silence
+        type: Melee
+        range: 0
+        profiles:
+        - variant: strike
+          attacks: 5
+          skill: 2
+          strength: 14
+          ap: -3
+          damage: "D6+1"
+          abilities:
+            torrent: false
+            blast: false
+            melta: 0
+            rapidFire: 0
+            sustainedHits: 0
+            lethalHits: true
+            devastatingWounds: true
+            twinLinked: false
+            anti: {}
+        - variant: sweep
+          attacks: 15
+          skill: 2
+          strength: 8
+          ap: -2
+          damage: 2
+          abilities:
+            torrent: false
+            blast: false
+            melta: 0
+            rapidFire: 0
+            sustainedHits: 1
+            lethalHits: true
+            devastatingWounds: false
+            twinLinked: false
+            anti: {}
+    toughness: 12
+    save: 2
+    invulnerableSave: 4
+    wounds: 16
+    feelNoPain: 5
+- simulationId: bt_crusader_squad_10_led_by_castellan_1_and_marshal_6_vs_dg_mortarion_4
+  attacker:
+    bodyguard:
+      name: Crusader Squad
+      faction: Black Templars
+      armyListIndex: 10
+      modelCount: 10
+      keywords:
+      - INFANTRY
+      - BATTLELINE
+      - GRENADES
+      - IMPERIUM
+      - 'FACTION: ADEPTUS ASTARTES'
+      - 'FACTION: BLACK TEMPLARS'
+      - TACTICUS
+      - CRUSADER SQUAD
+      abilities:
+      - name: Righteous Zeal
+        text: "In your opponent's Shooting phase, each time an enemy unit has shot, if any models from this unit were destroyed as a result of those attacks, this unit can make a Righteous Zeal move. To do so, roll one D6 and add 2 to the result: models in this unit move a number of inches up to this result, but this unit must end that move as close as possible to the closest enemy unit (excluding ^^**Aircraft^^**). When doing so, those models can be moved within Engagement Range of that enemy unit. This unit cannot make a Righteous Zeal move while it is Battle-shocked or within Engagement Range of one or more enemy units, and can only make one Righteous Zeal move per phase."
+      leadingAbilities: []
+      enhancements: []
+      rerolls:
+        hitRerollOnes: false
+        hitRerollAll: false
+        woundRerollOnes: false
+        woundRerollAll: false
+      criticalHitsOn: 6
+      models:
+      - modelName: Sword Brother
+        count: 1
+        weapons:
+        - weaponName: Master-crafted power weapon
+          type: Melee
+          range: 0
+          profiles:
+          - variant: default
+            attacks: 5
+            skill: 2
+            strength: 4
+            ap: -2
+            damage: 2
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+        - weaponName: Pyre pistol
+          type: Ranged
+          range: 12
+          profiles:
+          - variant: default
+            attacks: "D6"
+            skill: 3
+            strength: 4
+            ap: 0
+            damage: 1
+            abilities:
+              torrent: true
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+      - modelName: Initiate
+        count: 5
+        weapons:
+        - weaponName: Astartes chainsword
+          type: Melee
+          range: 0
+          profiles:
+          - variant: default
+            attacks: 5
+            skill: 3
+            strength: 4
+            ap: -1
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+        - weaponName: Bolt pistol
+          type: Ranged
+          range: 12
+          profiles:
+          - variant: default
+            attacks: 1
+            skill: 4
+            strength: 4
+            ap: 0
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+        - weaponName: Close combat weapon
+          type: Melee
+          range: 0
+          profiles:
+          - variant: default
+            attacks: 3
+            skill: 2
+            strength: 3
+            ap: 0
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+        - weaponName: Heavy bolt pistol
+          type: Ranged
+          range: 12
+          profiles:
+          - variant: default
+            attacks: 1
+            skill: 3
+            strength: 4
+            ap: -1
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+        - weaponName: Power fist
+          type: Melee
+          range: 0
+          profiles:
+          - variant: default
+            attacks: 5
+            skill: 2
+            strength: 8
+            ap: -2
+            damage: 2
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+      - modelName: Neophyte
+        count: 4
+        weapons:
+        - weaponName: Astartes chainsword
+          type: Melee
+          range: 0
+          profiles:
+          - variant: default
+            attacks: 5
+            skill: 3
+            strength: 4
+            ap: -1
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+        - weaponName: Bolt pistol
+          type: Ranged
+          range: 12
+          profiles:
+          - variant: default
+            attacks: 1
+            skill: 4
+            strength: 4
+            ap: 0
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+      toughness: 4
+      save: 3
+      wounds: 2
+    leaders:
+    - name: Castellan
+      faction: Black Templars
+      armyListIndex: 1
+      modelCount: 1
+      keywords:
+      - CHARACTER
+      - INFANTRY
+      - GRENADES
+      - IMPERIUM
+      - TACTICUS
+      - 'FACTION: ADEPTUS ASTARTES'
+      - 'FACTION: BLACK TEMPLARS'
+      - LIEUTENANT
+      - CASTELLAN
+      abilities:
+      - name: Leader
+        text: |-
+          This model can be attached to the following units:
+
+          ■ Assault Intercessor Squad
+          ■ Infernus Squad
+          ■ Intercessor Squad
+          ■ Crusader Squad
+          ■ Sword Brethren
+          ■ Sternguard Veteran Squad
+
+          You can attach this model to one of the above units even if one Captain or Chapter Master model has already been attached to it. If you do, and that Bodyguard unit is destroyed, the Leader units attached to it become separate units, with their original Starting Strengths.
+      - name: Prioritised Eradication
+        text: "Each time a model in this model's unit makes a melee attack that destroys one or more enemy units, roll one D6: on a 4+, you gain 1 CP"
+      leadingAbilities:
+      - name: Vehement Aggression
+        text: 'While this model is leading a unit, each time that unit is selected to fight, take a Leadership test for that unit: if passed, until the end of the phase, each time a model in that unit makes an attack, you can re-roll the Hit roll; if failed, until the end of the phase, each time a model in that unit makes an attack, re-roll a Hit roll of 1'
+      enhancements: []
+      rerolls:
+        hitRerollOnes: false
+        hitRerollAll: false
+        woundRerollOnes: false
+        woundRerollAll: false
+      criticalHitsOn: 6
+      models:
+      - modelName: Castellan
+        count: 1
+        weapons:
+        - weaponName: Combi-weapon
+          type: Ranged
+          range: 24
+          profiles:
+          - variant: default
+            attacks: 1
+            skill: 3
+            strength: 4
+            ap: 0
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 1
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: true
+              twinLinked: false
+              anti:
+                INFANTRY: 4
+        - weaponName: Master-crafted power weapon
+          type: Melee
+          range: 0
+          profiles:
+          - variant: default
+            attacks: 6
+            skill: 2
+            strength: 5
+            ap: -2
+            damage: 2
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: true
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+      toughness: 4
+      save: 3
+      wounds: 4
+    - name: Marshal
+      faction: Black Templars
+      armyListIndex: 6
+      modelCount: 1
+      keywords:
+      - CHARACTER
+      - INFANTRY
+      - GRENADES
+      - IMPERIUM
+      - TACTICUS
+      - 'FACTION: ADEPTUS ASTARTES'
+      - 'FACTION: BLACK TEMPLARS'
+      - MARSHAL
+      - CAPTAIN
+      abilities:
+      - name: Leader
+        text: |-
+          This model can be attached to the following units:
+
+          ■ Assault Intercessor Squad
+          ■ Infernus Squad
+          ■ Intercessor Squad
+          ■ Crusader Squad
+          ■ Sword Brethren
+          ■ Sternguard Veteran Squad
+      - name: Pious Fervour
+        text: Each time this model's unit is selected to fight, until the end of the phase, add 1 to the Attacks characteristic of this model's Master-Crafted Power Weapon for each enemy unit within 6" of this model (to a maximum of +3)
+      leadingAbilities:
+      - name: Inspirational Exemplar
+        text: While this model is leading a unit, each time a model in that unit makes a melee attack, an unmodified Hit roll of 5+ scores a Critical Hit.
+      enhancements: []
+      rerolls:
+        hitRerollOnes: false
+        hitRerollAll: false
+        woundRerollOnes: false
+        woundRerollAll: false
+      criticalHitsOn: 6
+      models:
+      - modelName: Marshal
+        count: 1
+        weapons:
+        - weaponName: Combi-weapon
+          type: Ranged
+          range: 24
+          profiles:
+          - variant: default
+            attacks: 1
+            skill: 3
+            strength: 4
+            ap: 0
+            damage: 1
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 1
+              sustainedHits: 0
+              lethalHits: false
+              devastatingWounds: true
+              twinLinked: false
+              anti:
+                INFANTRY: 4
+        - weaponName: Master-crafted power weapon
+          type: Melee
+          range: 0
+          profiles:
+          - variant: default
+            attacks: 7
+            skill: 2
+            strength: 5
+            ap: -2
+            damage: 2
+            abilities:
+              torrent: false
+              blast: false
+              melta: 0
+              rapidFire: 0
+              sustainedHits: 0
+              lethalHits: true
+              devastatingWounds: false
+              twinLinked: false
+              anti: {}
+      toughness: 4
+      save: 3
+      invulnerableSave: 4
+      wounds: 5
+    effectiveKeywords:
+    - INFANTRY
+    - BATTLELINE
+    - GRENADES
+    - IMPERIUM
+    - 'FACTION: ADEPTUS ASTARTES'
+    - 'FACTION: BLACK TEMPLARS'
+    - TACTICUS
+    - CRUSADER SQUAD
+    - CHARACTER
+    - LIEUTENANT
+    - CASTELLAN
+    - MARSHAL
+    - CAPTAIN
+    effectiveRerolls:
+      hitRerollOnes: false
+      hitRerollAll: false
+      woundRerollOnes: false
+      woundRerollAll: false
+    effectiveCritHitsOn: 5
+    effectiveAbilities:
+    - name: Righteous Zeal
+      text: "In your opponent's Shooting phase, each time an enemy unit has shot, if any models from this unit were destroyed as a result of those attacks, this unit can make a Righteous Zeal move. To do so, roll one D6 and add 2 to the result: models in this unit move a number of inches up to this result, but this unit must end that move as close as possible to the closest enemy unit (excluding ^^**Aircraft^^**). When doing so, those models can be moved within Engagement Range of that enemy unit. This unit cannot make a Righteous Zeal move while it is Battle-shocked or within Engagement Range of one or more enemy units, and can only make one Righteous Zeal move per phase."
+    - name: Vehement Aggression
+      text: 'While this model is leading a unit, each time that unit is selected to fight, take a Leadership test for that unit: if passed, until the end of the phase, each time a model in that unit makes an attack, you can re-roll the Hit roll; if failed, until the end of the phase, each time a model in that unit makes an attack, re-roll a Hit roll of 1'
+    - name: Inspirational Exemplar
+      text: While this model is leading a unit, each time a model in that unit makes a melee attack, an unmodified Hit roll of 5+ scores a Critical Hit.
+    notes:
+    - Second leader eligibility unverified — confirm manually
+    - criticalHitsOn reduced from 6 to 5 by Marshal / Inspirational Exemplar
+  defender:
+    name: Mortarion
+    faction: Death Guard
+    armyListIndex: 4
+    modelCount: 1
+    keywords:
+    - 'FACTION: DEATH GUARD'
+    - MONSTER
+    - PSYKER
+    - FLY
+    - CHARACTER
+    - EPIC HERO
+    - DAEMON
+    - GRENADES
+    - CHAOS
+    - NURGLE
+    - PRIMARCH
+    - MORTARION
+    abilities:
+    - name: Host of Plagues
+      text: At the end of your Movement phase, roll one D6 for each enemy unit within 6" of this model, adding 1 to the result if that unit is Afflicted; on a 3+, that enemy unit suffers D3 mortal wounds.
+    - name: Lord of the Death Guard
+      text: Once per turn, this model can use one of the Lord of the Death Guard abilties.
+    - name: 'Damaged: 1-6 wounds remaining'
+      text: While this model has 1-6 wounds remaining, each time this model makes an attack, subtract 1 from the Hit roll.
+    - name: Invulnerable Save
+      text: This model has a 4+ invulnerable save.
+    leadingAbilities: []
+    enhancements: []
+    rerolls:
+      hitRerollOnes: false
+      hitRerollAll: false
+      woundRerollOnes: false
+      woundRerollAll: false
+    criticalHitsOn: 6
+    models:
+    - modelName: Mortarion
+      count: 1
+      weapons:
+      - weaponName: Lantern
+        type: Ranged
+        range: 24
+        profiles:
+        - variant: default
+          attacks: 1
+          skill: 2
+          strength: 10
+          ap: -3
+          damage: 3
+          abilities:
+            torrent: false
+            blast: false
+            melta: 0
+            rapidFire: 0
+            sustainedHits: 0
+            lethalHits: false
+            devastatingWounds: false
+            twinLinked: false
+            anti: {}
+      - weaponName: Rotwind
+        type: Ranged
+        range: 24
+        profiles:
+        - variant: default
+          attacks: "D6+3"
+          skill: 2
+          strength: 7
+          ap: -2
+          damage: 1
+          abilities:
+            torrent: false
+            blast: true
+            melta: 0
+            rapidFire: 0
+            sustainedHits: 0
+            lethalHits: true
+            devastatingWounds: true
+            twinLinked: false
+            anti: {}
+      - weaponName: Silence
+        type: Melee
+        range: 0
+        profiles:
+        - variant: strike
+          attacks: 5
+          skill: 2
+          strength: 14
+          ap: -3
+          damage: "D6+1"
+          abilities:
+            torrent: false
+            blast: false
+            melta: 0
+            rapidFire: 0
+            sustainedHits: 0
+            lethalHits: true
+            devastatingWounds: true
+            twinLinked: false
+            anti: {}
+        - variant: sweep
+          attacks: 15
+          skill: 2
+          strength: 8
+          ap: -2
+          damage: 2
+          abilities:
+            torrent: false
+            blast: false
+            melta: 0
+            rapidFire: 0
+            sustainedHits: 1
+            lethalHits: true
+            devastatingWounds: false
+            twinLinked: false
+            anti: {}
+    toughness: 12
+    save: 2
+    invulnerableSave: 4
+    wounds: 16
+    feelNoPain: 5
