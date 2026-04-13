@@ -13,7 +13,9 @@ public static class SessionJson
 {
     public static readonly JsonSerializerOptions Options = new()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        // No naming policy — keep PascalCase so C# property names round-trip exactly.
+        // CamelCase is only needed for the data-unit HTML attribute (handled separately in ArmyView.cshtml).
+        PropertyNameCaseInsensitive = true,
         Converters = { new ScalarValueJsonConverter() }
     };
 }
