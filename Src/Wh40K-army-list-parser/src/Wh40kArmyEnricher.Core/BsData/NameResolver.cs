@@ -103,15 +103,19 @@ public class NameResolver
         CatalogueEntry? unitEntry, CatalogueEntry? modelEntry, CatalogueStore store)
     {
         // --- Pass 1: search by profile name ---
+        // Recurse the full model/unit hierarchy so weapons nested inside selectionEntryGroups
+        // (e.g. Sword Brother's "Master-crafted Power Weapon" lives under a "Melee Option"
+        // selectionEntryGroup, not directly on the model entry) are found before the global
+        // search, which may return the same weapon name from a different catalogue with different
+        // keywords (e.g. Space Marines has "Master-crafted Power Weapon" with "Precision" while
+        // Black Templars has the same weapon with "Lethal Hits").
         var profileCandidates = new List<WeaponProfileData>();
         if (modelEntry != null)
-            profileCandidates.AddRange(modelEntry.Weapons);
+            foreach (var e in FlattenEntry(modelEntry))
+                profileCandidates.AddRange(e.Weapons);
         if (unitEntry != null)
-        {
-            profileCandidates.AddRange(unitEntry.Weapons);
-            foreach (var child in unitEntry.ChildEntries)
-                profileCandidates.AddRange(child.Weapons);
-        }
+            foreach (var e in FlattenEntry(unitEntry))
+                profileCandidates.AddRange(e.Weapons);
         var byProfile = ResolveWeaponByProfile(weaponName, profileCandidates);
         if (byProfile != null) return [byProfile];
 
