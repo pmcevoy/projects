@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Wh40kArmyEnricher.Contracts;
+using Wh40kArmyEnricher.Web.Helpers;
 
 namespace Wh40kArmyEnricher.Web.Pages;
 
@@ -18,8 +19,8 @@ public class ArmyViewModel : PageModel
         if (attackerJson == null || defenderJson == null)
             return RedirectToPage("/Index");
 
-        AttackerArmy = JsonSerializer.Deserialize<List<UnitProfile>>(attackerJson) ?? [];
-        DefenderArmy = JsonSerializer.Deserialize<List<UnitProfile>>(defenderJson) ?? [];
+        AttackerArmy = JsonSerializer.Deserialize<List<UnitProfile>>(attackerJson, SessionJson.Options) ?? [];
+        DefenderArmy = JsonSerializer.Deserialize<List<UnitProfile>>(defenderJson, SessionJson.Options) ?? [];
 
         return Page();
     }

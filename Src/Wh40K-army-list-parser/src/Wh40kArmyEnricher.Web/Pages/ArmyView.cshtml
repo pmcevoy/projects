@@ -57,18 +57,12 @@
     </div>
 
     <div class="row g-2">
-        <!-- Weapon selector -->
-        <div class="col-md-4">
-            <label class="form-label small text-muted mb-1">Weapon</label>
-            <select id="weapon-select" class="form-select form-select-sm bg-dark text-light border-secondary">
-                <option value="">— select attacker first —</option>
-            </select>
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small text-muted mb-1">Variant</label>
-            <select id="variant-select" class="form-select form-select-sm bg-dark text-light border-secondary">
-                <option value="default">default</option>
-            </select>
+        <!-- Weapon display (selected by clicking a weapon row in the unit card) -->
+        <div class="col-md-7">
+            <label class="form-label small text-muted mb-1">Selected Weapon</label>
+            <div id="weapon-display" class="weapon-display-hint">
+                Expand an attacker unit and click a weapon row to select it.
+            </div>
         </div>
         <div class="col-md-2">
             <label class="form-label small text-muted mb-1">Models firing</label>

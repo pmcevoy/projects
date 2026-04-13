@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Wh40kArmyEnricher.Web.Helpers;
 using Wh40kArmyEnricher.Contracts;
 using Wh40kArmyEnricher.Core;
 using Wh40kArmyEnricher.Core.BsData;
@@ -85,8 +86,8 @@ app.MapPost("/api/simulate", (
     if (attackerJson == null || defenderJson == null)
         return Results.Json(new SimulationResponse { Success = false, Error = "Session expired. Please re-upload your army lists." });
 
-    var attackerArmy = JsonSerializer.Deserialize<List<UnitProfile>>(attackerJson);
-    var defenderArmy = JsonSerializer.Deserialize<List<UnitProfile>>(defenderJson);
+    var attackerArmy = JsonSerializer.Deserialize<List<UnitProfile>>(attackerJson, SessionJson.Options);
+    var defenderArmy = JsonSerializer.Deserialize<List<UnitProfile>>(defenderJson, SessionJson.Options);
 
     if (attackerArmy == null || defenderArmy == null)
         return Results.Json(new SimulationResponse { Success = false, Error = "Failed to read armies from session." });

@@ -7,26 +7,23 @@
     const selectedAttackers = new Map(); // index -> unitProfile
     let selectedDefenderIndex = null;
     let selectedDefenderUnit = null;
+    let selectedWeapon = null; // { weaponName, variantName, modelName, modelCount, rowElement }
 
     const combatPanel = document.getElementById('combat-panel');
     const selectionSummary = document.getElementById('selection-summary');
-    const weaponSelect = document.getElementById('weapon-select');
-    const variantSelect = document.getElementById('variant-select');
+    const weaponDisplay = document.getElementById('weapon-display');
     const attackingModelsInput = document.getElementById('attacking-models');
     const runSimBtn = document.getElementById('run-sim-btn');
     const resultsPanel = document.getElementById('results-panel');
     const loadingOverlay = document.getElementById('loading-overlay');
 
     // ---------------------------------------------------------------------------
-    // Unit card click handling
+    // Unit card click handling (header area — selection toggle)
     // ---------------------------------------------------------------------------
 
     document.querySelectorAll('.unit-card').forEach(card => {
-        // Expand/collapse is handled by Bootstrap on the inner header.
-        // We handle selection on the card element itself, but must not fire when
-        // the user is clicking the header to expand (Bootstrap handles that toggle).
         card.addEventListener('click', function (e) {
-            // Ignore clicks that originate inside the collapsed detail body
+            // Clicks inside the expanded detail body are handled separately
             if (e.target.closest('.collapse')) return;
 
             const role = card.dataset.role;
@@ -47,6 +44,10 @@
         if (selectedAttackers.has(index)) {
             selectedAttackers.delete(index);
             card.classList.remove('selected-attacker');
+            // Clear weapon if it belonged to this unit
+            if (selectedWeapon && selectedWeapon.unitIndex === index) {
+                clearWeaponSelection();
+            }
         } else {
             selectedAttackers.set(index, unit);
             card.classList.add('selected-attacker');
@@ -54,13 +55,11 @@
     }
 
     function selectDefender(card, index, unit) {
-        // Deselect previous defender
         document.querySelectorAll('.unit-card[data-role="defender"]').forEach(c => {
             c.classList.remove('selected-defender');
         });
 
         if (selectedDefenderIndex === index) {
-            // Clicking again deselects
             selectedDefenderIndex = null;
             selectedDefenderUnit = null;
         } else {
@@ -71,6 +70,59 @@
     }
 
     // ---------------------------------------------------------------------------
+    // Weapon row click handling
+    // ---------------------------------------------------------------------------
+
+    document.querySelectorAll('.unit-card[data-role="attacker"] .weapon-variant-row').forEach(row => {
+        row.addEventListener('click', function (e) {
+            e.stopPropagation(); // prevent card selection toggle
+
+            const card = row.closest('.unit-card');
+            const unitIndex = parseInt(card.dataset.index, 10);
+            const unit = JSON.parse(card.dataset.unit);
+
+            const weaponName  = row.dataset.weaponName;
+            const variantName = row.dataset.variant;
+            const modelName   = row.dataset.modelName;
+            const modelCount  = parseInt(row.dataset.modelCount, 10);
+
+            const isSameRow = selectedWeapon
+                && selectedWeapon.weaponName === weaponName
+                && selectedWeapon.variantName === variantName
+                && selectedWeapon.unitIndex === unitIndex;
+
+            if (isSameRow) {
+                // Clicking the same row again deselects it
+                clearWeaponSelection();
+            } else {
+                // Auto-select the parent unit as attacker if not already
+                if (!selectedAttackers.has(unitIndex)) {
+                    selectedAttackers.set(unitIndex, unit);
+                    card.classList.add('selected-attacker');
+                }
+
+                // Clear any previously highlighted weapon row
+                clearWeaponSelection(/* keepAttackers */ true);
+
+                selectedWeapon = { weaponName, variantName, modelName, modelCount, unitIndex, rowElement: row };
+                row.classList.add('selected-weapon');
+                attackingModelsInput.value = modelCount;
+            }
+
+            updateUI();
+        });
+    });
+
+    function clearWeaponSelection(keepAttackers = false) {
+        if (selectedWeapon && selectedWeapon.rowElement) {
+            selectedWeapon.rowElement.classList.remove('selected-weapon');
+        }
+        selectedWeapon = null;
+        updateWeaponDisplay();
+        if (!keepAttackers) updateRunButton();
+    }
+
+    // ---------------------------------------------------------------------------
     // UI updates
     // ---------------------------------------------------------------------------
 
@@ -78,107 +130,35 @@
         const hasAttackers = selectedAttackers.size > 0;
         const hasDefender = selectedDefenderIndex !== null;
 
-        if (hasAttackers || hasDefender) {
-            combatPanel.style.display = 'block';
-        } else {
-            combatPanel.style.display = 'none';
-        }
+        combatPanel.style.display = (hasAttackers || hasDefender) ? 'block' : 'none';
 
-        // Selection summary
         const attackerNames = [...selectedAttackers.values()].map(u => u.name).join(' + ');
         const defenderNameStr = selectedDefenderUnit ? selectedDefenderUnit.name : '—';
         selectionSummary.textContent = hasAttackers
             ? `Attacker: ${attackerNames} vs Defender: ${defenderNameStr}`
             : 'Select one or more attacker units and a defender unit.';
 
-        // Populate weapon dropdown
-        populateWeapons();
-
-        // Enable run button only when everything is selected
-        const weaponChosen = weaponSelect.value !== '';
-        runSimBtn.disabled = !(hasAttackers && hasDefender && weaponChosen);
-    }
-
-    function populateWeapons() {
-        const previousWeapon = weaponSelect.value;
-        weaponSelect.innerHTML = '<option value="">— choose weapon —</option>';
-
-        if (selectedAttackers.size === 0) return;
-
-        // Collect all weapons from all selected attacker units
-        // weapon key: "modelName|weaponName"
-        const weaponMap = new Map(); // weaponName -> { modelName, weapon }
-
-        for (const unit of selectedAttackers.values()) {
-            for (const model of unit.models) {
-                for (const weapon of model.weapons) {
-                    const key = weapon.weaponName;
-                    if (!weaponMap.has(key)) {
-                        weaponMap.set(key, { modelName: model.modelName, count: model.count, weapon });
-                    } else {
-                        // Same weapon on multiple models — accumulate count
-                        weaponMap.get(key).count += model.count;
-                    }
-                }
-            }
-        }
-
-        for (const [weaponName, info] of weaponMap) {
-            const opt = document.createElement('option');
-            opt.value = weaponName;
-            opt.dataset.modelName = info.modelName;
-            opt.dataset.count = info.count;
-            opt.dataset.variants = JSON.stringify(info.weapon.profiles.map(p => p.variant));
-            opt.textContent = `${weaponName} (${info.modelName} ×${info.count})`;
-            weaponSelect.appendChild(opt);
-        }
-
-        // Restore previous selection if still available
-        if (previousWeapon && [...weaponMap.keys()].includes(previousWeapon)) {
-            weaponSelect.value = previousWeapon;
-        }
-
-        populateVariants();
-    }
-
-    weaponSelect.addEventListener('change', function () {
-        populateVariants();
-        const selectedOpt = weaponSelect.options[weaponSelect.selectedIndex];
-        if (selectedOpt && selectedOpt.dataset.count) {
-            attackingModelsInput.value = selectedOpt.dataset.count;
-        }
+        updateWeaponDisplay();
         updateRunButton();
-    });
+    }
 
-    function populateVariants() {
-        variantSelect.innerHTML = '';
-        const selectedOpt = weaponSelect.options[weaponSelect.selectedIndex];
-        if (!selectedOpt || !selectedOpt.dataset.variants) {
-            const opt = document.createElement('option');
-            opt.value = 'default';
-            opt.textContent = 'default';
-            variantSelect.appendChild(opt);
+    function updateWeaponDisplay() {
+        if (!selectedWeapon) {
+            weaponDisplay.className = 'weapon-display-hint';
+            weaponDisplay.textContent = 'Expand an attacker unit and click a weapon row to select it.';
             return;
         }
-
-        const variants = JSON.parse(selectedOpt.dataset.variants);
-        for (const v of variants) {
-            const opt = document.createElement('option');
-            opt.value = v;
-            opt.textContent = v;
-            variantSelect.appendChild(opt);
-        }
+        weaponDisplay.className = 'weapon-display-selected';
+        const variantStr = selectedWeapon.variantName === 'default' ? '' : ` [${selectedWeapon.variantName}]`;
+        weaponDisplay.textContent =
+            `${selectedWeapon.weaponName}${variantStr}  —  ${selectedWeapon.modelName} ×${selectedWeapon.modelCount}`;
     }
 
     function updateRunButton() {
         const hasAttackers = selectedAttackers.size > 0;
         const hasDefender = selectedDefenderIndex !== null;
-        const weaponChosen = weaponSelect.value !== '';
-        runSimBtn.disabled = !(hasAttackers && hasDefender && weaponChosen);
+        runSimBtn.disabled = !(hasAttackers && hasDefender && selectedWeapon !== null);
     }
-
-    weaponSelect.addEventListener('change', updateRunButton);
-    variantSelect.addEventListener('change', updateRunButton);
 
     // ---------------------------------------------------------------------------
     // Run simulation
@@ -188,14 +168,12 @@
         loadingOverlay.classList.add('active');
         resultsPanel.style.display = 'none';
 
-        const selectedOpt = weaponSelect.options[weaponSelect.selectedIndex];
-
         const request = {
             attackerUnitIndices: [...selectedAttackers.keys()],
             defenderUnitIndex: selectedDefenderIndex,
-            weaponName: weaponSelect.value,
-            variantName: variantSelect.value || 'default',
-            modelName: selectedOpt ? selectedOpt.dataset.modelName : '',
+            weaponName: selectedWeapon.weaponName,
+            variantName: selectedWeapon.variantName,
+            modelName: selectedWeapon.modelName,
             attackingModels: parseInt(attackingModelsInput.value, 10) || 0,
             withinHalfRange: document.getElementById('within-half-range').checked,
             inCover: document.getElementById('in-cover').checked,

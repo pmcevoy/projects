@@ -119,6 +119,13 @@ body {
 
 .weapon-table td:first-child { text-align: left; }
 
+/* Combat panel — ensure all label text is readable on dark background */
+#combat-panel .text-muted,
+#combat-panel .form-check-label,
+#combat-panel label {
+    color: #adb5bd !important;
+}
+
 /* Combat panel */
 #combat-panel {
     background-color: #16213e;
@@ -210,6 +217,41 @@ body {
     outline: none;
     border-color: #457b9d;
     box-shadow: 0 0 0 2px rgba(69, 123, 157, 0.25);
+}
+
+/* Weapon row selection (attacker cards only) */
+.unit-card[data-role="attacker"] .weapon-variant-row {
+    cursor: pointer;
+}
+
+.unit-card[data-role="attacker"] .weapon-variant-row:hover {
+    background-color: #2a2a4a;
+    color: #fff;
+}
+
+.unit-card[data-role="attacker"] .weapon-variant-row.selected-weapon {
+    background-color: #3a1a1e;
+    outline: 1px solid #e63946;
+    color: #f8c8cc;
+}
+
+/* Weapon display in combat panel */
+.weapon-display-hint {
+    font-size: 0.8rem;
+    color: #6c757d;
+    padding: 0.4rem 0.6rem;
+    border: 1px dashed #2a2a4a;
+    border-radius: 4px;
+    font-style: italic;
+}
+
+.weapon-display-selected {
+    font-size: 0.85rem;
+    color: #a8dadc;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #457b9d;
+    border-radius: 4px;
+    font-weight: 600;
 }
 
 /* Spinner overlay */

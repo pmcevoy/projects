@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Wh40kArmyEnricher.Web.Helpers;
 using Wh40kArmyEnricher.Web.Services;
 
 namespace Wh40kArmyEnricher.Web.Pages;
@@ -36,9 +37,8 @@ public class IndexModel : PageModel
             var attackerUnits = _enricher.Enrich(AttackerText);
             var defenderUnits = _enricher.Enrich(DefenderText);
 
-            var opts = new JsonSerializerOptions { WriteIndented = false };
-            HttpContext.Session.SetString("attacker_army", JsonSerializer.Serialize(attackerUnits, opts));
-            HttpContext.Session.SetString("defender_army",  JsonSerializer.Serialize(defenderUnits, opts));
+            HttpContext.Session.SetString("attacker_army", JsonSerializer.Serialize(attackerUnits, SessionJson.Options));
+            HttpContext.Session.SetString("defender_army",  JsonSerializer.Serialize(defenderUnits, SessionJson.Options));
 
             return RedirectToPage("/ArmyView");
         }

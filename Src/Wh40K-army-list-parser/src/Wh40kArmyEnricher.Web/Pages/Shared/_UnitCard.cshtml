@@ -61,7 +61,11 @@
                             @foreach (var variant in weapon.Profiles)
                             {
                                 var abilityList = BuildAbilityList(variant.Abilities);
-                                <tr>
+                                <tr class="weapon-variant-row"
+                                    data-weapon-name="@weapon.WeaponName"
+                                    data-variant="@variant.Variant"
+                                    data-model-name="@modelProfile.ModelName"
+                                    data-model-count="@modelProfile.Count">
                                     <td>@variant.Variant</td>
                                     <td>@variant.Attacks</td>
                                     <td>@variant.Skill+</td>
