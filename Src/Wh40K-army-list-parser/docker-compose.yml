@@ -1,0 +1,15 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - wh40k-cache:/root/.wh40k-enricher/cache
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Enricher__CachePath=/root/.wh40k-enricher/cache
+
+volumes:
+  wh40k-cache:

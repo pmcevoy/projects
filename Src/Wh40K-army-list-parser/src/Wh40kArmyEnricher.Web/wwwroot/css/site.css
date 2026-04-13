@@ -1,0 +1,229 @@
+/* WH40K Army Tool — site styles */
+
+body {
+    background-color: #1a1a2e;
+    color: #e0e0e0;
+}
+
+.navbar-brand {
+    font-size: 1.1rem;
+    letter-spacing: 0.05em;
+}
+
+/* Army column headers */
+.army-header {
+    background-color: #16213e;
+    border-bottom: 2px solid #e63946;
+    padding: 0.5rem 1rem;
+    font-weight: bold;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.army-header.attacker { border-color: #e63946; }
+.army-header.defender { border-color: #457b9d; }
+
+/* Unit cards */
+.unit-card {
+    background-color: #16213e;
+    border: 1px solid #2a2a4a;
+    border-radius: 4px;
+    margin-bottom: 0.4rem;
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+
+.unit-card:hover {
+    border-color: #6c757d;
+    background-color: #1e2d50;
+}
+
+.unit-card.selected-attacker {
+    border-color: #e63946;
+    background-color: #2a1a1e;
+}
+
+.unit-card.selected-defender {
+    border-color: #457b9d;
+    background-color: #1a2530;
+}
+
+.unit-card-header {
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+}
+
+.unit-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.unit-stats-inline {
+    font-size: 0.75rem;
+    color: #adb5bd;
+    white-space: nowrap;
+}
+
+.unit-card-body {
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid #2a2a4a;
+    font-size: 0.8rem;
+}
+
+/* Statline table */
+.statline-table {
+    width: 100%;
+    text-align: center;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    margin-bottom: 0.5rem;
+}
+
+.statline-table th {
+    color: #adb5bd;
+    font-weight: 500;
+    padding: 0.15rem 0.3rem;
+    border-bottom: 1px solid #2a2a4a;
+}
+
+.statline-table td {
+    padding: 0.15rem 0.3rem;
+    font-weight: 600;
+}
+
+/* Weapon tables */
+.weapon-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+    margin-top: 0.3rem;
+}
+
+.weapon-table th {
+    color: #adb5bd;
+    font-weight: 500;
+    padding: 0.1rem 0.3rem;
+    border-bottom: 1px solid #2a2a4a;
+    text-align: center;
+}
+
+.weapon-table td {
+    padding: 0.1rem 0.3rem;
+    text-align: center;
+    border-bottom: 1px solid #1a1a2e;
+}
+
+.weapon-table td:first-child { text-align: left; }
+
+/* Combat panel */
+#combat-panel {
+    background-color: #16213e;
+    border: 1px solid #2a2a4a;
+    border-radius: 4px;
+    padding: 1rem;
+}
+
+.combat-panel-title {
+    font-size: 0.85rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.75rem;
+    color: #f1a94e;
+}
+
+/* Results */
+#results-panel {
+    background-color: #0f3460;
+    border: 1px solid #457b9d;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.result-value {
+    font-size: 1.6rem;
+    font-weight: bold;
+    color: #f1a94e;
+}
+
+.result-label {
+    font-size: 0.75rem;
+    color: #adb5bd;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Selection badges */
+.selection-badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 0.04em;
+}
+
+.badge-attacker { background-color: #e63946; color: white; }
+.badge-defender { background-color: #457b9d; color: white; }
+
+/* Keyword pills */
+.keyword-pill {
+    display: inline-block;
+    font-size: 0.65rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 2px;
+    background-color: #2a2a4a;
+    color: #adb5bd;
+    margin: 0.1rem 0.1rem 0 0;
+}
+
+/* Ability text */
+.ability-name { font-weight: 600; color: #c77dff; }
+.ability-text { color: #ced4da; font-size: 0.75rem; }
+
+/* Upload page */
+.upload-card {
+    background-color: #16213e;
+    border: 1px solid #2a2a4a;
+    border-radius: 6px;
+    padding: 1.5rem;
+}
+
+.army-textarea {
+    background-color: #0f0f1e;
+    color: #e0e0e0;
+    border: 1px solid #2a2a4a;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.78rem;
+    resize: vertical;
+    min-height: 300px;
+    width: 100%;
+}
+
+.army-textarea:focus {
+    outline: none;
+    border-color: #457b9d;
+    box-shadow: 0 0 0 2px rgba(69, 123, 157, 0.25);
+}
+
+/* Spinner overlay */
+#loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    color: white;
+    font-size: 1.1rem;
+}
+
+#loading-overlay.active { display: flex; }

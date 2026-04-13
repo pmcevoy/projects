@@ -1,0 +1,117 @@
+@model Wh40kArmyEnricher.Contracts.UnitProfile
+@{
+    var safeName = new string(Model.Name.ToLower().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
+    string cardId = $"unit-{safeName}-{Model.ArmyListIndex}";
+    string collapseId = $"collapse-{cardId}";
+    string invulnText = Model.InvulnerableSave.HasValue ? $"{Model.InvulnerableSave}++" : "-";
+    string fnpText = Model.FeelNoPain.HasValue ? $"{Model.FeelNoPain}+++" : "-";
+}
+
+<div class="unit-card-header" data-bs-toggle="collapse" data-bs-target="#@collapseId">
+    <div>
+        <span class="unit-name">@Model.Name</span>
+        <span class="ms-2 text-muted small">(@Model.ModelCount models)</span>
+    </div>
+    <span class="unit-stats-inline">
+        T@(Model.Toughness) Sv@(Model.Save)+ W@(Model.Wounds)
+        @if (Model.InvulnerableSave.HasValue) { <span>/@(Model.InvulnerableSave)++</span> }
+    </span>
+</div>
+
+<div class="collapse" id="@collapseId">
+    <div class="unit-card-body">
+        <!-- Statline -->
+        <table class="statline-table mb-2">
+            <thead>
+                <tr>
+                    <th>T</th><th>Sv</th><th>W</th><th>Inv</th><th>FNP</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>@Model.Toughness</td>
+                    <td>@Model.Save+</td>
+                    <td>@Model.Wounds</td>
+                    <td>@invulnText</td>
+                    <td>@fnpText</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Models & weapons -->
+        @foreach (var modelProfile in Model.Models)
+        {
+            <div class="mb-1 small fw-semibold text-light">
+                @modelProfile.ModelName
+                @if (modelProfile.Count > 1) { <span class="text-muted">×@modelProfile.Count</span> }
+            </div>
+            @foreach (var weapon in modelProfile.Weapons)
+            {
+                <div class="mb-1">
+                    <span class="small" style="color:#a8dadc;">@weapon.WeaponName</span>
+                    <span class="badge bg-secondary ms-1" style="font-size:0.6rem;">@weapon.Type</span>
+                    @if (weapon.Range > 0) { <span class="text-muted small ms-1">@(weapon.Range)"</span> }
+                    <table class="weapon-table mt-1">
+                        <thead>
+                            <tr>
+                                <th>Profile</th><th>A</th><th>Sk</th><th>S</th><th>AP</th><th>D</th><th>Abilities</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var variant in weapon.Profiles)
+                            {
+                                var abilityList = BuildAbilityList(variant.Abilities);
+                                <tr>
+                                    <td>@variant.Variant</td>
+                                    <td>@variant.Attacks</td>
+                                    <td>@variant.Skill+</td>
+                                    <td>@variant.Strength</td>
+                                    <td>@variant.Ap</td>
+                                    <td>@variant.Damage</td>
+                                    <td style="font-size:0.65rem;text-align:left;">@abilityList</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+
+        <!-- Keywords -->
+        @if (Model.Keywords.Count > 0)
+        {
+            <div class="mt-1">
+                @foreach (var kw in Model.Keywords)
+                {
+                    <span class="keyword-pill">@kw</span>
+                }
+            </div>
+        }
+
+        <!-- Enhancements -->
+        @if (Model.Enhancements.Count > 0)
+        {
+            <div class="mt-1 small" style="color:#c77dff;">
+                Enhancements: @string.Join(", ", Model.Enhancements)
+            </div>
+        }
+    </div>
+</div>
+
+@functions {
+    string BuildAbilityList(Wh40kArmyEnricher.Contracts.WeaponAbilities a)
+    {
+        var parts = new List<string>();
+        if (a.Torrent) parts.Add("Torrent");
+        if (a.Blast) parts.Add("Blast");
+        if (a.Melta > 0) parts.Add($"Melta {a.Melta}");
+        if (a.RapidFire > 0) parts.Add($"RF {a.RapidFire}");
+        if (a.SustainedHits > 0) parts.Add($"Sus {a.SustainedHits}");
+        if (a.LethalHits) parts.Add("Lethal");
+        if (a.DevastatingWounds) parts.Add("Dev.W");
+        if (a.TwinLinked) parts.Add("Twin");
+        foreach (var (kw, threshold) in a.Anti)
+            parts.Add($"Anti-{kw} {threshold}+");
+        return string.Join(", ", parts);
+    }
+}
