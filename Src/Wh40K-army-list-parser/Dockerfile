@@ -7,7 +7,6 @@ COPY Wh40kArmyEnricher.sln ./
 COPY src/Wh40kArmyEnricher.Contracts/Wh40kArmyEnricher.Contracts.csproj src/Wh40kArmyEnricher.Contracts/
 COPY src/Wh40kArmyEnricher.Core/Wh40kArmyEnricher.Core.csproj src/Wh40kArmyEnricher.Core/
 COPY src/Wh40kArmyEnricher.Web/Wh40kArmyEnricher.Web.csproj src/Wh40kArmyEnricher.Web/
-COPY src/Wh40kArmyEnricher.Cli/Wh40kArmyEnricher.Cli.csproj src/Wh40kArmyEnricher.Cli/
 COPY tests/Wh40kArmyEnricher.Tests/Wh40kArmyEnricher.Tests.csproj tests/Wh40kArmyEnricher.Tests/
 
 RUN dotnet restore Wh40kArmyEnricher.sln

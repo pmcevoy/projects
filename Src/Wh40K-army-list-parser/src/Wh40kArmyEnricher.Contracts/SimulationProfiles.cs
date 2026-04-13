@@ -1,12 +1,7 @@
-using YamlDotNet.Core;
-using YamlDotNet.Core.Events;
-using YamlDotNet.Serialization;
-
 namespace Wh40kArmyEnricher.Contracts;
 
 // ---------------------------------------------------------------------------
 // Scalar value that can be an integer or a string (e.g. attacks: 4 or "D6").
-// Registered via the serialiser builder — no attribute needed.
 // ---------------------------------------------------------------------------
 
 public readonly struct ScalarValue
@@ -25,32 +20,6 @@ public readonly struct ScalarValue
     public static implicit operator ScalarValue(string v) => new(v);
 
     public override string ToString() => _int.HasValue ? _int.Value.ToString() : _str ?? "";
-}
-
-/// <summary>
-/// YamlDotNet type converter for <see cref="ScalarValue"/>.
-/// Emits integers as plain scalars and strings as double-quoted scalars.
-/// </summary>
-public class ScalarValueConverter : IYamlTypeConverter
-{
-    public bool Accepts(Type type) => type == typeof(ScalarValue);
-
-    public object ReadYaml(IParser parser, Type type, ObjectDeserializer rootDeserializer)
-    {
-        var scalar = parser.Consume<Scalar>();
-        return int.TryParse(scalar.Value, out var i) ? new ScalarValue(i) : new ScalarValue(scalar.Value);
-    }
-
-    public void WriteYaml(IEmitter emitter, object? value, Type type, ObjectSerializer serializer)
-    {
-        var sv = value is ScalarValue s ? s : new ScalarValue(0);
-        if (sv.IsInt)
-            emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, sv.IntValue.ToString(),
-                ScalarStyle.Plain, true, false));
-        else
-            emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, sv.StringValue,
-                ScalarStyle.DoubleQuoted, false, true));
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -190,38 +159,4 @@ public record AttachedUnit
     public List<AbilityProfile> EffectiveAbilities { get; init; } = new();
     /// <summary>Warnings and assumptions about this combination (e.g. unverified double-primary).</summary>
     public List<string> Notes { get; init; } = new();
-}
-
-// ---------------------------------------------------------------------------
-// Simulation defaults
-// ---------------------------------------------------------------------------
-
-public record SimulationDefaults
-{
-    public bool WithinHalfRange { get; init; }
-    public int Runs { get; init; } = 10000;
-}
-
-// ---------------------------------------------------------------------------
-// A single attacker/defender pairing
-// ---------------------------------------------------------------------------
-
-public record Pairing
-{
-    public string SimulationId { get; init; } = "";
-    public AttachedUnit Attacker { get; init; } = new();
-    public UnitProfile Defender { get; init; } = new();
-}
-
-// ---------------------------------------------------------------------------
-// Full matchup output file
-// ---------------------------------------------------------------------------
-
-public record PairingFile
-{
-    public string AttackerArmy { get; init; } = "";
-    public string DefenderArmy { get; init; } = "";
-    public string GeneratedUtc { get; init; } = "";
-    public SimulationDefaults SimulationDefaults { get; init; } = new();
-    public List<Pairing> Pairings { get; init; } = new();
 }

@@ -148,19 +148,4 @@ public class EnrichPipelineTests
         squad!.Profile.Keywords.Should().Contain("INFANTRY");
     }
 
-    // ---------------------------------------------------------------------------
-    // YAML round-trip snapshot
-    // ---------------------------------------------------------------------------
-
-    [Fact]
-    public async Task Pipeline_YamlOutput_IsWellFormed()
-    {
-        var (enriched, _) = await RunPipelineAsync();
-        var yaml = YamlSerialiser.Serialise(enriched.Select(e => e.Profile).ToList());
-
-        yaml.Should().NotBeNullOrWhiteSpace();
-        yaml.Should().Contain("name:");
-        yaml.Should().Contain("faction:");
-        yaml.Should().Contain("modelCount:");
-    }
 }

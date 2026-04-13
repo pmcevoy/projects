@@ -4,9 +4,8 @@
 
 A .NET solution consisting of:
 
-1. **CLI tool** — parses Warhammer 40,000 (10th Edition) army list text exports from the official Warhammer app, resolves each unit/model/weapon against BattleScribe data files ([BSData/wh40k-10e](https://github.com/BSData/wh40k-10e)), enriches with full statlines, and outputs YAML pairings for offline simulation runs
-2. **Web application** (`Wh40kArmyEnricher.Web`) — live-game tool; paste two army lists, view enriched unit cards side-by-side, select an attacker weapon and a defender unit, configure combat options, and run a Monte Carlo simulation on the server — results appear inline without page reload
-3. **Simulation engine** (in `Wh40kArmyEnricher.Core/Simulation/`) — ported from the now-retired `wh40k-sim` project; full 4-step 40K attack sequence (hit → wound → save → damage) with all weapon abilities
+1. **Web application** (`Wh40kArmyEnricher.Web`) — live-game tool; paste two army lists, view enriched unit cards side-by-side, select an attacker weapon and a defender unit, configure combat options, and run a Monte Carlo simulation on the server — results appear inline without page reload
+2. **Simulation engine** (in `Wh40kArmyEnricher.Core/Simulation/`) — ported from the now-retired `wh40k-sim` project; full 4-step 40K attack sequence (hit → wound → save → damage) with all weapon abilities
 
 Sample input data lives in `./data` folder
 
@@ -23,15 +22,7 @@ Sample input data lives in `./data` folder
 
 ## NuGet Dependencies
 
-### `Wh40kArmyEnricher.Cli`
-- `System.CommandLine` (2.0.0-beta or later) — subcommand CLI parsing
-
 ### `Wh40kArmyEnricher.Core`
-- `YamlDotNet` 16.x — YAML serialisation of output profiles (use the serialiser/deserialiser API with a `NamingConvention` of `CamelCaseNamingConvention` to match the schema below)
-  - **Important:** v16 `IYamlTypeConverter` uses `ReadYaml(IParser, Type, ObjectDeserializer)` / `WriteYaml(IEmitter, object?, Type, ObjectSerializer)` — the signatures differ from v15 and earlier
-  - For custom scalar converters emitting double-quoted strings, `isQuotedImplicit` must be `true` and `tag` must be empty; setting both implicit flags to `false` with an empty tag throws at runtime
-  - Call `.DisableAliases()` on `SerializerBuilder` — without this, YamlDotNet emits YAML anchor/alias symbols (`&o1`, `*o3`) when it detects shared object references (e.g. default `RerollOptions` instances)
-  - Multi-line ability text uses `|` (literal block scalar) style, not `>` (folded). Folded style doubles newlines in the file. Implement a `LiteralBlockScalarEmitter : ChainedEventEmitter` that sets `ScalarStyle.Literal` for any string value containing `\n`, and register it with `.WithEventEmitter(next => new LiteralBlockScalarEmitter(next))`
 - `FuzzySharp` — fuzzy name matching (token-sort ratio) for resolving display names to BSData entries
 - No third-party XML library needed — use `System.Xml.Linq` (LINQ to XML / `XDocument`) which handles the namespace-qualified BSData schema cleanly
 
@@ -260,9 +251,7 @@ Resolution order:
 
 ---
 
-## Output Profiles Schema
-
-Output is YAML. Use `YamlDotNet` with `CamelCaseNamingConvention` so C# property names like `InvulnerableSave` serialise as `invulnerableSave`.
+## UnitProfile Schema
 
 ### Design Decisions (read before touching the schema)
 
@@ -282,7 +271,7 @@ Output is YAML. Use `YamlDotNet` with `CamelCaseNamingConvention` so C# property
 
 ### Unit Profile (full schema)
 
-A single `UnitProfile` record carries both offensive and defensive data. The `Pairing.Attacker` / `Pairing.Defender` field names encode the role; the profile type itself does not differ between roles. This eliminates the duplication of identity fields (name, faction, keywords, abilities) that would arise from separate attacker/defender types.
+A single `UnitProfile` record carries both offensive and defensive data. Both the attacker and defender use the same type; the web app's `/api/simulate` endpoint reads both from session and passes them to `SimulationAdapter`.
 
 ```yaml
 name: "Crusader Squad"           # Unit display name from army list
@@ -373,63 +362,6 @@ wounds: 2                        # Wounds per model
 feelNoPain: null                 # null if absent; integer if present (e.g. 5 = 5+++)
 ```
 
-### `enrich` command output
-
-The `enrich` command outputs a flat list of `UnitProfile` objects — one per unit in the army. Each unit appears exactly once with all its data.
-
-```yaml
-- name: "Assault Intercessor Squad"
-  faction: "Black Templars"
-  modelCount: 5
-  # ... full UnitProfile as above
-- name: "Crusader Squad"
-  faction: "Black Templars"
-  # ...
-```
-
-### Pairing File (`matchup` command output)
-
-One YAML file per matchup containing all requested pairings. Both `attacker` and `defender` are full `UnitProfile` objects. The simulation project reads this file to enumerate and execute runs.
-
-```yaml
-attackerArmy: "Iron Canticle (Black Templars)"
-defenderArmy: "Plague Horde (Death Guard)"
-generatedUtc: "2025-03-13T12:00:00Z"
-simulationDefaults:
-  withinHalfRange: false           # Applied to all pairings unless overridden
-  runs: 10000                      # Default Monte Carlo iteration count
-pairings:
-  - simulationId: "bt_crusader_squad_vs_dg_plague_marines"
-    attacker:
-      # full UnitProfile (offensive + defensive data for the attacking unit)
-    defender:
-      # full UnitProfile (offensive + defensive data for the defending unit)
-```
-
-The Monte Carlo simulation project should deserialise the pairing file using matching C# record types defined in `Wh40kArmyEnricher.Contracts`, using `YamlDotNet` with the same `CamelCaseNamingConvention`.
-
----
-
-## CLI Interface
-
-Built with `System.CommandLine`. Two subcommands:
-
-```
-# Enrich a single army list — outputs a flat list of UnitProfile objects (one per unit)
-army-enricher enrich <army-list.txt> [--output <path>] [--refresh-cache] [--dry-run]
-
-# Enrich two armies and generate all pairings
-army-enricher matchup <attacker.txt> <defender.txt> [--output <path>] [--refresh-cache]
-
-# Selective pairings by unit name filter (repeatable)
-army-enricher matchup attacker.txt defender.txt \
-  --attacker-unit "Crusader Squad" \
-  --defender-unit "Plague Marines" \
-  --output selective.json
-```
-
-`--dry-run` runs the full parse and resolution pipeline but writes no output files; useful for auditing unresolved names before committing to a run.
-
 ---
 
 ## Key Behaviours & Rules
@@ -446,7 +378,6 @@ army-enricher matchup attacker.txt defender.txt \
 - **Non-weapon entries.** The army export uses bullet characters for both weapons and ability upgrades (e.g. Shield Dome). When an entry cannot be resolved as a weapon, check whether it resolves to a catalogue entry with no weapon profiles. If so, apply any invuln/FNP it grants to the model statline and skip it silently — do not emit a warning. The check must match either the entry name or any ability profile name within that entry (e.g. `"Icon of Despair"` entry contains profile `"Icon of Despair (Aura)"`).
 - **Keywords.** Parse the `Keywords` characteristic as a comma-separated list, trimming whitespace and normalising `-` (no keywords) to an empty list. Keywords such as `Blast`, `Torrent`, `Pistol`, `Indirect Fire`, `Lethal Hits`, `Sustained Hits X`, `Devastating Wounds` directly affect simulation logic.
 - **Unit abilities.** Capture all `profile[@typeName='Abilities']` entries by name and text even if the simulation does not yet consume them — they will be needed for future rule modelling.
-- **`simulation_id` generation** (`matchup` output only). Prefixed with faction abbreviation (e.g. `bt_` for Black Templars, `dg_` for Death Guard), attacker and defender name slugs joined with `_vs_` (e.g. `bt_crusader_squad_vs_dg_plague_marines`). The `enrich` command does not use simulation IDs — it outputs a plain list of unit profiles.
 
 ---
 
@@ -470,11 +401,9 @@ army-enricher matchup attacker.txt defender.txt \
 - GitHub raw URL pattern: `https://raw.githubusercontent.com/BSData/wh40k-10e/main/{Uri.EscapeDataString(filename)}` — note spaces in filenames like `Imperium - Black Templars.cat` must be encoded as `%20`
 - `.catz` files are raw deflate compressed (no zlib header). Use `new DeflateStream(stream, CompressionMode.Decompress)` — do **not** use `ZLibStream` or `GZipStream`
 - Register `HttpClient` via `IHttpClientFactory` in DI; set a `User-Agent` header identifying this tool — the GitHub API rejects requests without one
-- Keep the record types in `Wh40kArmyEnricher.Contracts` in sync with the Monte Carlo simulation project's deserialisation expectations. Both projects use `YamlDotNet` with `CamelCaseNamingConvention`. If both projects live in separate solutions, publish `Contracts` as a local NuGet package or use a git submodule
-- Static classes cannot be used as type parameters for `ILogger<T>` — use `ILoggerFactory.CreateLogger("Name")` for loggers inside static command classes
+- Static classes cannot be used as type parameters for `ILogger<T>` — use `ILoggerFactory.CreateLogger("Name")` for loggers inside static classes
 - All `typeName` comparisons (e.g. `"Ranged Weapons"`, `"Melee Weapons"`, `"Unit"`) **must use `StringComparison.OrdinalIgnoreCase`** — case variation has been observed in the wild and silently drops profiles if compared with `==`
-- `name_overrides.json` must be present in the **current working directory** when `army-enricher.exe` is invoked — not relative to the executable. Example entry: `{ "Deathshroud Champion": "Deathshroud Terminator Champion" }`. The file is optional; if absent, resolution proceeds without overrides.
-- `dotnet test` only builds the test project and its transitive dependencies — it does **not** build the CLI project. Use `dotnet build Wh40kArmyEnricher.sln` to update `army-enricher.exe`.
+- `name_overrides.json` must be present in the **current working directory** when the web app is started. Example entry: `{ "Deathshroud Champion": "Deathshroud Terminator Champion" }`. The file is optional; if absent, resolution proceeds without overrides.
 
 ---
 
@@ -621,18 +550,11 @@ Responsibilities:
    - `"re-roll wound rolls"` (all) → `woundRerollAll: true`
    - `"Critical Hits are scored on a 5+"` → `criticalHitsOn: 5`
 
-### `Pairing` changes
+### Web app simulation changes
 
-- `Attacker` changes from `UnitProfile` to `AttachedUnit`.
-- `Defender` remains `UnitProfile` — defenders are always plain units, never attached.
-- `simulationId` encodes leader names: `bt_sword_brethren_led_by_marshal_castellan_vs_dg_plague_marines`.
-- A baseline pairing (0 leaders) is always included alongside leader combinations.
-
-### `matchup` command changes
-
-- **Attacker side**: enumerate all `AttachedUnit` combinations from the attacking army (0-leader baseline + all valid 1-leader + all valid 2-leader combinations).
-- **Defender side**: if `--defender-unit` flag is present, use those units; otherwise present an interactive numbered list of defender units and prompt for selection.
-- `--defender-unit` remains repeatable and optional.
+- The `/api/simulate` attacker payload will need to accept an `AttachedUnit` instead of a plain `UnitProfile`.
+- A baseline run (0 leaders) is always included alongside leader combinations.
+- Selecting leader combinations will be done in the web UI, not via command-line flags.
 
 ### Retinue models
 
