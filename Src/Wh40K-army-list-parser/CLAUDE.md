@@ -2,14 +2,11 @@
 
 ## Project Overview
 
-A .NET CLI tool that:
-1. Parses Warhammer 40,000 (10th Edition) army list text exports from the official Warhammer app
-2. Resolves each unit, model, and weapon against the BattleScribe data files in the [BSData/wh40k-10e](https://github.com/BSData/wh40k-10e) GitHub repository
-3. Enriches the list with full statline data (Movement, Toughness, Save, Wounds, Leadership, OC, etc.) and weapon profiles (Range, Attacks, Skill, Strength, AP, Damage, keywords)
-4. Outputs structured **attacker** and **defender** profiles compatible with the separate Monte Carlo simulation project (also .NET/C#)
-5. Supports pairwise matchup mode: given two army exports (e.g. Black Templars vs Death Guard), produce all desired attacker/defender pairings for simulation runs
+A .NET solution consisting of:
 
-The output YAML schema must be agreed with and kept in sync with the Monte Carlo simulation project.
+1. **CLI tool** — parses Warhammer 40,000 (10th Edition) army list text exports from the official Warhammer app, resolves each unit/model/weapon against BattleScribe data files ([BSData/wh40k-10e](https://github.com/BSData/wh40k-10e)), enriches with full statlines, and outputs YAML pairings for offline simulation runs
+2. **Web application** (`Wh40kArmyEnricher.Web`) — live-game tool; paste two army lists, view enriched unit cards side-by-side, select an attacker weapon and a defender unit, configure combat options, and run a Monte Carlo simulation on the server — results appear inline without page reload
+3. **Simulation engine** (in `Wh40kArmyEnricher.Core/Simulation/`) — ported from the now-retired `wh40k-sim` project; full 4-step 40K attack sequence (hit → wound → save → damage) with all weapon abilities
 
 Sample input data lives in `./data` folder
 
@@ -22,6 +19,8 @@ Wh40kArmyEnricher/
 ├── CLAUDE.md
 ├── README.md
 ├── Wh40kArmyEnricher.sln
+├── Dockerfile                              # Builds Wh40kArmyEnricher.Web image
+├── docker-compose.yml                      # Runs web app on :8080, mounts BSData cache volume
 ├── src/
 │   ├── Wh40kArmyEnricher.Cli/
 │   │   ├── Wh40kArmyEnricher.Cli.csproj   # Entry point — System.CommandLine
@@ -34,31 +33,64 @@ Wh40kArmyEnricher/
 │   │   ├── Parser/
 │   │   │   └── ArmyListParser.cs           # Parses raw .txt export from the Warhammer app
 │   │   ├── BsData/
-│   │   │   ├── ICatalogueFetcher.cs        # Abstraction for HTTP fetch + disk cache (mockable)
-│   │   │   ├── CatalogueFetcher.cs         # Downloads/caches .cat files from BSData GitHub
-│   │   │   ├── CatalogueParser.cs          # Parses .cat XML into in-memory model
-│   │   │   ├── CatalogueStore.cs           # Holds all loaded catalogues
-│   │   │   └── NameResolver.cs             # Matches army list names -> BSData entries
-│   │   ├── Enricher.cs                     # Assembles enriched unit/weapon profiles
-│   │   └── Models/                         # All domain record types
+│   │   │   ├── ICatalogueFetcher.cs
+│   │   │   ├── CatalogueFetcher.cs
+│   │   │   ├── CatalogueParser.cs
+│   │   │   ├── CatalogueStore.cs
+│   │   │   └── NameResolver.cs
+│   │   ├── Enricher.cs
+│   │   ├── Simulation/                     # Monte Carlo simulation engine (ported from wh40k-sim)
+│   │   │   ├── DiceExpression.cs           # Parses "D6", "2D3+1", fixed integers
+│   │   │   ├── DiceRoller.cs               # IDiceRoller interface + Random implementation
+│   │   │   ├── SimWeaponAbilities.cs       # Ability flags for the simulator
+│   │   │   ├── SimWeaponProfile.cs         # Weapon stats fed into the simulator
+│   │   │   ├── SimRerollOptions.cs
+│   │   │   ├── SimAttackerProfile.cs
+│   │   │   ├── SimDefenderProfile.cs
+│   │   │   ├── SimulationConfig.cs
+│   │   │   ├── SimulationResult.cs         # Statistical output (mean, stddev, distribution)
+│   │   │   ├── AbilityProcessor.cs         # WoundThreshold, EffectiveSave helpers
+│   │   │   └── CombatSimulator.cs          # Full 4-step attack sequence
+│   │   └── Models/
 │   │       ├── ArmyList.cs
 │   │       ├── CatalogueEntry.cs
-│   │       └── Profiles.cs                 # Output profile types + YAML serialisation attrs
-│   └── Wh40kArmyEnricher.Contracts/
-│       ├── Wh40kArmyEnricher.Contracts.csproj  # Shared with simulation project
-│       └── SimulationProfiles.cs               # Profile records used by both projects
-│                                               # Deserialised by sim project using YamlDotNet
+│   │       └── Profiles.cs
+│   ├── Wh40kArmyEnricher.Contracts/
+│   │   ├── Wh40kArmyEnricher.Contracts.csproj
+│   │   └── SimulationProfiles.cs           # UnitProfile, WeaponProfile, etc. — YAML schema
+│   └── Wh40kArmyEnricher.Web/
+│       ├── Wh40kArmyEnricher.Web.csproj    # ASP.NET Core 8, Razor Pages, Bootstrap 5
+│       ├── Program.cs                      # DI wiring, session, /api/simulate endpoint
+│       ├── appsettings.json
+│       ├── appsettings.Development.json
+│       ├── Helpers/
+│       │   └── SessionJson.cs              # JsonSerializerOptions with ScalarValueJsonConverter
+│       ├── Models/
+│       │   ├── SimulationRequest.cs        # AJAX request body from army-view.js
+│       │   └── SimulationResponse.cs       # JSON result returned to browser
+│       ├── Pages/
+│       │   ├── Index.cshtml / .cs          # Upload page — paste two army list texts
+│       │   ├── ArmyView.cshtml / .cs       # Side-by-side enriched unit cards + combat panel
+│       │   └── Shared/
+│       │       ├── _Layout.cshtml
+│       │       └── _UnitCard.cshtml        # Partial: statline, weapons, keywords
+│       ├── Services/
+│       │   ├── EnrichmentService.cs        # Wraps ArmyListParser + Enricher for web use
+│       │   └── SimulationAdapter.cs        # Maps UnitProfile → SimulationConfig, runs sim
+│       └── wwwroot/
+│           ├── css/site.css                # Dark WH40K theme
+│           └── js/army-view.js             # Unit/weapon selection, AJAX simulate call
 └── tests/
     └── Wh40kArmyEnricher.Tests/
         ├── Wh40kArmyEnricher.Tests.csproj
         ├── Fixtures/
         │   ├── black-templars-sample.txt
-        │   └── death-guard.txt                 # Android app export format (Death Guard)
+        │   └── death-guard.txt
         ├── Parser/
-        │   ├── ArmyListParserTests.cs           # iOS format (Black Templars)
-        │   └── ArmyListParserAndroidTests.cs    # Android format (Death Guard)
+        │   ├── ArmyListParserTests.cs
+        │   └── ArmyListParserAndroidTests.cs
         ├── BsData/
-        │   ├── CatalogueParserTests.cs          # Uses saved .cat XML snippets, no live calls
+        │   ├── CatalogueParserTests.cs
         │   └── NameResolverTests.cs
         └── Integration/
             └── EnrichPipelineTests.cs
@@ -529,6 +561,86 @@ army-enricher matchup attacker.txt defender.txt \
 - All `typeName` comparisons (e.g. `"Ranged Weapons"`, `"Melee Weapons"`, `"Unit"`) **must use `StringComparison.OrdinalIgnoreCase`** — case variation has been observed in the wild and silently drops profiles if compared with `==`
 - `name_overrides.json` must be present in the **current working directory** when `army-enricher.exe` is invoked — not relative to the executable. Example entry: `{ "Deathshroud Champion": "Deathshroud Terminator Champion" }`. The file is optional; if absent, resolution proceeds without overrides.
 - `dotnet test` only builds the test project and its transitive dependencies — it does **not** build the CLI project. Use `dotnet build Wh40kArmyEnricher.sln` to update `army-enricher.exe`.
+
+---
+
+## Web Application (`Wh40kArmyEnricher.Web`)
+
+### Purpose
+
+A live-game tool designed for use on a phone or tablet at the table. The user pastes two army exports, the server enriches them, and the resulting page lets them click through weapons and run instant Monte Carlo simulations to get expected damage / expected kills.
+
+### Running locally (Docker)
+
+```bash
+docker compose up --build        # first run: downloads ~35 MB BSData cache
+docker compose up                # subsequent runs: cache is on the volume, starts fast
+# browse to http://localhost:8080
+```
+
+`appsettings.json` key: `Enricher:CachePath` — set to `/root/.wh40k-enricher/cache` in the container (mounted volume). Override in `appsettings.Development.json` to a local Windows path for non-Docker dev.
+
+### User flow
+
+1. **Index page** — paste attacker and defender army list text, submit
+2. Server enriches both lists (BSData catalogue lookup) and stores `List<UnitProfile>` in ASP.NET Core session
+3. **ArmyView page** — two columns of collapsed unit cards; click a card header to expand it
+4. In an expanded attacker card, **click a weapon variant row** to select it (highlights red; auto-selects the unit)
+5. Click a defender unit card to select it (highlights blue)
+6. The **combat panel** appears at the bottom; configure options and click **Run Simulation**
+7. Results display inline: mean damage, expected kills, P(kill ≥ 1 model), std deviation
+
+### Session storage and JSON
+
+Enriched armies are stored in session as JSON using `SessionJson.Options` (`Helpers/SessionJson.cs`). Two non-obvious requirements:
+- **`ScalarValueJsonConverter`** is mandatory — `ScalarValue` has only private backing fields and serialises to `{}` by default; without the converter every `Attacks`/`Damage` value comes back as empty string and `DiceExpression.Parse` throws.
+- **`PropertyNameCaseInsensitive = true`** — session data uses PascalCase (no naming policy); case-insensitive matching ensures round-trips work correctly. Do NOT set `PropertyNamingPolicy = CamelCase` on `SessionJson.Options` — that causes `WeaponAbilities` booleans (`LethalHits`, `DevastatingWounds`, etc.) to deserialise as `false` because the default STJ matcher is case-sensitive.
+- The `data-unit` HTML attribute in `ArmyView.cshtml` uses a **separate** `camelCaseJson` variable so the JavaScript receives camelCase property names — this is independent of session serialisation.
+
+### Combat options (user-controlled)
+
+All simulation modifiers are set explicitly by the user — ability text is not auto-parsed into rerolls:
+- **Hit rerolls**: None / Reroll 1s / Reroll All
+- **Wound rerolls**: None / Reroll 1s / Reroll All
+- **Within Half Range** — enables Melta bonus damage and Rapid Fire extra attacks
+- **In Cover** — adds +1 to defender's armour save before simulation
+- **Crit on 5+** — lowers `CriticalHitsOn` to 5 for abilities like Oath of Moment
+- **Models firing** — pre-filled from the weapon's model count; can be overridden (e.g. only 3 of 5 models in range)
+
+### AP sign convention
+
+`WeaponVariantProfile.Ap` in Contracts is stored as a **negative integer** (e.g. AP-2 → `-2`). `SimulationAdapter` negates it when building `SimWeaponProfile.Ap` because the simulator's `AbilityProcessor.EffectiveSave` does `save + ap` (expects a positive value). Do not change this without updating both sides.
+
+---
+
+## Simulation Engine (`Wh40kArmyEnricher.Core/Simulation/`)
+
+Ported from the retired `wh40k-sim` standalone project. The combat rules spec lives in `.claude/rules/combat-rules.md`.
+
+### Key types
+
+| Type | Purpose |
+|---|---|
+| `DiceExpression` | Parses `"D6"`, `"2D3+1"`, fixed integers; `Count=0` means fixed value in `Modifier` |
+| `IDiceRoller` / `DiceRoller` | Abstracts randomness; injectable for deterministic testing |
+| `SimAttackerProfile` | Name, model count, single `SimWeaponProfile`, rerolls, `CriticalHitsOn` |
+| `SimDefenderProfile` | Name, model count, T, Sv, invuln, W, FNP, keywords |
+| `CombatSimulator` | Runs N iterations; returns `IReadOnlyList<int>` (damage per run) |
+| `SimulationResult` | Computed statistics: mean, median, stddev, min, max, probability/cumulative distributions |
+| `AbilityProcessor` | Pure static helpers: `WoundThreshold(S,T)`, `EffectiveSave(defender, ap)` |
+
+### Simulation flow
+
+Per run: resolve attack count (base × models + Blast bonus + Rapid Fire if half range) → for each attack: hit roll (skip if Torrent) → Sustained Hits bonus attacks → wound roll (skip if Lethal Hit) → save roll (skip if Devastating Wounds) → damage + FNP. Each die may only be rerolled once. Natural 1 always fails, natural 6 (or lower if `CriticalHitsOn` is reduced) always succeeds.
+
+### `SimulationAdapter` (in Web project)
+
+Bridges `UnitProfile` (Contracts) → `SimulationConfig` (Core.Simulation):
+- Finds the selected weapon variant across all selected attacker unit models
+- Negates AP: `simAp = -contractsAp`
+- Parses `ScalarValue` attacks/damage via `DiceExpression.Parse`
+- Applies cover by adding 1 to `SimDefenderProfile.Save` before the run
+- Returns `SimulationResponse` with mean damage, expected kills (`mean / woundsPerModel`), P(kill ≥ 1), stddev
 
 ---
 
