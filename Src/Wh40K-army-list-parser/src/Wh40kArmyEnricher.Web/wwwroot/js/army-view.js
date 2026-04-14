@@ -97,7 +97,7 @@
             const modelCount  = parseInt(row.dataset.modelCount, 10);
             const weaponType  = row.dataset.weaponType;
 
-            const weaponKey = `${unitIndex}::${weaponName}::${variantName}`;
+            const weaponKey = `${unitIndex}::${modelName}::${weaponName}::${variantName}`;
 
             if (selectedWeapons.has(weaponKey)) {
                 // Deselect this weapon.
