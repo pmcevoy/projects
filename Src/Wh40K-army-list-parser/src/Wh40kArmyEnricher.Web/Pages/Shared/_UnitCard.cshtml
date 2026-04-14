@@ -49,6 +49,7 @@
             {
                 <div class="mb-1">
                     <span class="small" style="color:#a8dadc;">@weapon.WeaponName</span>
+                    @if (weapon.ModelCount > 1) { <span class="small ms-1" style="color:#9aa8c0;">×@weapon.ModelCount</span> }
                     <span class="badge bg-secondary ms-1" style="font-size:0.6rem;">@weapon.Type</span>
                     @if (weapon.Range > 0) { <span class="text-muted small ms-1">@(weapon.Range)"</span> }
                     <table class="weapon-table mt-1">
