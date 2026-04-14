@@ -10,7 +10,7 @@
 <div class="unit-card-header" data-bs-toggle="collapse" data-bs-target="#@collapseId">
     <div>
         <span class="unit-name">@Model.Name</span>
-        <span class="ms-2 text-muted small">(@Model.ModelCount models)</span>
+        <span class="ms-2 small" style="color:#9aa8c0;">(@Model.ModelCount models)</span>
     </div>
     <span class="unit-stats-inline">
         T@(Model.Toughness) Sv@(Model.Save)+ W@(Model.Wounds)
@@ -43,7 +43,7 @@
         {
             <div class="mb-1 small fw-semibold text-light">
                 @modelProfile.ModelName
-                @if (modelProfile.Count > 1) { <span class="text-muted">×@modelProfile.Count</span> }
+                @if (modelProfile.Count > 1) { <span style="color:#9aa8c0;">×@modelProfile.Count</span> }
             </div>
             @foreach (var weapon in modelProfile.Weapons)
             {
