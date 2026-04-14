@@ -7,7 +7,8 @@
     const selectedAttackers = new Map(); // index -> unitProfile
     let selectedDefenderIndex = null;
     let selectedDefenderUnit = null;
-    let selectedWeapon = null; // { weaponName, variantName, modelName, modelCount, rowElement }
+    let selectedWeapon = null; // { weaponName, variantName, modelName, modelCount, weaponType, rowElement }
+    let activeWeaponType = null; // 'Melee' | 'Ranged' | null — set by first weapon selected
 
     const combatPanel = document.getElementById('combat-panel');
     const selectionSummary = document.getElementById('selection-summary');
@@ -85,6 +86,10 @@
             const variantName = row.dataset.variant;
             const modelName   = row.dataset.modelName;
             const modelCount  = parseInt(row.dataset.modelCount, 10);
+            const weaponType  = row.dataset.weaponType; // 'Melee' | 'Ranged'
+
+            // Enforce phase constraint: once a type is locked in, reject the other type.
+            if (activeWeaponType && weaponType !== activeWeaponType) return;
 
             const isSameRow = selectedWeapon
                 && selectedWeapon.weaponName === weaponName
@@ -104,7 +109,8 @@
                 // Clear any previously highlighted weapon row
                 clearWeaponSelection(/* keepAttackers */ true);
 
-                selectedWeapon = { weaponName, variantName, modelName, modelCount, unitIndex, rowElement: row };
+                activeWeaponType = weaponType;
+                selectedWeapon = { weaponName, variantName, modelName, modelCount, weaponType, unitIndex, rowElement: row };
                 row.classList.add('selected-weapon');
                 attackingModelsInput.value = modelCount;
             }
@@ -118,7 +124,9 @@
             selectedWeapon.rowElement.classList.remove('selected-weapon');
         }
         selectedWeapon = null;
+        activeWeaponType = null;
         updateWeaponDisplay();
+        updateWeaponTypeConstraints();
         if (!keepAttackers) updateRunButton();
     }
 
@@ -139,7 +147,18 @@
             : 'Select one or more attacker units and a defender unit.';
 
         updateWeaponDisplay();
+        updateWeaponTypeConstraints();
         updateRunButton();
+    }
+
+    function updateWeaponTypeConstraints() {
+        document.querySelectorAll('.unit-card[data-role="attacker"] .weapon-variant-row').forEach(row => {
+            if (activeWeaponType && row.dataset.weaponType !== activeWeaponType) {
+                row.classList.add('weapon-type-locked');
+            } else {
+                row.classList.remove('weapon-type-locked');
+            }
+        });
     }
 
     function updateWeaponDisplay() {

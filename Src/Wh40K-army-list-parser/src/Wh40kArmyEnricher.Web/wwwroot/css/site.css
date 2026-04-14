@@ -235,6 +235,12 @@ body {
     color: #f8c8cc;
 }
 
+.unit-card[data-role="attacker"] .weapon-variant-row.weapon-type-locked {
+    opacity: 0.35;
+    cursor: not-allowed;
+    color: #6c757d;
+}
+
 /* Weapon display in combat panel */
 .weapon-display-hint {
     font-size: 0.8rem;
