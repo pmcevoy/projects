@@ -13,99 +13,73 @@ public class SimulationAdapter
         _simulator = new CombatSimulator(new DiceRoller());
     }
 
-    /// <summary>
-    /// Builds a SimulationConfig from the selected attacker units, weapon choice, and defender,
-    /// runs the simulation, and returns a <see cref="SimulationResponse"/>.
-    /// </summary>
+    // ---------------------------------------------------------------------------
+    // Weapon equality key — groups weapon selections that share the same attack pipeline.
+    // Attacks are intentionally excluded: Marshal (7A) and Sword Brother (3A) carrying the
+    // same MCPW profile are grouped together and their attacks aggregated.
+    // ---------------------------------------------------------------------------
+
+    private record WeaponGroupKey(
+        string Type, int Skill, int Strength, int Ap, string Damage,
+        bool Torrent, bool Blast, int Melta, int RapidFire, int SustainedHits,
+        bool LethalHits, bool DevastatingWounds, bool TwinLinked, string Anti);
+
+    private record WeaponGroupData(
+        string WeaponName,
+        string WeaponType,
+        WeaponVariantProfile Variant,
+        List<(DiceExpression Attacks, int ModelCount)> Contributions);
+
+    // ---------------------------------------------------------------------------
+    // Public entry point
+    // ---------------------------------------------------------------------------
+
     public SimulationResponse Run(
         IReadOnlyList<UnitProfile> attackerUnits,
         UnitProfile defender,
         SimulationRequest request)
     {
-        // Find the weapon variant across all models in all selected attacker units
-        WeaponVariantProfile? variant = null;
-        string resolvedWeaponName = request.WeaponName;
-        int modelCount = 0;
+        if (request.WeaponSelections.Count == 0)
+            return Error("No weapons selected.");
 
-        foreach (var unit in attackerUnits)
-        {
-            foreach (var model in unit.Models)
-            {
-                // Match by model name if supplied, otherwise search all models
-                if (!string.IsNullOrEmpty(request.ModelName) &&
-                    !string.Equals(model.ModelName, request.ModelName, StringComparison.OrdinalIgnoreCase))
-                    continue;
+        var weaponGroups = BuildWeaponGroups(attackerUnits, request.WeaponSelections);
+        if (weaponGroups.Count == 0)
+            return Error("No matching weapons found for the selected weapon names.");
 
-                foreach (var wp in model.Weapons)
-                {
-                    if (!string.Equals(wp.WeaponName, request.WeaponName, StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    var v = wp.Profiles.FirstOrDefault(p =>
-                        string.Equals(p.Variant, request.VariantName, StringComparison.OrdinalIgnoreCase))
-                        ?? wp.Profiles.FirstOrDefault();
-
-                    if (v != null)
-                    {
-                        variant = v;
-                        resolvedWeaponName = wp.WeaponName;
-                        modelCount += model.Count;
-                    }
-                }
-            }
-        }
-
-        if (variant == null)
-            return Error($"Weapon '{request.WeaponName}' not found on selected attacker units.");
-
-        // User can override the attacking model count
-        if (request.AttackingModels > 0)
-            modelCount = request.AttackingModels;
-
-        if (modelCount <= 0)
-            return Error("No attacking models found for the selected weapon.");
-
-        // Map reroll options
         var rerolls = new SimRerollOptions
         {
-            HitRerollOnes = request.HitRerolls == "ones",
-            HitRerollAll  = request.HitRerolls == "all",
+            HitRerollOnes   = request.HitRerolls == "ones",
+            HitRerollAll    = request.HitRerolls == "all",
             WoundRerollOnes = request.WoundRerolls == "ones",
             WoundRerollAll  = request.WoundRerolls == "all",
         };
 
-        // Parse attacks and damage from ScalarValue (may be fixed int or dice string e.g. "D6")
-        var attacks = ParseDice(variant.Attacks);
-        var damage  = ParseDice(variant.Damage);
-
-        // AP: enricher stores as negative (e.g. -2), simulator expects positive (save + ap)
-        int simAp = -variant.Ap;
-
-        var weapon = new SimWeaponProfile
+        var simWeapons = weaponGroups.Select(g =>
         {
-            Name           = resolvedWeaponName,
-            Attacks        = attacks,
-            Skill          = variant.Skill,
-            Strength       = variant.Strength,
-            Ap             = simAp,
-            Damage         = damage,
-            WithinHalfRange = request.WithinHalfRange,
-            Abilities      = MapAbilities(variant.Abilities),
-        };
+            var aggregatedAttacks = AggregateAttacks(g.Contributions);
+            return new SimWeaponProfile
+            {
+                Name            = g.WeaponName,
+                Attacks         = aggregatedAttacks,
+                Skill           = g.Variant.Skill,
+                Strength        = g.Variant.Strength,
+                Ap              = -g.Variant.Ap,   // Contracts: negative int → Sim: positive int
+                Damage          = ParseDice(g.Variant.Damage),
+                WithinHalfRange = request.WithinHalfRange,
+                Abilities       = MapAbilities(g.Variant.Abilities),
+            };
+        }).ToList();
 
         var attackerName = string.Join(" + ", attackerUnits.Select(u => u.Name));
         var attacker = new SimAttackerProfile
         {
             Name          = attackerName,
-            Models        = modelCount,
-            Weapon        = weapon,
+            Weapons       = simWeapons,
             Rerolls       = rerolls,
             CriticalHitsOn = request.CriticalHitsOn5 ? 5 : attackerUnits.Min(u => u.CriticalHitsOn),
         };
 
-        // Cover: +1 to armour save (makes it harder to fail = numerically higher threshold)
         int coverBonus = request.InCover ? 1 : 0;
-
         var defenderProfile = new SimDefenderProfile
         {
             Name             = defender.Name,
@@ -125,24 +99,28 @@ public class SimulationAdapter
             Defender       = defenderProfile,
         };
 
-        var (raw, stageStats) = _simulator.Run(config);
+        var (raw, aggregate, perWeapon) = _simulator.Run(config);
         var result = SimulationResult.Compute(raw);
 
-        // Expected kills: total damage / wounds per model (wounds > 0 guard)
         int woundsPerModel = defender.Wounds > 0 ? defender.Wounds : 1;
         double expectedKills = result.Mean / woundsPerModel;
-
-        // Probability of killing at least one model: P(damage >= woundsPerModel)
         double probKillAtLeastOne = raw.Count(d => d >= woundsPerModel) / (double)raw.Count;
 
-        var variantLabel = string.Equals(request.VariantName, "default", StringComparison.OrdinalIgnoreCase)
-            ? "" : $" [{request.VariantName}]";
+        // Weapon description: single weapon uses variant label; multiple uses comma-separated names.
+        string weaponDescription = weaponGroups.Count == 1
+            ? BuildSingleWeaponLabel(weaponGroups[0], request.WeaponSelections[0].VariantName)
+            : string.Join(", ", weaponGroups.Select(g => g.WeaponName).Distinct());
+
+        // Per-weapon breakdown only populated when there are multiple groups (single group → use StageStats).
+        var breakdown = perWeapon.Count > 1
+            ? perWeapon.Select(w => new WeaponGroupResult { WeaponName = w.WeaponName, Stats = w.Stats }).ToList()
+            : new List<WeaponGroupResult>();
 
         return new SimulationResponse
         {
             Success              = true,
             AttackerName         = attackerName,
-            WeaponDescription    = $"{resolvedWeaponName}{variantLabel}",
+            WeaponDescription    = weaponDescription,
             DefenderName         = defender.Name,
             Runs                 = result.Runs,
             MeanDamage           = Math.Round(result.Mean, 2),
@@ -151,9 +129,107 @@ public class SimulationAdapter
             ProbKillAtLeastOne   = Math.Round(probKillAtLeastOne, 3),
             MinDamage            = result.Min,
             MaxDamage            = result.Max,
-            StageStats           = stageStats,
+            StageStats           = aggregate,
+            WeaponBreakdown      = breakdown,
         };
     }
+
+    // ---------------------------------------------------------------------------
+    // Weapon grouping
+    // ---------------------------------------------------------------------------
+
+    private static List<WeaponGroupData> BuildWeaponGroups(
+        IReadOnlyList<UnitProfile> attackerUnits,
+        IReadOnlyList<WeaponSelection> selections)
+    {
+        var groups = new Dictionary<WeaponGroupKey, WeaponGroupData>();
+
+        foreach (var sel in selections)
+        {
+            WeaponVariantProfile? variant = null;
+            string weaponType = "Melee";
+
+            // Find the matching variant in the attacker units.
+            foreach (var unit in attackerUnits)
+            {
+                foreach (var model in unit.Models)
+                {
+                    if (!string.IsNullOrEmpty(sel.ModelName) &&
+                        !string.Equals(model.ModelName, sel.ModelName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    foreach (var wp in model.Weapons)
+                    {
+                        if (!string.Equals(wp.WeaponName, sel.WeaponName, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        variant = wp.Profiles.FirstOrDefault(p =>
+                            string.Equals(p.Variant, sel.VariantName, StringComparison.OrdinalIgnoreCase))
+                            ?? wp.Profiles.FirstOrDefault();
+
+                        if (variant != null)
+                        {
+                            weaponType = wp.Type;
+                            break;
+                        }
+                    }
+                    if (variant != null) break;
+                }
+                if (variant != null) break;
+            }
+
+            if (variant == null) continue;
+
+            var key = MakeGroupKey(weaponType, variant);
+            var attackExpr = ParseDice(variant.Attacks);
+            int modelCount = sel.ModelCount > 0 ? sel.ModelCount : 1;
+
+            if (groups.TryGetValue(key, out var existing))
+                existing.Contributions.Add((attackExpr, modelCount));
+            else
+                groups[key] = new WeaponGroupData(
+                    sel.WeaponName, weaponType, variant,
+                    new List<(DiceExpression, int)> { (attackExpr, modelCount) });
+        }
+
+        return groups.Values.ToList();
+    }
+
+    private static WeaponGroupKey MakeGroupKey(string type, WeaponVariantProfile v)
+    {
+        var anti = string.Join(",", v.Abilities.Anti
+            .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(x => $"{x.Key}:{x.Value}"));
+
+        return new WeaponGroupKey(
+            type, v.Skill, v.Strength, v.Ap, v.Damage.ToString(),
+            v.Abilities.Torrent, v.Abilities.Blast, v.Abilities.Melta,
+            v.Abilities.RapidFire, v.Abilities.SustainedHits, v.Abilities.LethalHits,
+            v.Abilities.DevastatingWounds, v.Abilities.TwinLinked, anti);
+    }
+
+    /// <summary>
+    /// Aggregates attack contributions using DiceExpression.Scale and Add.
+    /// 3 models × D6 attacks → 3D6; 1×7 + 1×6 + 4×3 → Fixed(25).
+    /// </summary>
+    private static DiceExpression AggregateAttacks(List<(DiceExpression Attacks, int ModelCount)> contributions)
+    {
+        var total = DiceExpression.Fixed(0);
+        foreach (var (attacks, count) in contributions)
+            total = total.Add(attacks.Scale(count));
+        return total;
+    }
+
+    private static string BuildSingleWeaponLabel(WeaponGroupData group, string variantName)
+    {
+        var variantLabel = string.Equals(variantName, "default", StringComparison.OrdinalIgnoreCase)
+            ? "" : $" [{variantName}]";
+        return $"{group.WeaponName}{variantLabel}";
+    }
+
+    // ---------------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------------
 
     private static SimulationResponse Error(string message) =>
         new() { Success = false, Error = message };

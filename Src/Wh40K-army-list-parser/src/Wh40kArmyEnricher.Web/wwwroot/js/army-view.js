@@ -3,33 +3,39 @@
 (function () {
     'use strict';
 
+    // ---------------------------------------------------------------------------
     // State
-    const selectedAttackers = new Map(); // index -> unitProfile
-    let selectedDefenderIndex = null;
-    let selectedDefenderUnit = null;
-    let selectedWeapon = null; // { weaponName, variantName, modelName, modelCount, weaponType, rowElement }
-    let activeWeaponType = null; // 'Melee' | 'Ranged' | null — set by first weapon selected
+    // ---------------------------------------------------------------------------
 
-    const combatPanel = document.getElementById('combat-panel');
-    const selectionSummary = document.getElementById('selection-summary');
-    const weaponDisplay = document.getElementById('weapon-display');
+    const selectedAttackers = new Map();  // unitIndex -> unitProfile
+    let selectedDefenderIndex = null;
+    let selectedDefenderUnit  = null;
+
+    // Map of weaponKey -> { weaponName, variantName, modelName, modelCount, weaponType, unitIndex, rowElement }
+    // weaponKey = `${unitIndex}::${weaponName}::${variantName}`
+    const selectedWeapons = new Map();
+    let activeWeaponType = null; // 'Melee' | 'Ranged' | null
+
+    const combatPanel         = document.getElementById('combat-panel');
+    const selectionSummary    = document.getElementById('selection-summary');
+    const weaponDisplay       = document.getElementById('weapon-display');
     const attackingModelsInput = document.getElementById('attacking-models');
-    const runSimBtn = document.getElementById('run-sim-btn');
-    const resultsPanel = document.getElementById('results-panel');
-    const loadingOverlay = document.getElementById('loading-overlay');
+    const attackingModelsCol  = document.getElementById('attacking-models-col');
+    const runSimBtn           = document.getElementById('run-sim-btn');
+    const resultsPanel        = document.getElementById('results-panel');
+    const loadingOverlay      = document.getElementById('loading-overlay');
 
     // ---------------------------------------------------------------------------
-    // Unit card click handling (header area — selection toggle)
+    // Unit card click handling (header — selection toggle)
     // ---------------------------------------------------------------------------
 
     document.querySelectorAll('.unit-card').forEach(card => {
         card.addEventListener('click', function (e) {
-            // Clicks inside the expanded detail body are handled separately
             if (e.target.closest('.collapse')) return;
 
-            const role = card.dataset.role;
+            const role  = card.dataset.role;
             const index = parseInt(card.dataset.index, 10);
-            const unit = JSON.parse(card.dataset.unit);
+            const unit  = JSON.parse(card.dataset.unit);
 
             if (role === 'attacker') {
                 toggleAttacker(card, index, unit);
@@ -45,10 +51,15 @@
         if (selectedAttackers.has(index)) {
             selectedAttackers.delete(index);
             card.classList.remove('selected-attacker');
-            // Clear weapon if it belonged to this unit
-            if (selectedWeapon && selectedWeapon.unitIndex === index) {
-                clearWeaponSelection();
+
+            // Remove any weapons that came from this unit.
+            for (const [key, w] of selectedWeapons.entries()) {
+                if (w.unitIndex === index) {
+                    w.rowElement.classList.remove('selected-weapon');
+                    selectedWeapons.delete(key);
+                }
             }
+            if (selectedWeapons.size === 0) activeWeaponType = null;
         } else {
             selectedAttackers.set(index, unit);
             card.classList.add('selected-attacker');
@@ -56,79 +67,68 @@
     }
 
     function selectDefender(card, index, unit) {
-        document.querySelectorAll('.unit-card[data-role="defender"]').forEach(c => {
-            c.classList.remove('selected-defender');
-        });
+        document.querySelectorAll('.unit-card[data-role="defender"]').forEach(c =>
+            c.classList.remove('selected-defender'));
 
         if (selectedDefenderIndex === index) {
             selectedDefenderIndex = null;
-            selectedDefenderUnit = null;
+            selectedDefenderUnit  = null;
         } else {
             selectedDefenderIndex = index;
-            selectedDefenderUnit = unit;
+            selectedDefenderUnit  = unit;
             card.classList.add('selected-defender');
         }
     }
 
     // ---------------------------------------------------------------------------
-    // Weapon row click handling
+    // Weapon row click handling — toggle-based multi-select
     // ---------------------------------------------------------------------------
 
     document.querySelectorAll('.unit-card[data-role="attacker"] .weapon-variant-row').forEach(row => {
         row.addEventListener('click', function (e) {
-            e.stopPropagation(); // prevent card selection toggle
+            e.stopPropagation();
 
-            const card = row.closest('.unit-card');
-            const unitIndex = parseInt(card.dataset.index, 10);
-            const unit = JSON.parse(card.dataset.unit);
-
+            const card       = row.closest('.unit-card');
+            const unitIndex  = parseInt(card.dataset.index, 10);
+            const unit       = JSON.parse(card.dataset.unit);
             const weaponName  = row.dataset.weaponName;
             const variantName = row.dataset.variant;
             const modelName   = row.dataset.modelName;
             const modelCount  = parseInt(row.dataset.modelCount, 10);
-            const weaponType  = row.dataset.weaponType; // 'Melee' | 'Ranged'
+            const weaponType  = row.dataset.weaponType;
 
-            // Enforce phase constraint: once a type is locked in, reject the other type.
-            if (activeWeaponType && weaponType !== activeWeaponType) return;
+            const weaponKey = `${unitIndex}::${weaponName}::${variantName}`;
 
-            const isSameRow = selectedWeapon
-                && selectedWeapon.weaponName === weaponName
-                && selectedWeapon.variantName === variantName
-                && selectedWeapon.unitIndex === unitIndex;
-
-            if (isSameRow) {
-                // Clicking the same row again deselects it
-                clearWeaponSelection();
+            if (selectedWeapons.has(weaponKey)) {
+                // Deselect this weapon.
+                row.classList.remove('selected-weapon');
+                selectedWeapons.delete(weaponKey);
+                if (selectedWeapons.size === 0) activeWeaponType = null;
             } else {
-                // Auto-select the parent unit as attacker if not already
+                // Enforce phase constraint.
+                if (activeWeaponType && weaponType !== activeWeaponType) return;
+
+                // Auto-select the parent unit as attacker.
                 if (!selectedAttackers.has(unitIndex)) {
                     selectedAttackers.set(unitIndex, unit);
                     card.classList.add('selected-attacker');
                 }
 
-                // Clear any previously highlighted weapon row
-                clearWeaponSelection(/* keepAttackers */ true);
-
                 activeWeaponType = weaponType;
-                selectedWeapon = { weaponName, variantName, modelName, modelCount, weaponType, unitIndex, rowElement: row };
+                selectedWeapons.set(weaponKey, {
+                    weaponName, variantName, modelName, modelCount,
+                    weaponType, unitIndex, rowElement: row
+                });
                 row.classList.add('selected-weapon');
-                attackingModelsInput.value = modelCount;
+
+                // Seed the models-firing input on first selection.
+                if (selectedWeapons.size === 1)
+                    attackingModelsInput.value = modelCount;
             }
 
             updateUI();
         });
     });
-
-    function clearWeaponSelection(keepAttackers = false) {
-        if (selectedWeapon && selectedWeapon.rowElement) {
-            selectedWeapon.rowElement.classList.remove('selected-weapon');
-        }
-        selectedWeapon = null;
-        activeWeaponType = null;
-        updateWeaponDisplay();
-        updateWeaponTypeConstraints();
-        if (!keepAttackers) updateRunButton();
-    }
 
     // ---------------------------------------------------------------------------
     // UI updates
@@ -136,11 +136,11 @@
 
     function updateUI() {
         const hasAttackers = selectedAttackers.size > 0;
-        const hasDefender = selectedDefenderIndex !== null;
+        const hasDefender  = selectedDefenderIndex !== null;
 
         combatPanel.style.display = (hasAttackers || hasDefender) ? 'block' : 'none';
 
-        const attackerNames = [...selectedAttackers.values()].map(u => u.name).join(' + ');
+        const attackerNames  = [...selectedAttackers.values()].map(u => u.name).join(' + ');
         const defenderNameStr = selectedDefenderUnit ? selectedDefenderUnit.name : '—';
         selectionSummary.textContent = hasAttackers
             ? `Attacker: ${attackerNames} vs Defender: ${defenderNameStr}`
@@ -151,32 +151,46 @@
         updateRunButton();
     }
 
-    function updateWeaponTypeConstraints() {
-        document.querySelectorAll('.unit-card[data-role="attacker"] .weapon-variant-row').forEach(row => {
-            if (activeWeaponType && row.dataset.weaponType !== activeWeaponType) {
-                row.classList.add('weapon-type-locked');
-            } else {
-                row.classList.remove('weapon-type-locked');
-            }
-        });
-    }
-
     function updateWeaponDisplay() {
-        if (!selectedWeapon) {
+        const count = selectedWeapons.size;
+
+        if (count === 0) {
             weaponDisplay.className = 'weapon-display-hint';
             weaponDisplay.textContent = 'Expand an attacker unit and click a weapon row to select it.';
+            attackingModelsCol.style.display = '';
             return;
         }
+
         weaponDisplay.className = 'weapon-display-selected';
-        const variantStr = selectedWeapon.variantName === 'default' ? '' : ` [${selectedWeapon.variantName}]`;
-        weaponDisplay.textContent =
-            `${selectedWeapon.weaponName}${variantStr}  —  ${selectedWeapon.modelName} ×${selectedWeapon.modelCount}`;
+
+        if (count === 1) {
+            const w = [...selectedWeapons.values()][0];
+            const variantStr = w.variantName === 'default' ? '' : ` [${w.variantName}]`;
+            weaponDisplay.textContent = `${w.weaponName}${variantStr}  —  ${w.modelName} ×${w.modelCount}`;
+            attackingModelsCol.style.display = '';
+        } else {
+            const lines = [...selectedWeapons.values()].map(w => {
+                const variantStr = w.variantName === 'default' ? '' : ` [${w.variantName}]`;
+                return `${w.weaponName}${variantStr} — ${w.modelName} ×${w.modelCount}`;
+            });
+            weaponDisplay.innerHTML = lines.map(l => escHtml(l)).join('<br>');
+            attackingModelsCol.style.display = 'none';
+        }
+    }
+
+    function updateWeaponTypeConstraints() {
+        document.querySelectorAll('.unit-card[data-role="attacker"] .weapon-variant-row').forEach(row => {
+            if (activeWeaponType && row.dataset.weaponType !== activeWeaponType)
+                row.classList.add('weapon-type-locked');
+            else
+                row.classList.remove('weapon-type-locked');
+        });
     }
 
     function updateRunButton() {
         const hasAttackers = selectedAttackers.size > 0;
-        const hasDefender = selectedDefenderIndex !== null;
-        runSimBtn.disabled = !(hasAttackers && hasDefender && selectedWeapon !== null);
+        const hasDefender  = selectedDefenderIndex !== null;
+        runSimBtn.disabled = !(hasAttackers && hasDefender && selectedWeapons.size > 0);
     }
 
     // ---------------------------------------------------------------------------
@@ -186,27 +200,35 @@
     runSimBtn.addEventListener('click', async function () {
         loadingOverlay.classList.add('active');
         resultsPanel.style.display = 'none';
+        document.getElementById('pipeline-section').style.display = 'none';
+
+        const isSingleWeapon = selectedWeapons.size === 1;
+        const modelsOverride = isSingleWeapon ? (parseInt(attackingModelsInput.value) || 0) : 0;
+
+        const weaponSelections = [...selectedWeapons.values()].map(w => ({
+            weaponName:  w.weaponName,
+            variantName: w.variantName,
+            modelName:   w.modelName,
+            modelCount:  (isSingleWeapon && modelsOverride > 0) ? modelsOverride : w.modelCount,
+        }));
 
         const request = {
             attackerUnitIndices: [...selectedAttackers.keys()],
-            defenderUnitIndex: selectedDefenderIndex,
-            weaponName: selectedWeapon.weaponName,
-            variantName: selectedWeapon.variantName,
-            modelName: selectedWeapon.modelName,
-            attackingModels: parseInt(attackingModelsInput.value, 10) || 0,
-            withinHalfRange: document.getElementById('within-half-range').checked,
-            inCover: document.getElementById('in-cover').checked,
-            hitRerolls: document.querySelector('input[name="hit-rerolls"]:checked')?.value ?? 'none',
-            woundRerolls: document.querySelector('input[name="wound-rerolls"]:checked')?.value ?? 'none',
-            criticalHitsOn5: document.getElementById('crit-5').checked,
-            runs: 10000
+            defenderUnitIndex:   selectedDefenderIndex,
+            weaponSelections,
+            withinHalfRange:  document.getElementById('within-half-range').checked,
+            inCover:          document.getElementById('in-cover').checked,
+            hitRerolls:       document.querySelector('input[name="hit-rerolls"]:checked')?.value ?? 'none',
+            woundRerolls:     document.querySelector('input[name="wound-rerolls"]:checked')?.value ?? 'none',
+            criticalHitsOn5:  document.getElementById('crit-5').checked,
+            runs: 10000,
         };
 
         try {
             const resp = await fetch('/api/simulate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(request)
+                body: JSON.stringify(request),
             });
 
             const data = await resp.json();
@@ -224,83 +246,121 @@
         }
     });
 
+    // ---------------------------------------------------------------------------
+    // Results display
+    // ---------------------------------------------------------------------------
+
     function displayResults(data) {
         document.getElementById('results-description').textContent =
             `${data.attackerName} firing ${data.weaponDescription} at ${data.defenderName} (${data.runs.toLocaleString()} runs)`;
 
-        document.getElementById('res-mean').textContent = data.meanDamage.toFixed(2);
-        document.getElementById('res-kills').textContent = data.expectedKills.toFixed(2);
+        document.getElementById('res-mean').textContent    = data.meanDamage.toFixed(2);
+        document.getElementById('res-kills').textContent   = data.expectedKills.toFixed(2);
         document.getElementById('res-prob-kill').textContent = (data.probKillAtLeastOne * 100).toFixed(1) + '%';
-        document.getElementById('res-std').textContent = '±' + data.stdDeviation.toFixed(2);
-        document.getElementById('res-range').textContent =
-            `Damage range: ${data.minDamage} – ${data.maxDamage}`;
+        document.getElementById('res-std').textContent     = '±' + data.stdDeviation.toFixed(2);
+        document.getElementById('res-range').textContent   = `Damage range: ${data.minDamage} – ${data.maxDamage}`;
 
         resultsPanel.style.display = 'block';
 
         if (data.stageStats) {
-            displayPipeline(data.stageStats, data.meanDamage);
+            displayPipeline(data.stageStats, data.weaponBreakdown || [], data.meanDamage);
         }
 
         resultsPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    function fmt(n) { return n.toFixed(2); }
+    // ---------------------------------------------------------------------------
+    // Pipeline display — dynamically generated
+    // ---------------------------------------------------------------------------
 
-    function pct(num, denom) {
-        if (!denom || denom < 0.001) return '';
-        return `(${(num / denom * 100).toFixed(1)}%)`;
+    function displayPipeline(aggregate, weaponBreakdown, finalDamage) {
+        const content = document.getElementById('pipeline-content');
+        let html = '';
+
+        if (weaponBreakdown.length > 1) {
+            // Per-weapon sections followed by a combined summary.
+            for (const group of weaponBreakdown) {
+                html += `<div class="pipeline-weapon-header">${escHtml(group.weaponName)}</div>`;
+                html += buildFunnelTable(group.stats, null);
+            }
+            html += '<div class="pipeline-weapon-header pipeline-combined">Combined</div>';
+            html += buildSummaryTable(aggregate, finalDamage);
+        } else {
+            // Single weapon: full funnel with Final Damage at the bottom.
+            html += buildFunnelTable(aggregate, finalDamage);
+        }
+
+        content.innerHTML = html;
+        document.getElementById('pipeline-section').style.display = 'block';
     }
 
-    function setRow(id, value, rate) {
-        document.getElementById(id + '-val').textContent = fmt(value);
-        const rateEl = document.getElementById(id + '-rate');
-        if (rateEl) rateEl.textContent = rate || '';
-    }
+    /** Full funnel table: all stages and ability sub-rows. finalDamage appended when non-null. */
+    function buildFunnelTable(s, finalDamage) {
+        const rows = [];
 
-    function showRow(id, visible) {
-        const row = document.getElementById(id);
-        if (row) row.style.display = visible ? '' : 'none';
-    }
+        rows.push(pRow('main', 'Attacks', s.avgAttacks, ''));
+        rows.push(pRow('main', 'Hits', s.avgHits, pct(s.avgHits, s.avgAttacks)));
+        rows.push(pRow('sub',  '↳ Critical Hits', s.avgCritHits, ''));
+        if (s.avgSustainedHitsBonus > 0.001)
+            rows.push(pRow('sub', '↳ Sustained Hits bonus', s.avgSustainedHitsBonus, ''));
 
-    function displayPipeline(s, finalDamage) {
-        const section = document.getElementById('pipeline-section');
+        rows.push(pRow('main', 'Wounds', s.avgWounds, pct(s.avgWounds, s.avgHits)));
+        rows.push(pRow('sub',  '↳ Critical Wounds', s.avgCritWounds, ''));
+        if (s.avgLethalHitsAutoWounds > 0.001)
+            rows.push(pRow('sub', '↳ Lethal Hits auto-wounds', s.avgLethalHitsAutoWounds, ''));
+        if (s.avgAntiCritWounds > 0.001)
+            rows.push(pRow('sub', '↳ Anti-X crit wounds', s.avgAntiCritWounds, ''));
 
-        setRow('pl-attacks',      s.avgAttacks,    '');
-        setRow('pl-hits',         s.avgHits,        pct(s.avgHits, s.avgAttacks));
-        setRow('pl-crit-hits',    s.avgCritHits,    '');
-        setRow('pl-sh-bonus',     s.avgSustainedHitsBonus, '');
-        setRow('pl-wounds',       s.avgWounds,      pct(s.avgWounds, s.avgHits));
-        setRow('pl-crit-wounds',  s.avgCritWounds,  '');
-        setRow('pl-lh',           s.avgLethalHitsAutoWounds, '');
-        setRow('pl-anti',         s.avgAntiCritWounds, '');
+        const totalFailed = s.avgFailedSaves + s.avgDevastatingWoundsTriggers;
+        rows.push(pRow('main', 'Failed Saves', totalFailed, pct(totalFailed, s.avgWounds)));
+        if (s.avgDevastatingWoundsTriggers > 0.001)
+            rows.push(pRow('sub', '↳ Devastating Wounds (bypassed)', s.avgDevastatingWoundsTriggers, ''));
 
-        // Failed saves = actual save rolls that failed + DevW bypasses
-        const totalFailedOrBypassed = s.avgFailedSaves + s.avgDevastatingWoundsTriggers;
-        setRow('pl-failed-saves', totalFailedOrBypassed, pct(totalFailedOrBypassed, s.avgWounds));
-        setRow('pl-devw',         s.avgDevastatingWoundsTriggers, '');
-
-        // Save type breakdown: only shown when save rolls were made
         const totalSaveRolls = s.avgArmourSaveRolls + s.avgInvulnSaveRolls;
-        setRow('pl-armour-saves', s.avgArmourSaveRolls,  '');
-        setRow('pl-invuln-saves', s.avgInvulnSaveRolls,  '');
+        if (totalSaveRolls > 0.001) {
+            rows.push(pRow('sub', '↳ vs Armour save', s.avgArmourSaveRolls, ''));
+            if (s.avgInvulnSaveRolls > 0.001)
+                rows.push(pRow('sub', '↳ vs Invulnerable save', s.avgInvulnSaveRolls, ''));
+        }
 
-        setRow('pl-dmg-pre-fnp',  s.avgDamageBeforeFnp, '');
-        setRow('pl-fnp',          s.avgFnpSaved,  pct(s.avgFnpSaved, s.avgDamageBeforeFnp));
-        setRow('pl-final',        finalDamage,    '');
+        rows.push(pRow('main', 'Damage (pre-FNP)', s.avgDamageBeforeFnp, ''));
+        if (s.avgFnpSaved > 0.001)
+            rows.push(pRow('sub', '↳ Feel No Pain saved', s.avgFnpSaved, pct(s.avgFnpSaved, s.avgDamageBeforeFnp)));
 
-        // Hide ability rows when zero (weapon doesn't have that ability)
-        showRow('pl-sh-bonus',  s.avgSustainedHitsBonus > 0.001);
-        showRow('pl-lh',        s.avgLethalHitsAutoWounds > 0.001);
-        showRow('pl-anti',      s.avgAntiCritWounds > 0.001);
-        showRow('pl-devw',      s.avgDevastatingWoundsTriggers > 0.001);
-        showRow('pl-fnp',       s.avgFnpSaved > 0.001 || s.avgDamageBeforeFnp > s.avgFnpSaved + 0.001);
+        if (finalDamage !== null)
+            rows.push(pRow('final', 'Final Damage', finalDamage, ''));
 
-        // Hide invuln row when not in use
-        showRow('pl-invuln-saves', s.avgInvulnSaveRolls > 0.001);
-        // Hide armour save row when all saves went to invuln (and invuln is shown)
-        showRow('pl-armour-saves', totalSaveRolls > 0.001);
-
-        section.style.display = 'block';
+        return `<table class="pipeline-table"><tbody>${rows.join('')}</tbody></table>`;
     }
+
+    /** Compact summary table for the combined row in multi-weapon mode. */
+    function buildSummaryTable(s, finalDamage) {
+        const totalFailed = s.avgFailedSaves + s.avgDevastatingWoundsTriggers;
+        const rows = [
+            pRow('main',  'Attacks',           s.avgAttacks,        ''),
+            pRow('main',  'Hits',               s.avgHits,           ''),
+            pRow('main',  'Wounds',             s.avgWounds,         ''),
+            pRow('main',  'Failed Saves',       totalFailed,         ''),
+            pRow('main',  'Damage (pre-FNP)',   s.avgDamageBeforeFnp,''),
+            pRow('final', 'Final Damage',       finalDamage,         ''),
+        ];
+        return `<table class="pipeline-table"><tbody>${rows.join('')}</tbody></table>`;
+    }
+
+    function pRow(cls, label, value, rate) {
+        return `<tr class="pipeline-row pipeline-${escHtml(cls)}">` +
+            `<td class="pipeline-stage">${escHtml(label)}</td>` +
+            `<td class="pipeline-value">${fmt(value)}</td>` +
+            `<td class="pipeline-rate">${escHtml(rate)}</td>` +
+            `</tr>`;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Utilities
+    // ---------------------------------------------------------------------------
+
+    function fmt(n)         { return (typeof n === 'number' ? n : 0).toFixed(2); }
+    function pct(num, denom){ return (!denom || denom < 0.001) ? '' : `(${(num / denom * 100).toFixed(1)}%)`; }
+    function escHtml(s)     { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 })();

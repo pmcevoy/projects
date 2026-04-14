@@ -27,3 +27,10 @@ public sealed record CombatStageStats
     public required double AvgArmourSaveRolls { get; init; }
     public required double AvgInvulnSaveRolls { get; init; }
 }
+
+/// <summary>Per-weapon breakdown entry returned alongside the aggregate stats.</summary>
+public sealed record WeaponGroupStats
+{
+    public required string WeaponName { get; init; }
+    public required CombatStageStats Stats { get; init; }
+}

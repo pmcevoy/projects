@@ -6,12 +6,13 @@ public class SimulationRequest
     public List<int> AttackerUnitIndices { get; set; } = new();
     /// <summary>0-based index into the session defender army list.</summary>
     public int DefenderUnitIndex { get; set; }
-    public string WeaponName { get; set; } = "";
-    public string VariantName { get; set; } = "default";
-    /// <summary>Name of the model type carrying the selected weapon.</summary>
-    public string ModelName { get; set; } = "";
-    /// <summary>Number of attacking models. If 0, uses the full count from the unit profile.</summary>
-    public int AttackingModels { get; set; }
+
+    /// <summary>
+    /// One entry per selected weapon row. The adapter groups these by weapon equality
+    /// (Type + Skill + S + AP + D + Abilities) and aggregates attack counts within each group.
+    /// </summary>
+    public List<WeaponSelection> WeaponSelections { get; set; } = new();
+
     public bool WithinHalfRange { get; set; }
     /// <summary>When true, adds +1 to the defender's armour save.</summary>
     public bool InCover { get; set; }
@@ -22,4 +23,18 @@ public class SimulationRequest
     /// <summary>When true, Critical Hits are scored on 5+.</summary>
     public bool CriticalHitsOn5 { get; set; }
     public int Runs { get; set; } = 10000;
+}
+
+public class WeaponSelection
+{
+    public string WeaponName { get; set; } = "";
+    public string VariantName { get; set; } = "default";
+    /// <summary>Name of the model type carrying this weapon (used to find the right variant).</summary>
+    public string ModelName { get; set; } = "";
+    /// <summary>
+    /// Number of models contributing this weapon. For single-weapon selections this may be
+    /// overridden by the user via the "models firing" input; for multi-weapon it is taken
+    /// directly from the unit profile.
+    /// </summary>
+    public int ModelCount { get; set; }
 }

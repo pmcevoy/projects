@@ -21,5 +21,14 @@ public class SimulationResponse
     public int MinDamage { get; set; }
     public int MaxDamage { get; set; }
 
+    /// <summary>Aggregate pipeline stats across all weapon groups.</summary>
     public CombatStageStats? StageStats { get; set; }
+    /// <summary>One entry per distinct weapon group; empty when only one group (use StageStats directly).</summary>
+    public List<WeaponGroupResult> WeaponBreakdown { get; set; } = new();
+}
+
+public class WeaponGroupResult
+{
+    public string WeaponName { get; set; } = "";
+    public CombatStageStats Stats { get; set; } = null!;
 }

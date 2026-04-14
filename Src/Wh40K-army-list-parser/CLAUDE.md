@@ -464,26 +464,46 @@ Ported from the retired `wh40k-sim` standalone project. The combat rules spec li
 
 | Type | Purpose |
 |---|---|
-| `DiceExpression` | Parses `"D6"`, `"2D3+1"`, fixed integers; `Count=0` means fixed value in `Modifier` |
+| `DiceExpression` | Parses `"D6"`, `"2D3+1"`, fixed integers; `Count=0` means fixed value in `Modifier`; has `Scale(n)` and `Add(other)` for attack aggregation |
 | `IDiceRoller` / `DiceRoller` | Abstracts randomness; injectable for deterministic testing |
-| `SimAttackerProfile` | Name, model count, single `SimWeaponProfile`, rerolls, `CriticalHitsOn` |
+| `SimAttackerProfile` | Name, `IReadOnlyList<SimWeaponProfile>` Weapons, rerolls, `CriticalHitsOn` |
 | `SimDefenderProfile` | Name, model count, T, Sv, invuln, W, FNP, keywords |
-| `CombatSimulator` | Runs N iterations; returns `(IReadOnlyList<int> Damage, CombatStageStats Stats)` |
+| `CombatSimulator` | Runs N iterations; returns `(IReadOnlyList<int> Damage, CombatStageStats Aggregate, IReadOnlyList<WeaponGroupStats> PerWeapon)` |
 | `CombatStageStats` | Per-run averages for each pipeline stage and ability contribution |
+| `WeaponGroupStats` | `{ WeaponName, CombatStageStats Stats }` — per-weapon breakdown entry |
 | `SimulationResult` | Computed statistics: mean, median, stddev, min, max, probability/cumulative distributions |
 | `AbilityProcessor` | Pure static helpers: `WoundThreshold(S,T)`, `EffectiveSave(defender, ap)` |
 
 ### Simulation flow
 
-Per run: resolve attack count (base × models + Blast bonus + Rapid Fire if half range) → for each attack: hit roll (skip if Torrent) → Sustained Hits bonus attacks → wound roll (skip if Lethal Hit) → save roll (skip if Devastating Wounds) → damage + FNP. Each die may only be rerolled once. Natural 1 always fails, natural 6 (or lower if `CriticalHitsOn` is reduced) always succeeds.
+Per run: loop over each weapon in `Attacker.Weapons` — for each weapon, resolve attack count (already aggregated, includes Blast/Rapid Fire adjustments) → for each attack: hit roll (skip if Torrent) → Sustained Hits bonus attacks → wound roll (skip if Lethal Hit) → save roll (skip if Devastating Wounds) → damage + FNP. Each die may only be rerolled once. Natural 1 always fails, natural 6 (or lower if `CriticalHitsOn` is reduced) always succeeds.
 
-### Combat stage statistics (`CombatStageStats`)
+### Multi-weapon selection and attack aggregation
 
-`CombatSimulator.Run()` returns both the raw per-run damage list and a `CombatStageStats` record containing per-run averages across the full attack pipeline. These are displayed in the web UI as an "Attack Pipeline" funnel below the headline stats.
+The simulation supports firing multiple weapons simultaneously (e.g. a Marshal, Castellan, and Sword Brethren all firing their Master-crafted Power Weapon in the same fight phase). The key design decisions:
 
-**Implementation:** `CombatSimulator` uses a private `RunTally` struct (passed via `ref` through all internal methods) to count events per run. Totals are accumulated as `long` across all runs and divided at the end to produce averages. No per-run allocations.
+**Weapon equality** — two weapon selections are considered the same weapon profile if their `(Type, Skill, Strength, Ap, Damage, Abilities)` match. Attacks are explicitly **excluded** from the equality key; they are the quantity being aggregated, not part of the weapon's identity. This means Marshal (7A), Castellan (6A), and 4× Sword Brother (3A) with identical MCPW stats all merge into one group: 7 + 6 + 12 = 25 total attacks.
 
-**Pipeline fields tracked:**
+**Attack aggregation** — implemented in `SimulationAdapter.AggregateAttacks()` using `DiceExpression.Scale(n)` and `DiceExpression.Add(other)`:
+- Fixed attacks: Σ(attacks × modelCount) → `DiceExpression.Fixed(total)` e.g. 7+6+12 = `Fixed(25)`
+- Dice attacks: 3 models × D6 → `3D6` (correct distribution, not roll-once-multiply); D3+1 × 2 → `2D3+2`
+- `DiceExpression.Add` requires same `Sides` when both have dice (throws for mixed D3/D6 — shouldn't occur in practice for the same named weapon)
+
+**`SimAttackerProfile.Weapons`** — a list of `SimWeaponProfile`, one per distinct weapon group. Each profile's `Attacks` field already encodes the aggregated total. No separate model count field. The simulator loops over all weapons per run and sums damage.
+
+**Phase constraint** — shooting and melee occur in different game phases; it is invalid to simulate both simultaneously. The UI enforces this: the first weapon selected locks in a type (`Melee` or `Ranged`); rows of the opposite type get `.weapon-type-locked` styling (35% opacity, `cursor: not-allowed`) and clicks on them are silently rejected. The constraint resets when all weapon selections are cleared.
+
+**`SimulationRequest.WeaponSelections`** — replaces the old single `WeaponName`/`VariantName`/`ModelName` fields with `List<WeaponSelection>`. Each entry carries `{ WeaponName, VariantName, ModelName, ModelCount }`. For single-weapon selections the `ModelCount` may be overridden by the user via the "models firing" input; for multi-weapon it is taken directly from the unit profile. The adapter groups selections by equality key, aggregates attacks, and builds one `SimWeaponProfile` per group.
+
+### Combat stage statistics (`CombatStageStats` and `WeaponGroupStats`)
+
+`CombatSimulator.Run()` returns the raw per-run damage list, an aggregate `CombatStageStats`, and a per-weapon `IReadOnlyList<WeaponGroupStats>`. These are displayed in the web UI as an "Attack Pipeline" funnel.
+
+**Implementation:** `CombatSimulator` uses two private structs:
+- `RunTally` (int fields) — per-run counters, passed via `ref` through all internal methods, cleared between runs using a reused `RunTally[]` buffer (one slot per weapon, `Array.Clear` each run — no per-run heap allocations)
+- `RunTotals` (long fields) — cross-run accumulators, one per weapon; aggregate is the element-wise sum of all weapon totals
+
+**Pipeline fields tracked (per weapon, then summed for aggregate):**
 
 | Field | What it counts |
 |---|---|
@@ -502,18 +522,21 @@ Per run: resolve attack count (base × models + Blast bonus + Rapid Fire if half
 | `AvgDamageBeforeFnp` | Raw damage that reached the FNP step |
 | `AvgFnpSaved` | Damage points negated by Feel No Pain rolls |
 
-**Save type logic:** `RollSave` replicates `AbilityProcessor.EffectiveSave` inline to determine which save is active: if `defender.InvulnerableSave.HasValue && invuln < armourSave`, the invuln save is used — increment `InvulnSaveRolls`; otherwise increment `ArmourSaveRolls`. The total of both equals the total save rolls made (i.e., wounds minus DevW bypasses).
+**Save type logic:** `RollSave` replicates `AbilityProcessor.EffectiveSave` inline: if `defender.InvulnerableSave.HasValue && invuln < armourSave`, invuln save is used.
 
-**UI display:** The pipeline funnel is rendered in `displayPipeline()` in `army-view.js`. Ability sub-rows (Sustained Hits, Lethal Hits, Anti-X, Devastating Wounds, Feel No Pain) are hidden via `display:none` when their average is < 0.001 — so the funnel is uncluttered for weapons with no special abilities. Percentage rates (e.g. hit rate, wound rate, save-fail rate) are shown alongside each main stage value.
+**UI display:** `displayPipeline()` in `army-view.js` generates all pipeline HTML dynamically into `#pipeline-content`:
+- **Single weapon group**: full funnel table with ability sub-rows; Final Damage at the bottom. Sub-rows hidden when value < 0.001.
+- **Multiple weapon groups**: one labelled full-funnel section per group (`.pipeline-weapon-header`), followed by a compact "Combined" summary table (main stages only, no rates) ending with Final Damage.
+- `SimulationResponse.WeaponBreakdown` is empty for single-group runs (use `StageStats` directly); populated only when multiple groups exist.
 
 ### `SimulationAdapter` (in Web project)
 
 Bridges `UnitProfile` (Contracts) → `SimulationConfig` (Core.Simulation):
-- Finds the selected weapon variant across all selected attacker unit models
+- Groups `WeaponSelections` by `WeaponGroupKey` (type + Skill + S + AP + D + Abilities; Anti normalised to sorted `"kw:val,..."` string for dictionary equality)
+- Aggregates attacks per group via `DiceExpression.Scale` + `DiceExpression.Add`
 - Negates AP: `simAp = -contractsAp`
-- Parses `ScalarValue` attacks/damage via `DiceExpression.Parse`
 - Applies cover by adding 1 to `SimDefenderProfile.Save` before the run
-- Returns `SimulationResponse` with mean damage, expected kills (`mean / woundsPerModel`), P(kill ≥ 1), stddev, and `StageStats`
+- Returns `SimulationResponse` with mean damage, expected kills, P(kill ≥ 1), stddev, `StageStats` (aggregate), and `WeaponBreakdown` (per-group, empty when single group)
 
 ---
 

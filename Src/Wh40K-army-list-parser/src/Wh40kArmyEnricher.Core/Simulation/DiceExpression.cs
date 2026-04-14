@@ -41,6 +41,30 @@ public sealed record DiceExpression
         return new DiceExpression { Count = count, Sides = sides, Modifier = modifier };
     }
 
+    /// <summary>
+    /// Scales this expression by <paramref name="n"/>, as if n models each independently rolled it.
+    /// Fixed(7).Scale(3) = Fixed(21); D6.Scale(3) = 3D6; (D3+1).Scale(2) = 2D3+2.
+    /// </summary>
+    public DiceExpression Scale(int n)
+    {
+        if (n <= 0) throw new ArgumentOutOfRangeException(nameof(n));
+        if (Count == 0) return Fixed(Modifier * n);
+        return new DiceExpression { Count = Count * n, Sides = Sides, Modifier = Modifier * n };
+    }
+
+    /// <summary>
+    /// Adds two compatible expressions (same Sides, or at least one is a fixed offset).
+    /// Throws if both have dice with different Sides values.
+    /// </summary>
+    public DiceExpression Add(DiceExpression other)
+    {
+        if (Count == 0 && other.Count == 0) return Fixed(Modifier + other.Modifier);
+        if (Count == 0) return new DiceExpression { Count = other.Count, Sides = other.Sides, Modifier = Modifier + other.Modifier };
+        if (other.Count == 0) return new DiceExpression { Count = Count, Sides = Sides, Modifier = Modifier + other.Modifier };
+        if (Sides != other.Sides) throw new InvalidOperationException($"Cannot add D{Sides} and D{other.Sides} expressions.");
+        return new DiceExpression { Count = Count + other.Count, Sides = Sides, Modifier = Modifier + other.Modifier };
+    }
+
     public override string ToString() =>
         Count == 0 ? Modifier.ToString() :
         Count == 1 ? (Modifier == 0 ? $"D{Sides}" : $"D{Sides}{Modifier:+#;-#}") :

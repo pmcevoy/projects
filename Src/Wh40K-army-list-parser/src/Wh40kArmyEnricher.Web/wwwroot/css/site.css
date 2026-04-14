@@ -350,3 +350,26 @@ body {
 .pipeline-row.pipeline-main:first-child {
     border-top: none;
 }
+
+/* Per-weapon section label (multi-weapon mode) */
+.pipeline-weapon-header {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #a8dadc;
+    padding: 0.35rem 0.3rem 0.1rem;
+    margin-top: 0.4rem;
+    border-top: 1px solid #2a4a6a;
+}
+
+.pipeline-weapon-header:first-child {
+    margin-top: 0;
+    border-top: none;
+}
+
+.pipeline-weapon-header.pipeline-combined {
+    color: #f1a94e;
+    border-top: 2px solid #2a4a6a;
+    margin-top: 0.5rem;
+}
