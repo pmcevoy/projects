@@ -125,7 +125,7 @@ public class SimulationAdapter
             Defender       = defenderProfile,
         };
 
-        var raw    = _simulator.Run(config);
+        var (raw, stageStats) = _simulator.Run(config);
         var result = SimulationResult.Compute(raw);
 
         // Expected kills: total damage / wounds per model (wounds > 0 guard)
@@ -151,6 +151,7 @@ public class SimulationAdapter
             ProbKillAtLeastOne   = Math.Round(probKillAtLeastOne, 3),
             MinDamage            = result.Min,
             MaxDamage            = result.Max,
+            StageStats           = stageStats,
         };
     }
 

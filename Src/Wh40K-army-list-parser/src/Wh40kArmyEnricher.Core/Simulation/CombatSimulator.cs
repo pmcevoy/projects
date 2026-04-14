@@ -9,15 +9,79 @@ public sealed class CombatSimulator
         _dice = dice;
     }
 
-    public IReadOnlyList<int> Run(SimulationConfig config)
+    // Accumulates raw counts for one simulation run; averaged across all runs to build CombatStageStats.
+    private struct RunTally
     {
-        var results = new List<int>(config.SimulationRuns);
-        for (int i = 0; i < config.SimulationRuns; i++)
-            results.Add(SimulateOneRun(config.Attacker, config.Defender));
-        return results;
+        public int Attacks;
+        public int Hits;
+        public int CritHits;
+        public int Wounds;
+        public int CritWounds;
+        public int FailedSaves;
+        public int DamageBeforeFnp;
+        public int FnpSaved;
+        public int SustainedHitsBonus;
+        public int LethalHitsAutoWounds;
+        public int DevastatingWoundsTriggers;
+        public int AntiCritWounds;
+        public int ArmourSaveRolls;
+        public int InvulnSaveRolls;
     }
 
-    private int SimulateOneRun(SimAttackerProfile attacker, SimDefenderProfile defender)
+    public (IReadOnlyList<int> Damage, CombatStageStats Stats) Run(SimulationConfig config)
+    {
+        var results = new List<int>(config.SimulationRuns);
+
+        // Accumulate totals as longs to avoid overflow on large run counts.
+        long attacks = 0, hits = 0, critHits = 0, wounds = 0, critWounds = 0;
+        long failedSaves = 0, damageBeforeFnp = 0, fnpSaved = 0;
+        long sustainedBonus = 0, lethalHitsAutoWounds = 0, devWTriggers = 0, antiCritWounds = 0;
+        long armourSaveRolls = 0, invulnSaveRolls = 0;
+
+        for (int i = 0; i < config.SimulationRuns; i++)
+        {
+            var tally = new RunTally();
+            results.Add(SimulateOneRun(config.Attacker, config.Defender, ref tally));
+
+            attacks            += tally.Attacks;
+            hits               += tally.Hits;
+            critHits           += tally.CritHits;
+            wounds             += tally.Wounds;
+            critWounds         += tally.CritWounds;
+            failedSaves        += tally.FailedSaves;
+            damageBeforeFnp    += tally.DamageBeforeFnp;
+            fnpSaved           += tally.FnpSaved;
+            sustainedBonus     += tally.SustainedHitsBonus;
+            lethalHitsAutoWounds += tally.LethalHitsAutoWounds;
+            devWTriggers       += tally.DevastatingWoundsTriggers;
+            antiCritWounds     += tally.AntiCritWounds;
+            armourSaveRolls    += tally.ArmourSaveRolls;
+            invulnSaveRolls    += tally.InvulnSaveRolls;
+        }
+
+        double n = config.SimulationRuns;
+        var stats = new CombatStageStats
+        {
+            AvgAttacks                  = attacks / n,
+            AvgHits                     = hits / n,
+            AvgCritHits                 = critHits / n,
+            AvgWounds                   = wounds / n,
+            AvgCritWounds               = critWounds / n,
+            AvgFailedSaves              = failedSaves / n,
+            AvgDamageBeforeFnp          = damageBeforeFnp / n,
+            AvgFnpSaved                 = fnpSaved / n,
+            AvgSustainedHitsBonus       = sustainedBonus / n,
+            AvgLethalHitsAutoWounds     = lethalHitsAutoWounds / n,
+            AvgDevastatingWoundsTriggers = devWTriggers / n,
+            AvgAntiCritWounds           = antiCritWounds / n,
+            AvgArmourSaveRolls          = armourSaveRolls / n,
+            AvgInvulnSaveRolls          = invulnSaveRolls / n,
+        };
+
+        return (results, stats);
+    }
+
+    private int SimulateOneRun(SimAttackerProfile attacker, SimDefenderProfile defender, ref RunTally tally)
     {
         var weapon = attacker.Weapon;
 
@@ -31,11 +95,13 @@ public sealed class CombatSimulator
         if (weapon.WithinHalfRange && weapon.Abilities.RapidFire > 0)
             totalAttacks += weapon.Abilities.RapidFire * attacker.Models;
 
+        tally.Attacks = totalAttacks;
+
         int criticalWoundsOn = ComputeCriticalWoundsOn(weapon, defender);
 
         int totalDamage = 0;
         for (int i = 0; i < totalAttacks; i++)
-            totalDamage += ResolveOneAttack(weapon, attacker.Rerolls, defender, attacker.CriticalHitsOn, criticalWoundsOn, isFromSustainedHits: false);
+            totalDamage += ResolveOneAttack(weapon, attacker.Rerolls, defender, attacker.CriticalHitsOn, criticalWoundsOn, isFromSustainedHits: false, ref tally);
 
         return totalDamage;
     }
@@ -46,44 +112,62 @@ public sealed class CombatSimulator
         SimDefenderProfile defender,
         int criticalHitsOn,
         int criticalWoundsOn,
-        bool isFromSustainedHits)
+        bool isFromSustainedHits,
+        ref RunTally tally)
     {
         int damage = 0;
         bool isCriticalHit = false;
 
-        if (!weapon.Abilities.Torrent && !isFromSustainedHits)
+        if (isFromSustainedHits)
+        {
+            // Bonus hit generated by Sustained Hits — auto-hit, never itself a critical hit.
+            tally.Hits++;
+            tally.SustainedHitsBonus++;
+        }
+        else if (weapon.Abilities.Torrent)
+        {
+            tally.Hits++;
+        }
+        else
         {
             bool hit = RollHit(weapon, rerolls, criticalHitsOn, out isCriticalHit);
             if (!hit) return 0;
+            tally.Hits++;
+            if (isCriticalHit) tally.CritHits++;
         }
 
+        // Sustained Hits: each critical hit spawns bonus attacks.
         if (isCriticalHit && weapon.Abilities.SustainedHits > 0 && !isFromSustainedHits)
         {
             for (int s = 0; s < weapon.Abilities.SustainedHits; s++)
-                damage += ResolveOneAttack(weapon, rerolls, defender, criticalHitsOn, criticalWoundsOn, isFromSustainedHits: true);
+                damage += ResolveOneAttack(weapon, rerolls, defender, criticalHitsOn, criticalWoundsOn, isFromSustainedHits: true, ref tally);
         }
 
+        // Lethal Hits: critical hits on original attacks auto-wound (SH bonus attacks cannot trigger LH).
         bool isLethalHit = isCriticalHit && weapon.Abilities.LethalHits && !isFromSustainedHits;
 
-        bool wounded = RollWound(weapon, defender, rerolls, isLethalHit, criticalWoundsOn, out bool devastatingWound);
+        bool wounded = RollWound(weapon, defender, rerolls, isLethalHit, criticalWoundsOn, out bool devastatingWound, ref tally);
 
         if (devastatingWound)
         {
+            tally.DevastatingWoundsTriggers++;
             int rawDmg = _dice.Roll(weapon.Damage);
             if (weapon.WithinHalfRange && weapon.Abilities.Melta > 0)
                 rawDmg += weapon.Abilities.Melta;
-            damage += ApplyDamageWithFnp(rawDmg, defender);
+            damage += ApplyDamageWithFnp(rawDmg, defender, ref tally);
             return damage;
         }
 
         if (!wounded) return damage;
 
-        if (RollSave(weapon, defender)) return damage;
+        bool savedRoll = RollSave(weapon, defender, ref tally);
+        if (savedRoll) return damage;
 
+        tally.FailedSaves++;
         int d = _dice.Roll(weapon.Damage);
         if (weapon.WithinHalfRange && weapon.Abilities.Melta > 0)
             d += weapon.Abilities.Melta;
-        damage += ApplyDamageWithFnp(d, defender);
+        damage += ApplyDamageWithFnp(d, defender, ref tally);
         return damage;
     }
 
@@ -113,10 +197,13 @@ public sealed class CombatSimulator
         SimRerollOptions rerolls,
         bool isLethalHit,
         int criticalWoundsOn,
-        out bool devastatingWound)
+        out bool devastatingWound,
+        ref RunTally tally)
     {
         if (isLethalHit)
         {
+            tally.Wounds++;
+            tally.LethalHitsAutoWounds++;
             devastatingWound = false;
             return true;
         }
@@ -137,12 +224,22 @@ public sealed class CombatSimulator
 
         if (raw >= criticalWoundsOn)
         {
+            tally.Wounds++;
+            tally.CritWounds++;
+            // Anti-triggered crit: would not have been a crit wound at the normal threshold of 6.
+            if (criticalWoundsOn < 6 && raw < 6)
+                tally.AntiCritWounds++;
             devastatingWound = weapon.Abilities.DevastatingWounds;
             return true;
         }
 
         devastatingWound = false;
-        return raw >= threshold;
+        if (raw >= threshold)
+        {
+            tally.Wounds++;
+            return true;
+        }
+        return false;
     }
 
     private static int ComputeCriticalWoundsOn(SimWeaponProfile weapon, SimDefenderProfile defender)
@@ -156,27 +253,40 @@ public sealed class CombatSimulator
         return threshold;
     }
 
-    private bool RollSave(SimWeaponProfile weapon, SimDefenderProfile defender)
+    private bool RollSave(SimWeaponProfile weapon, SimDefenderProfile defender, ref RunTally tally)
     {
+        int armourSave = defender.Save + weapon.Ap;
+        bool usingInvuln = defender.InvulnerableSave.HasValue
+            && defender.InvulnerableSave.Value < armourSave;
+
+        if (usingInvuln)
+            tally.InvulnSaveRolls++;
+        else
+            tally.ArmourSaveRolls++;
+
         int raw = _dice.RollD6();
         if (raw == 1) return false;
 
-        int effectiveSave = AbilityProcessor.EffectiveSave(defender, weapon.Ap);
+        int effectiveSave = usingInvuln ? defender.InvulnerableSave!.Value : armourSave;
         return raw >= effectiveSave;
     }
 
-    private int ApplyDamageWithFnp(int rawDamage, SimDefenderProfile defender)
+    private int ApplyDamageWithFnp(int rawDamage, SimDefenderProfile defender, ref RunTally tally)
     {
+        tally.DamageBeforeFnp += rawDamage;
+
         if (!defender.FeelNoPain.HasValue)
             return rawDamage;
 
         int fnpValue = defender.FeelNoPain.Value;
-        int survived = 0;
+        int damageThroughFnp = 0;
         for (int i = 0; i < rawDamage; i++)
         {
             if (_dice.RollD6() < fnpValue)
-                survived++;
+                damageThroughFnp++;
+            else
+                tally.FnpSaved++;
         }
-        return survived;
+        return damageThroughFnp;
     }
 }

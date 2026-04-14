@@ -217,7 +217,71 @@
             `Damage range: ${data.minDamage} – ${data.maxDamage}`;
 
         resultsPanel.style.display = 'block';
+
+        if (data.stageStats) {
+            displayPipeline(data.stageStats, data.meanDamage);
+        }
+
         resultsPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function fmt(n) { return n.toFixed(2); }
+
+    function pct(num, denom) {
+        if (!denom || denom < 0.001) return '';
+        return `(${(num / denom * 100).toFixed(1)}%)`;
+    }
+
+    function setRow(id, value, rate) {
+        document.getElementById(id + '-val').textContent = fmt(value);
+        const rateEl = document.getElementById(id + '-rate');
+        if (rateEl) rateEl.textContent = rate || '';
+    }
+
+    function showRow(id, visible) {
+        const row = document.getElementById(id);
+        if (row) row.style.display = visible ? '' : 'none';
+    }
+
+    function displayPipeline(s, finalDamage) {
+        const section = document.getElementById('pipeline-section');
+
+        setRow('pl-attacks',      s.avgAttacks,    '');
+        setRow('pl-hits',         s.avgHits,        pct(s.avgHits, s.avgAttacks));
+        setRow('pl-crit-hits',    s.avgCritHits,    '');
+        setRow('pl-sh-bonus',     s.avgSustainedHitsBonus, '');
+        setRow('pl-wounds',       s.avgWounds,      pct(s.avgWounds, s.avgHits));
+        setRow('pl-crit-wounds',  s.avgCritWounds,  '');
+        setRow('pl-lh',           s.avgLethalHitsAutoWounds, '');
+        setRow('pl-anti',         s.avgAntiCritWounds, '');
+
+        // Failed saves = actual save rolls that failed + DevW bypasses
+        const totalFailedOrBypassed = s.avgFailedSaves + s.avgDevastatingWoundsTriggers;
+        setRow('pl-failed-saves', totalFailedOrBypassed, pct(totalFailedOrBypassed, s.avgWounds));
+        setRow('pl-devw',         s.avgDevastatingWoundsTriggers, '');
+
+        // Save type breakdown: only shown when save rolls were made
+        const totalSaveRolls = s.avgArmourSaveRolls + s.avgInvulnSaveRolls;
+        setRow('pl-armour-saves', s.avgArmourSaveRolls,  '');
+        setRow('pl-invuln-saves', s.avgInvulnSaveRolls,  '');
+
+        setRow('pl-dmg-pre-fnp',  s.avgDamageBeforeFnp, '');
+        setRow('pl-fnp',          s.avgFnpSaved,  pct(s.avgFnpSaved, s.avgDamageBeforeFnp));
+        setRow('pl-final',        finalDamage,    '');
+
+        // Hide ability rows when zero (weapon doesn't have that ability)
+        showRow('pl-sh-bonus',  s.avgSustainedHitsBonus > 0.001);
+        showRow('pl-lh',        s.avgLethalHitsAutoWounds > 0.001);
+        showRow('pl-anti',      s.avgAntiCritWounds > 0.001);
+        showRow('pl-devw',      s.avgDevastatingWoundsTriggers > 0.001);
+        showRow('pl-fnp',       s.avgFnpSaved > 0.001 || s.avgDamageBeforeFnp > s.avgFnpSaved + 0.001);
+
+        // Hide invuln row when not in use
+        showRow('pl-invuln-saves', s.avgInvulnSaveRolls > 0.001);
+        // Hide armour save row when all saves went to invuln (and invuln is shown)
+        showRow('pl-armour-saves', totalSaveRolls > 0.001);
+
+        section.style.display = 'block';
     }
 
 })();

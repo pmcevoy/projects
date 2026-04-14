@@ -138,6 +138,90 @@
             </div>
         </div>
         <div class="mt-2 small text-muted" id="res-range"></div>
+
+        <!-- Attack pipeline funnel -->
+        <div class="pipeline-section mt-3" id="pipeline-section" style="display:none;">
+            <div class="pipeline-title">Attack Pipeline</div>
+            <table class="pipeline-table">
+                <tbody>
+                    <tr class="pipeline-row pipeline-main" id="pl-attacks">
+                        <td class="pipeline-stage">Attacks</td>
+                        <td class="pipeline-value" id="pl-attacks-val">—</td>
+                        <td class="pipeline-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-main" id="pl-hits">
+                        <td class="pipeline-stage">Hits</td>
+                        <td class="pipeline-value" id="pl-hits-val">—</td>
+                        <td class="pipeline-rate" id="pl-hits-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-sub" id="pl-crit-hits">
+                        <td class="pipeline-stage">↳ Critical Hits</td>
+                        <td class="pipeline-value" id="pl-crit-hits-val">—</td>
+                        <td class="pipeline-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-sub ability-row" id="pl-sh-bonus">
+                        <td class="pipeline-stage">↳ Sustained Hits bonus</td>
+                        <td class="pipeline-value" id="pl-sh-bonus-val">—</td>
+                        <td class="pipeline-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-main" id="pl-wounds">
+                        <td class="pipeline-stage">Wounds</td>
+                        <td class="pipeline-value" id="pl-wounds-val">—</td>
+                        <td class="pipeline-rate" id="pl-wounds-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-sub" id="pl-crit-wounds">
+                        <td class="pipeline-stage">↳ Critical Wounds</td>
+                        <td class="pipeline-value" id="pl-crit-wounds-val">—</td>
+                        <td class="pipeline-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-sub ability-row" id="pl-lh">
+                        <td class="pipeline-stage">↳ Lethal Hits auto-wounds</td>
+                        <td class="pipeline-value" id="pl-lh-val">—</td>
+                        <td class="pipeline-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-sub ability-row" id="pl-anti">
+                        <td class="pipeline-stage">↳ Anti-X crit wounds</td>
+                        <td class="pipeline-value" id="pl-anti-val">—</td>
+                        <td class="pipeline-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-main" id="pl-failed-saves">
+                        <td class="pipeline-stage">Failed Saves</td>
+                        <td class="pipeline-value" id="pl-failed-saves-val">—</td>
+                        <td class="pipeline-rate" id="pl-failed-saves-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-sub ability-row" id="pl-devw">
+                        <td class="pipeline-stage">↳ Devastating Wounds (bypassed)</td>
+                        <td class="pipeline-value" id="pl-devw-val">—</td>
+                        <td class="pipeline-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-sub" id="pl-armour-saves">
+                        <td class="pipeline-stage">↳ vs Armour save</td>
+                        <td class="pipeline-value" id="pl-armour-saves-val">—</td>
+                        <td class="pipeline-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-sub" id="pl-invuln-saves">
+                        <td class="pipeline-stage">↳ vs Invulnerable save</td>
+                        <td class="pipeline-value" id="pl-invuln-saves-val">—</td>
+                        <td class="pipeline-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-main" id="pl-dmg-pre-fnp">
+                        <td class="pipeline-stage">Damage (pre-FNP)</td>
+                        <td class="pipeline-value" id="pl-dmg-pre-fnp-val">—</td>
+                        <td class="pipeline-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-sub ability-row" id="pl-fnp">
+                        <td class="pipeline-stage">↳ Feel No Pain saved</td>
+                        <td class="pipeline-value" id="pl-fnp-val">—</td>
+                        <td class="pipeline-rate" id="pl-fnp-rate"></td>
+                    </tr>
+                    <tr class="pipeline-row pipeline-final" id="pl-final">
+                        <td class="pipeline-stage">Final Damage</td>
+                        <td class="pipeline-value" id="pl-final-val">—</td>
+                        <td class="pipeline-rate"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 

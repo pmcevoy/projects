@@ -269,3 +269,78 @@ body {
 }
 
 #loading-overlay.active { display: flex; }
+
+/* Attack pipeline funnel */
+.pipeline-section {
+    margin-top: 0.75rem;
+    border-top: 1px solid #2a4a6a;
+    padding-top: 0.75rem;
+}
+
+.pipeline-title {
+    font-size: 0.7rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #6c9ab7;
+    margin-bottom: 0.4rem;
+}
+
+.pipeline-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+}
+
+.pipeline-row td {
+    padding: 0.18rem 0.3rem;
+    vertical-align: middle;
+}
+
+.pipeline-stage {
+    color: #adb5bd;
+    width: 55%;
+}
+
+.pipeline-value {
+    font-weight: 600;
+    color: #f1a94e;
+    width: 20%;
+    text-align: right;
+}
+
+.pipeline-rate {
+    color: #6c757d;
+    font-size: 0.72rem;
+    width: 25%;
+    padding-left: 0.5rem;
+}
+
+.pipeline-row.pipeline-main .pipeline-stage {
+    color: #c9d6df;
+    font-weight: 500;
+}
+
+.pipeline-row.pipeline-sub .pipeline-stage {
+    color: #7a8a96;
+    font-size: 0.73rem;
+    padding-left: 0.5rem;
+}
+
+.pipeline-row.pipeline-final .pipeline-stage {
+    color: #a8dadc;
+    font-weight: 700;
+}
+
+.pipeline-row.pipeline-final .pipeline-value {
+    color: #a8dadc;
+    font-size: 1rem;
+}
+
+.pipeline-row.pipeline-main {
+    border-top: 1px solid #1e3a52;
+}
+
+.pipeline-row.pipeline-main:first-child {
+    border-top: none;
+}

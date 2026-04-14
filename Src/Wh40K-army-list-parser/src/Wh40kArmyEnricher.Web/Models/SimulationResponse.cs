@@ -1,3 +1,5 @@
+using Wh40kArmyEnricher.Core.Simulation;
+
 namespace Wh40kArmyEnricher.Web.Models;
 
 public class SimulationResponse
@@ -18,4 +20,6 @@ public class SimulationResponse
     public double ProbKillAtLeastOne { get; set; }
     public int MinDamage { get; set; }
     public int MaxDamage { get; set; }
+
+    public CombatStageStats? StageStats { get; set; }
 }
