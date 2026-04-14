@@ -63,6 +63,13 @@ public record WeaponProfile
     public string WeaponName { get; init; } = "";
     public string Type { get; init; } = "Melee";   // "Melee" | "Ranged"
     public int Range { get; init; }                 // 0 = melee, inches otherwise
+    /// <summary>
+    /// How many models in the parent model group carry this weapon.
+    /// For mixed-loadout squads (e.g. 5 Initiates where only 3 have chainswords) this will
+    /// be less than ModelProfile.Count. For multi-gun vehicles (e.g. 2x Fragstorm grenade
+    /// launcher on a single Impulsor) this will be the number of guns fired.
+    /// </summary>
+    public int ModelCount { get; init; } = 1;
     public List<WeaponVariantProfile> Profiles { get; init; } = new();
 }
 

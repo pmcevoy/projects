@@ -279,6 +279,7 @@ public class Enricher
                 WeaponName = weapon.Name,
                 Type = isMelee ? "Melee" : "Ranged",
                 Range = ParseRange(first.Range),
+                ModelCount = weapon.Count,
                 Profiles = variantProfiles
             });
         }
