@@ -126,8 +126,8 @@ public sealed class CombatSimulator
             int criticalWoundsOn = ComputeCriticalWoundsOn(weapon, defender);
             for (int i = 0; i < attacks; i++)
                 totalDamage += ResolveOneAttack(weapon, attacker.Rerolls, defender,
-                    attacker.CriticalHitsOn, criticalWoundsOn, isFromSustainedHits: false,
-                    ref weaponTallies[wi]);
+                    attacker.CriticalHitsOn, criticalWoundsOn, attacker.WoundRollModifier,
+                    isFromSustainedHits: false, ref weaponTallies[wi]);
         }
         return totalDamage;
     }
@@ -138,6 +138,7 @@ public sealed class CombatSimulator
         SimDefenderProfile defender,
         int criticalHitsOn,
         int criticalWoundsOn,
+        int woundRollModifier,
         bool isFromSustainedHits,
         ref RunTally tally)
     {
@@ -165,13 +166,13 @@ public sealed class CombatSimulator
         {
             for (int s = 0; s < weapon.Abilities.SustainedHits; s++)
                 damage += ResolveOneAttack(weapon, rerolls, defender, criticalHitsOn, criticalWoundsOn,
-                    isFromSustainedHits: true, ref tally);
+                    woundRollModifier, isFromSustainedHits: true, ref tally);
         }
 
         bool isLethalHit = isCriticalHit && weapon.Abilities.LethalHits && !isFromSustainedHits;
 
         bool wounded = RollWound(weapon, defender, rerolls, isLethalHit, criticalWoundsOn,
-            out bool devastatingWound, ref tally);
+            woundRollModifier, out bool devastatingWound, ref tally);
 
         if (devastatingWound)
         {
@@ -222,6 +223,7 @@ public sealed class CombatSimulator
         SimRerollOptions rerolls,
         bool isLethalHit,
         int criticalWoundsOn,
+        int woundRollModifier,
         out bool devastatingWound,
         ref RunTally tally)
     {
@@ -236,6 +238,7 @@ public sealed class CombatSimulator
         int raw = _dice.RollD6();
         int threshold = AbilityProcessor.WoundThreshold(weapon.Strength, defender.Toughness);
 
+        // Rerolls are applied before modifiers (per rules). Reroll decision uses raw die only.
         bool canRerollAll = rerolls.WoundRerollAll || weapon.Abilities.TwinLinked;
         bool shouldReroll =
             canRerollAll              ? (raw < criticalWoundsOn && raw < threshold) :
@@ -245,8 +248,11 @@ public sealed class CombatSimulator
         if (shouldReroll)
             raw = _dice.RollD6();
 
+        // Natural 1 always fails regardless of modifier.
         if (raw == 1) { devastatingWound = false; return false; }
 
+        // Critical wound check uses the raw (unmodified) die — Anti and crit wound thresholds
+        // are always stated as "unmodified wound roll" in the rules.
         if (raw >= criticalWoundsOn)
         {
             tally.Wounds++;
@@ -257,8 +263,10 @@ public sealed class CombatSimulator
             return true;
         }
 
+        // Apply modifier (capped at +1/-1 per 40K rules) to the threshold comparison.
+        int mod = Math.Clamp(woundRollModifier, -1, 1);
         devastatingWound = false;
-        if (raw >= threshold)
+        if (raw + mod >= threshold)
         {
             tally.Wounds++;
             return true;

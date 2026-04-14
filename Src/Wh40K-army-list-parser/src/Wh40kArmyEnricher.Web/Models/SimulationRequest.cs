@@ -22,6 +22,8 @@ public class SimulationRequest
     public string WoundRerolls { get; set; } = "none";
     /// <summary>When true, Critical Hits are scored on 5+.</summary>
     public bool CriticalHitsOn5 { get; set; }
+    /// <summary>When true, adds +1 to all wound rolls (e.g. Black Templars detachment rule).</summary>
+    public bool PlusOneToWound { get; set; }
     public int Runs { get; set; } = 10000;
 }
 

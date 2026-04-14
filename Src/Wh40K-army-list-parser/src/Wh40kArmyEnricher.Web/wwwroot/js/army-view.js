@@ -221,6 +221,7 @@
             hitRerolls:       document.querySelector('input[name="hit-rerolls"]:checked')?.value ?? 'none',
             woundRerolls:     document.querySelector('input[name="wound-rerolls"]:checked')?.value ?? 'none',
             criticalHitsOn5:  document.getElementById('crit-5').checked,
+            plusOneToWound:   document.getElementById('plus-one-wound').checked,
             runs: 10000,
         };
 

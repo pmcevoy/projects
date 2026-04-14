@@ -12,4 +12,9 @@ public sealed record SimAttackerProfile
     public SimRerollOptions Rerolls { get; init; } = new();
     /// <summary>Minimum raw die roll that counts as a Critical Hit. Default 6; can be lowered e.g. to 5.</summary>
     public int CriticalHitsOn { get; init; } = 6;
+    /// <summary>
+    /// Flat modifier applied to wound rolls after rerolls. Capped at +1/-1 per the 40K rules.
+    /// Default 0 (no modifier). Set to 1 for "+1 to wound" detachment rules.
+    /// </summary>
+    public int WoundRollModifier { get; init; } = 0;
 }

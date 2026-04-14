@@ -73,10 +73,11 @@ public class SimulationAdapter
         var attackerName = string.Join(" + ", attackerUnits.Select(u => u.Name));
         var attacker = new SimAttackerProfile
         {
-            Name          = attackerName,
-            Weapons       = simWeapons,
-            Rerolls       = rerolls,
-            CriticalHitsOn = request.CriticalHitsOn5 ? 5 : attackerUnits.Min(u => u.CriticalHitsOn),
+            Name             = attackerName,
+            Weapons          = simWeapons,
+            Rerolls          = rerolls,
+            CriticalHitsOn   = request.CriticalHitsOn5 ? 5 : attackerUnits.Min(u => u.CriticalHitsOn),
+            WoundRollModifier = request.PlusOneToWound ? 1 : 0,
         };
 
         int coverBonus = request.InCover ? 1 : 0;
