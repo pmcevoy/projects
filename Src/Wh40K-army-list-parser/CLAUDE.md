@@ -451,13 +451,79 @@ Enriched armies are stored in session as JSON using `SessionJson.Options` (`Help
 
 ### Combat options (user-controlled)
 
-All simulation modifiers are set explicitly by the user — ability text is not auto-parsed into rerolls:
-- **Hit rerolls**: None / Reroll 1s / Reroll All
-- **Wound rerolls**: None / Reroll 1s / Reroll All
-- **Within Half Range** — enables Melta bonus damage and Rapid Fire extra attacks
-- **In Cover** — adds +1 to defender's armour save before simulation
-- **Crit on 5+** — lowers `CriticalHitsOn` to 5 for abilities like Oath of Moment
-- **Models firing** — pre-filled from the weapon's model count; can be overridden (e.g. only 3 of 5 models in range)
+All simulation modifiers are set explicitly by the user — ability text is not auto-parsed. The combat panel is organised into five collapsible modifier sections plus a top-level "Models firing" control.
+
+**Models firing** — pre-filled from the weapon's model count; can be overridden (e.g. only 3 of 5 models in range). Hidden when multiple weapons are selected.
+
+---
+
+#### Attack Modifiers
+
+| Control | Effect |
+|---|---|
+| **+1/-1 Attack** | Adds or subtracts 1 from the total attack count for each selected weapon group, applied after Blast and Rapid Fire adjustments. |
+| **Blast** | Override toggle — enables the Blast keyword on selected weapons that do not already have it. Weapons that already have Blast are unaffected. Blast adds 1 attack per 5 defender models (rounded down). |
+| **Reroll attack dice** | For variable-attack weapons (e.g. D6 attacks), reroll the attack-count dice once per model group if the result is below the expected average (average = sides/2 rounded down + 0.5 — i.e. reroll 1–3 on D6, reroll 1 on D3). Applied independently per model contribution before aggregation. |
+
+---
+
+#### Hit Modifiers
+
+| Control | Effect |
+|---|---|
+| **+1/-1 Hit** | Roll modifier — added to the raw dice result after rolling, capped at a net total of +1/-1 (bonuses cancel penalties; cannot exceed ±1). Natural 1 still always fails; natural 6 always hits. |
+| **+1/-1 BS/WS** | Characteristic modifier — changes the effective BS/WS target number by ±1 step (e.g. BS 4+ → 3+). Tracked separately from the roll modifier; the two stack independently (e.g. +1 Hit roll AND -1 BS can combine to the equivalent of a +2 shift, unlike two roll modifiers which cap at +1). |
+| **Reroll 1s** | Reroll hit rolls of 1 once. Mutually exclusive with Reroll All. |
+| **Reroll All** | Reroll all failed hit rolls once. Mutually exclusive with Reroll 1s. |
+| **Fish for Criticals** | Sub-option of Reroll All only. Instead of rerolling failures, reroll any result below `criticalHitsOn` (i.e. reroll successful non-critical hits as well, accepting only critical results). Only available when Reroll All is selected. |
+| **Indirect Fire** | Weapon hits on a flat 4+ regardless of BS. The -1 to hit from Indirect Fire is already baked in (no further modifier needed). Torrent overrides this if both are active. |
+| **Crit Hit on 5+** | Lowers `CriticalHitsOn` to 5, so natural 5 or 6 counts as a Critical Hit. |
+| **Sustained Hits 1** | Override toggle — grants Sustained Hits 1 to selected weapons that do not already have it. Weapons with Sustained Hits already are unaffected. |
+| **Lethal Hits** | Override toggle — grants Lethal Hits to selected weapons that do not already have it. Typically applied via a stratagem aura. |
+
+---
+
+#### Wound Modifiers
+
+| Control | Effect |
+|---|---|
+| **+1/-1 Wound** | Roll modifier — added to the raw wound dice result, capped at net ±1. Natural 1 still always fails; natural 6 always wounds. Critical wound threshold checks use the raw unmodified die. |
+| **+1/-1 Strength** | Adjusts the attacker's effective Strength by ±1 for the wound table lookup (`S vs T`). |
+| **+1/-1 Toughness** | Adjusts the defender's effective Toughness by ±1 for the wound table lookup. |
+| **Reroll 1s** | Reroll wound rolls of 1 once. |
+| **Reroll All** | Reroll all failed wound rolls once (also applies to Twin-Linked weapons). |
+| **Fish for Criticals** | Sub-option of Wound Reroll All only. Reroll any wound result below `criticalWoundsOn`, accepting only critical wounds. |
+| **Crit Wound on 5+** | Lowers the critical wound threshold to 5, so unmodified 5 or 6 scores a Critical Wound. Independent of Anti thresholds (both are tracked; the lower value wins). |
+| **Devastating Wounds** | Override toggle — grants Devastating Wounds to selected weapons that do not already have it. |
+| **Anti-X** | Override — applies an Anti keyword to all selected weapons. User configures: keyword type (one of `Infantry`, `Monster`, `Vehicle`, `Fly`, `Psyker`, `Character`, `Daemon`) and threshold (e.g. 4+). The Anti threshold combines with any existing Anti on the weapon; the lower threshold wins. Applied to the defender's keywords at simulation time. |
+
+---
+
+#### Save Modifiers
+
+| Control | Effect |
+|---|---|
+| **Cover** | Adds +1 to the defender's armour save before simulation (e.g. Sv 3+ → 2+). Does not affect invulnerable saves. |
+| **Ignores Cover** | Negates the Cover bonus if both are active (net zero effect on save). |
+| **+1/-1 AP** | Adjusts the weapon's AP by ±1 (e.g. AP-1 → AP-2 with +1, or AP-2 → AP-1 with -1). Applied to the sim-side `Ap` value (stored as positive int in `SimWeaponProfile`). |
+
+---
+
+#### Damage Modifiers
+
+| Control | Effect |
+|---|---|
+| **+1/-1 Damage** | Adds or subtracts 1 from each individual damage roll after rolling (applied per wound, before FNP). |
+| **Reroll damage dice** | For variable-damage weapons (e.g. D3 damage, D6 damage), reroll the damage dice once if the result is below the expected average (reroll 1–3 on D6, reroll 1 on D3). Applied per wound resolution. |
+
+---
+
+#### Implementation notes for modifier stacking
+
+- **Roll modifier cap:** the +1/-1 Hit and +1/-1 Wound roll modifiers are each capped at net ±1 before being applied to the threshold comparison. The BS/WS characteristic modifier is separate and uncapped.
+- **Ability overrides (Blast, Sustained, Lethals, Dev Wounds, Anti):** the override simply ORs the flag / merges the value into `SimWeaponAbilities` before the run. Weapons that already have the ability are unaffected — the sim engine already handles them correctly.
+- **Fish for Criticals** replaces the normal reroll condition: instead of `raw < threshold`, the reroll triggers when `raw < criticalHitsOn` (hits) or `raw < criticalWoundsOn` (wounds).
+- **Ignores Cover + Cover:** both flags flow through to `SimulationAdapter`; if both are set, the cover bonus is not applied (they cancel).
 
 ### AP sign convention
 
