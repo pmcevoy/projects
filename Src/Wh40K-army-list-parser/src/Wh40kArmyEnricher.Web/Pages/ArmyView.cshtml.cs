@@ -24,4 +24,18 @@ public class ArmyViewModel : PageModel
 
         return Page();
     }
+
+    public IActionResult OnPostSwap()
+    {
+        var attackerJson = HttpContext.Session.GetString("attacker_army");
+        var defenderJson = HttpContext.Session.GetString("defender_army");
+
+        if (attackerJson == null || defenderJson == null)
+            return RedirectToPage("/Index");
+
+        HttpContext.Session.SetString("attacker_army", defenderJson);
+        HttpContext.Session.SetString("defender_army", attackerJson);
+
+        return RedirectToPage();
+    }
 }
