@@ -101,6 +101,32 @@
                 Enhancements: @string.Join(", ", Model.Enhancements)
             </div>
         }
+
+        <!-- Abilities -->
+        @if (Model.Abilities.Count > 0)
+        {
+            <div class="abilities-section mt-2">
+                <div class="abilities-label">Abilities</div>
+                @for (int ai = 0; ai < Model.Abilities.Count; ai++)
+                {
+                    var ability = Model.Abilities[ai];
+                    string abilityCollapseId = $"{collapseId}-ability-{ai}";
+                    <div class="ability-item">
+                        <div class="ability-item-header"
+                             data-bs-toggle="collapse"
+                             data-bs-target="#@abilityCollapseId"
+                             aria-expanded="false"
+                             aria-controls="@abilityCollapseId">
+                            <span class="ability-item-name">@ability.Name</span>
+                            <span class="ability-item-chevron">›</span>
+                        </div>
+                        <div class="collapse" id="@abilityCollapseId">
+                            <div class="ability-item-body">@ability.Text</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
     </div>
 </div>
 

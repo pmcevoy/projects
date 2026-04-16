@@ -193,6 +193,67 @@ body {
 .ability-name { font-weight: 600; color: #c77dff; }
 .ability-text { color: #ced4da; font-size: 0.75rem; }
 
+/* Ability accordion within unit cards */
+.abilities-section {
+    border-top: 1px solid #2a2a4a;
+    padding-top: 0.4rem;
+}
+
+.abilities-label {
+    font-size: 0.65rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #6c757d;
+    margin-bottom: 0.3rem;
+}
+
+.ability-item {
+    border-bottom: 1px solid #1e1e36;
+}
+
+.ability-item:last-child {
+    border-bottom: none;
+}
+
+.ability-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.25rem 0.1rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.ability-item-header:hover .ability-item-name {
+    color: #d9a0ff;
+}
+
+.ability-item-name {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #c77dff;
+    transition: color 0.1s;
+}
+
+.ability-item-chevron {
+    font-size: 1rem;
+    color: #6c757d;
+    line-height: 1;
+    transition: transform 0.15s;
+}
+
+.ability-item-header[aria-expanded="true"] .ability-item-chevron {
+    transform: rotate(90deg);
+}
+
+.ability-item-body {
+    font-size: 0.75rem;
+    color: #ced4da;
+    padding: 0.2rem 0.1rem 0.4rem 0.4rem;
+    line-height: 1.45;
+}
+
 /* Upload page */
 .upload-card {
     background-color: #16213e;
