@@ -52,33 +52,35 @@
                     @if (weapon.ModelCount > 1) { <span class="small ms-1" style="color:#9aa8c0;">×@weapon.ModelCount</span> }
                     <span class="badge bg-secondary ms-1" style="font-size:0.6rem;">@weapon.Type</span>
                     @if (weapon.Range > 0) { <span class="text-muted small ms-1">@(weapon.Range)"</span> }
-                    <table class="weapon-table mt-1">
-                        <thead>
-                            <tr>
-                                <th>Profile</th><th>A</th><th>Sk</th><th>S</th><th>AP</th><th>D</th><th>Abilities</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var variant in weapon.Profiles)
-                            {
-                                var abilityList = BuildAbilityList(variant.Abilities);
-                                <tr class="weapon-variant-row"
-                                    data-weapon-name="@weapon.WeaponName"
-                                    data-variant="@variant.Variant"
-                                    data-model-name="@modelProfile.ModelName"
-                                    data-model-count="@weapon.ModelCount"
-                                    data-weapon-type="@weapon.Type">
-                                    <td>@variant.Variant</td>
-                                    <td>@variant.Attacks</td>
-                                    <td>@variant.Skill+</td>
-                                    <td>@variant.Strength</td>
-                                    <td>@variant.Ap</td>
-                                    <td>@variant.Damage</td>
-                                    <td style="font-size:0.65rem;text-align:left;">@abilityList</td>
+                    <div class="weapon-table-scroll">
+                        <table class="weapon-table">
+                            <thead>
+                                <tr>
+                                    <th>Profile</th><th>A</th><th>Sk</th><th>S</th><th>AP</th><th>D</th><th>Abilities</th>
                                 </tr>
-                            }
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                @foreach (var variant in weapon.Profiles)
+                                {
+                                    var abilityList = BuildAbilityList(variant.Abilities);
+                                    <tr class="weapon-variant-row"
+                                        data-weapon-name="@weapon.WeaponName"
+                                        data-variant="@variant.Variant"
+                                        data-model-name="@modelProfile.ModelName"
+                                        data-model-count="@weapon.ModelCount"
+                                        data-weapon-type="@weapon.Type">
+                                        <td>@variant.Variant</td>
+                                        <td>@variant.Attacks</td>
+                                        <td>@variant.Skill+</td>
+                                        <td>@variant.Strength</td>
+                                        <td>@variant.Ap</td>
+                                        <td>@variant.Damage</td>
+                                        <td style="font-size:0.65rem;text-align:left;">@abilityList</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             }
         }

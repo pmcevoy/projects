@@ -42,13 +42,21 @@ The GitHub Contents API listing (`GET https://api.github.com/repos/BSData/wh40k-
 
 ### 1. Army List Text Export (Input)
 
-The Warhammer app exports a structured plain-text format. Two distinct format variants exist depending on the platform:
+The Warhammer app exports a structured plain-text format. Three format variants exist:
 
-#### iOS format (reference: `black-templars-sample.txt`)
+#### iOS current format (clipboard export — confirmed via diagnostic)
+- `  •` (2 spaces + U+2022) = model entry in a squad, or single-model weapon
+- `     ◦` (5 spaces + U+25E6) = weapon belonging to the current model
+- Enhancement line: `  ◦ Enhancements: <name>`
+- Metadata order: game system / faction / detachment / force-size (same as iOS legacy)
+- **Key implementation note:** `◦` (U+25E6) is always a weapon regardless of indent depth — handle it before the indent-based branching in `ClassifyBulletLine`.
+
+#### iOS legacy format (reference: `black-templars-sample.txt`)
 - `•` (U+2022) at column 0 = model entry in a squad
 - `◦` (U+25E6) at column 0 = weapon or ability upgrade belonging to the current model
 - Enhancement line: `◦ Enhancements: <name>`
 - Metadata order: game system / faction / detachment / force-size
+- Note: this format may no longer be produced by current app versions but the fixture is kept for regression coverage.
 
 #### Android format (reference: `death-guard.txt`)
 - `  •` (2 spaces + bullet) = model in a squad, **or** first weapon of a single-model unit
@@ -71,9 +79,10 @@ The Warhammer app exports a structured plain-text format. Two distinct format va
 - Unit names may use U+2019 RIGHT SINGLE QUOTATION MARK (`'`) rather than ASCII apostrophe (`'`) — e.g. "Emperor's Champion"
 
 #### Parser implementation notes
-- `ClassifyBulletLine()` normalises both formats into a `(int Level, bool IsBullet, string Content)` tuple
+- `ClassifyBulletLine()` normalises all formats into a `(int Level, bool IsBullet, string Content)` tuple
   - Level 0 = model (or single-model unit item); Level 1 = weapon or continuation
-  - `IsBullet` is `true` only when a `•` character is present on that line (not for bare continuation lines)
+  - `IsBullet` is `true` only when a bullet character (`•` or `◦`) is present on that line (not for bare continuation lines)
+  - `◦` (U+25E6) is **always** Level 1 regardless of indent — check for it before the indent-based `•` branching
 - **Model mode detection:** a unit is in model mode (has distinct sub-models) only when at least one Level-1 item has `IsBullet == true`. Bare continuation lines (Level 1, no bullet) do not trigger model mode.
 - **Android detachment scan:** after the force-size line break, if `detachment` is still empty, scan forward for the next non-empty, non-points-header line and treat it as the detachment.
 

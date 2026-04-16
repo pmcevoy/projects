@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 using Wh40kArmyEnricher.Core.Parser;
 
@@ -22,7 +23,7 @@ public class ArmyListParserAndroidTests
 
     private static string FixtureText => File.ReadAllText(FixturePath);
 
-    private readonly ArmyListParser _parser = new();
+    private readonly ArmyListParser _parser = new(NullLogger<ArmyListParser>.Instance);
 
     // ---------------------------------------------------------------------------
     // Army header

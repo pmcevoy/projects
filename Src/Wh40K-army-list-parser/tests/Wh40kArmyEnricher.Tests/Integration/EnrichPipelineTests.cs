@@ -24,7 +24,7 @@ public class EnrichPipelineTests
     private async Task<(IReadOnlyList<EnrichedUnit> Enriched, string ArmyName)> RunPipelineAsync()
     {
         var armyText = await File.ReadAllTextAsync(SampleArmyPath);
-        var army = new ArmyListParser().Parse(armyText);
+        var army = new ArmyListParser(NullLogger<ArmyListParser>.Instance).Parse(armyText);
 
         var catalogueParser = new CatalogueParser();
 

@@ -55,6 +55,7 @@ body {
     align-items: center;
     justify-content: space-between;
     user-select: none;
+    cursor: pointer;
 }
 
 .unit-name {
@@ -95,12 +96,18 @@ body {
     font-weight: 600;
 }
 
+/* Weapon table scroll wrapper — allows horizontal scroll on narrow viewports */
+.weapon-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-top: 0.3rem;
+}
+
 /* Weapon tables */
 .weapon-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.75rem;
-    margin-top: 0.3rem;
 }
 
 .weapon-table th {

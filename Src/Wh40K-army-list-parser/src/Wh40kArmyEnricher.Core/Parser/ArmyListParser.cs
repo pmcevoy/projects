@@ -1,18 +1,36 @@
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using Wh40kArmyEnricher.Core.Models;
 
 namespace Wh40kArmyEnricher.Core.Parser;
 
 /// <summary>
 /// Parses Warhammer 40,000 (10th edition) army list text exports from the official app.
-/// Handles both iOS format (• / ◦ bullets at column 0) and Android format (indentation-based).
+/// Handles the iOS format (current and legacy) and the Android format.
 ///
-/// iOS:   • model  then  ◦ weapons under it
-/// Android: [2sp]• model  then  [4sp]• first-weapon  then  [4-6sp] NxWeapon continuations
-///          For single-model units: [2sp]• first-weapon  then  [4sp] NxWeapon continuations
+/// iOS (current, clipboard):
+///   [2sp]•  model entry
+///   [5sp]◦  weapon of the current model (◦ = U+25E6, any indent)
+///
+/// iOS (legacy fixture format, column 0):
+///   •  model entry
+///   ◦  weapon of the current model
+///
+/// Android:
+///   [2sp]•  model (or single-model first weapon)
+///   [4sp]•  first weapon of a squad model
+///   [4-6sp] weapon continuation lines (no bullet)
+///
+/// Key rule: ◦ (U+25E6) at ANY indent level always means "weapon of the current model".
 /// </summary>
 public class ArmyListParser
 {
+    private readonly ILogger<ArmyListParser> _logger;
+
+    public ArmyListParser(ILogger<ArmyListParser> logger)
+    {
+        _logger = logger;
+    }
     private static readonly Regex PointsHeaderRegex =
         new(@"^(.+?)\s+\((\d[\d,]*)\s+Points?\)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -31,7 +49,19 @@ public class ArmyListParser
 
     public ArmyList Parse(string text)
     {
-        var lines = text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
+        // Normalise all line-separator variants to LF before splitting.
+        // The iOS Warhammer 40k app clipboard emits bare \r (CR-only) between bullet lines
+        // within a unit block, while using \n between unit headers. Email and messaging apps
+        // normalise these before transmission, which is why the issue only appears when pasting
+        // directly from the iOS app clipboard. The \r\n replacement must come first so that
+        // CRLF pairs are collapsed to a single \n rather than two.
+        text = text
+            .Replace("\r\n", "\n")   // Windows CRLF → LF
+            .Replace("\r",   "\n")   // bare CR (iOS app, old Mac) → LF
+            .Replace("\u2028", "\n") // Unicode LINE SEPARATOR → LF
+            .Replace("\u2029", "\n"); // Unicode PARAGRAPH SEPARATOR → LF
+
+        var lines = text.Split('\n').ToList();
 
         // Line 0: army name + total points
         var armyLine = lines.Count > 0 ? lines[0].Trim() : "";
@@ -161,29 +191,41 @@ public class ArmyListParser
     /// Level 0 = model (or single-model weapon); Level 1 = weapon of the current model.
     /// IsBullet distinguishes explicit bullet lines from Android weapon-continuation lines.
     ///
-    /// iOS format:
-    ///   • content          → (0, true,  content)
-    ///   ◦ content          → (1, true,  content)
+    /// iOS current (clipboard) format:
+    ///   [2sp]• content     → (0, true,  content)   model entry
+    ///   [5sp]◦ content     → (1, true,  content)   weapon of the current model
+    ///
+    /// iOS legacy (column-0) format:
+    ///   • content          → (0, true,  content)   model entry
+    ///   ◦ content          → (1, true,  content)   weapon of the current model
     ///
     /// Android format:
     ///   [2sp]• content     → (0, true,  content)   model or single-model first weapon
     ///   [4sp]• content     → (1, true,  content)   first weapon of a model
     ///   [4-6sp] content    → (1, false, content)   weapon continuation (no bullet)
+    ///
+    /// ◦ (U+25E6) at any indent is always level 1 (weapon).
     /// </summary>
     private static (int Level, bool IsBullet, string Content)? ClassifyBulletLine(string rawLine)
     {
-        var stripped = rawLine.TrimStart(' ');
+        // Use TrimStart() (all Unicode whitespace) rather than TrimStart(' ') so that
+        // tabs, non-breaking spaces (U+00A0), and other space-like characters used for
+        // indentation by some app versions are treated correctly as indent.
+        var stripped = rawLine.TrimStart();
         int indent = rawLine.Length - stripped.Length;
 
-        // iOS format: bullet at column 0
+        // ◦ (U+25E6) always means weapon/sub-item regardless of indent level.
+        // iOS format uses ◦ at column 0; some iOS app versions use indented ◦.
+        if (stripped.StartsWith('\u25E6')) return (1, true, stripped[1..].Trim());
+
+        // iOS format: • bullet at column 0 = model
         if (indent == 0)
         {
-            if (stripped.StartsWith('\u2022')) return (0, true,  stripped[1..].Trim());  // •
-            if (stripped.StartsWith('\u25E6')) return (1, true,  stripped[1..].Trim());  // ◦
+            if (stripped.StartsWith('\u2022')) return (0, true, stripped[1..].Trim());
             return null;
         }
 
-        // Android format: indented bullet
+        // Android format: indented • bullet
         if (stripped.StartsWith('\u2022'))
         {
             var content = stripped[1..].Trim();
