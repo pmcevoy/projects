@@ -471,20 +471,67 @@ public class CatalogueParser
     // Abilities
     // ---------------------------------------------------------------------------
 
+    // Known system typeNames that are NOT custom-ability sub-types.
+    private static readonly HashSet<string> KnownProfileTypeNames = new(StringComparer.OrdinalIgnoreCase)
+        { "Unit", "Ranged Weapons", "Melee Weapons", "Abilities" };
+
+    /// <summary>
+    /// Strips BSData rich-text markers from ability/effect text.
+    /// "^^" is a faction/keyword formatting delimiter; "**" is bold markdown.
+    /// Both are rendered as plain text in the web UI.
+    /// </summary>
+    private static string StripBsDataFormatting(string text) =>
+        text.Replace("^^", "").Replace("**", "");
+
     private static List<AbilityData> ParseAbilities(List<XElement> profiles)
     {
+        // Collect profiles whose typeName is a custom type (not a known system type).
+        // These represent sub-ability effects for an ability of the same name, e.g.:
+        //   Abilities profile "Lord of the Death Guard"  →  parent ability
+        //   typeName="Lord of the Death Guard" profiles  →  sub-effects (Diseased Influence, etc.)
+        var customGroups = profiles
+            .Where(p =>
+            {
+                var tn = (string?)p.Attribute("typeName") ?? "";
+                return !string.IsNullOrEmpty(tn) && !KnownProfileTypeNames.Contains(tn);
+            })
+            .GroupBy(p => (string?)p.Attribute("typeName") ?? "", StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
         return profiles
             .Where(p => string.Equals((string?)p.Attribute("typeName"), "Abilities",
                 StringComparison.OrdinalIgnoreCase))
             .Select(p =>
             {
                 var chars = GetCharacteristics(p);
+                var name = NormalizeXmlText((string?)p.Attribute("name"));
+                var text = chars.GetValueOrDefault("Description",
+                           chars.GetValueOrDefault("Effect",
+                           chars.Values.FirstOrDefault() ?? ""));
+
+                // Attach sub-abilities if a custom profileType shares this ability's name
+                List<AbilityData> subAbilities = [];
+                if (customGroups.TryGetValue(name, out var subProfiles))
+                {
+                    subAbilities = subProfiles.Select(sp =>
+                    {
+                        var subChars = GetCharacteristics(sp);
+                        var subText = subChars.GetValueOrDefault("Effect",
+                                      subChars.GetValueOrDefault("Description",
+                                      subChars.Values.FirstOrDefault() ?? ""));
+                        return new AbilityData
+                        {
+                            Name = NormalizeXmlText((string?)sp.Attribute("name")),
+                            Text = StripBsDataFormatting(NormalizeXmlText(subText))
+                        };
+                    }).ToList();
+                }
+
                 return new AbilityData
                 {
-                    Name = NormalizeXmlText((string?)p.Attribute("name")),
-                    Text = chars.GetValueOrDefault("Description",
-                           chars.GetValueOrDefault("Effect",
-                           chars.Values.FirstOrDefault() ?? ""))
+                    Name = name,
+                    Text = text,
+                    SubAbilities = subAbilities
                 };
             })
             .ToList();

@@ -61,6 +61,11 @@ public record AbilityData
 {
     public string Name { get; init; } = "";
     public string Text { get; init; } = "";
+    /// <summary>
+    /// Sub-ability effects from a custom BSData profileType whose name matches this ability.
+    /// E.g. "Lord of the Death Guard" ability has sub-entries with typeName="Lord of the Death Guard".
+    /// </summary>
+    public IReadOnlyList<AbilityData> SubAbilities { get; init; } = [];
 }
 
 /// <summary>Top-level parsed catalogue (one per .cat / .gst file).</summary>

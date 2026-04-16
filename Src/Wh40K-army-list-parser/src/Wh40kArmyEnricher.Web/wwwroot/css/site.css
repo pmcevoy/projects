@@ -254,6 +254,36 @@ body {
     line-height: 1.45;
 }
 
+/* Sub-ability effects (e.g. Lord of the Death Guard → Diseased Influence, Boon of Death) */
+.ability-sub-list {
+    margin-top: 0.4rem;
+    border-top: 1px solid #2a2a4a;
+    padding-top: 0.3rem;
+}
+
+.ability-sub-item {
+    padding: 0.3rem 0.4rem;
+    border-left: 2px solid #3a2a5a;
+    margin-bottom: 0.35rem;
+}
+
+.ability-sub-item:last-child {
+    margin-bottom: 0;
+}
+
+.ability-sub-name {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #a07acc;
+    margin-bottom: 0.15rem;
+}
+
+.ability-sub-text {
+    font-size: 0.72rem;
+    color: #adb5bd;
+    line-height: 1.4;
+}
+
 /* Upload page */
 .upload-card {
     background-color: #16213e;

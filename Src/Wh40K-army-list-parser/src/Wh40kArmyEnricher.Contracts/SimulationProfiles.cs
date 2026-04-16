@@ -104,6 +104,11 @@ public record AbilityProfile
 {
     public string Name { get; init; } = "";
     public string Text { get; init; } = "";
+    /// <summary>
+    /// Optional sub-ability effects from a custom BSData profileType with the same name as this ability.
+    /// E.g. "Lord of the Death Guard" has sub-entries "Diseased Influence", "Boon of Death", etc.
+    /// </summary>
+    public List<AbilityProfile> SubAbilities { get; init; } = [];
 }
 
 // ---------------------------------------------------------------------------

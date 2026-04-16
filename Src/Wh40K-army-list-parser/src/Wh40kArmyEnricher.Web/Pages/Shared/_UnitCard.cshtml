@@ -122,6 +122,18 @@
                         </div>
                         <div class="collapse" id="@abilityCollapseId">
                             <div class="ability-item-body">@ability.Text</div>
+                            @if (ability.SubAbilities.Count > 0)
+                            {
+                                <div class="ability-sub-list">
+                                    @foreach (var sub in ability.SubAbilities)
+                                    {
+                                        <div class="ability-sub-item">
+                                            <div class="ability-sub-name">@sub.Name</div>
+                                            <div class="ability-sub-text">@sub.Text</div>
+                                        </div>
+                                    }
+                                </div>
+                            }
                         </div>
                     </div>
                 }

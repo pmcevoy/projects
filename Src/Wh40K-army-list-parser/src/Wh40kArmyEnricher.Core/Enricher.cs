@@ -117,7 +117,8 @@ public class Enricher
         var allAbilities = unitEntry.Abilities.Select(a => new AbilityProfile
         {
             Name = a.Name,
-            Text = a.Text
+            Text = a.Text,
+            SubAbilities = a.SubAbilities.Select(s => new AbilityProfile { Name = s.Name, Text = s.Text }).ToList()
         }).ToList();
         var abilities = allAbilities
             .Where(a => !a.Text.StartsWith(LeadingPrefix, StringComparison.OrdinalIgnoreCase))
