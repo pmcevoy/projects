@@ -374,6 +374,59 @@ body {
 
 #loading-overlay.active { display: flex; }
 
+/* Modifier accordion sections */
+.modifier-accordion {
+    border: 1px solid #2a2a4a;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.modifier-accordion-item {
+    background-color: #0f1a2e;
+    border: none;
+    border-top: 1px solid #2a2a4a;
+}
+
+.modifier-accordion-item:first-child {
+    border-top: none;
+}
+
+.modifier-section-btn {
+    background-color: #0f1a2e;
+    color: #c9d6df;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    box-shadow: none !important;
+}
+
+.modifier-section-btn:not(.collapsed) {
+    background-color: #162038;
+    color: #f1a94e;
+}
+
+.modifier-section-btn::after {
+    filter: invert(1) brightness(0.7);
+}
+
+.modifier-body {
+    background-color: #162038;
+    padding: 0.75rem;
+    color: #e0e0e0;
+}
+
+.modifier-summary {
+    font-size: 0.68rem;
+    font-weight: normal;
+    color: #f1a94e;
+    letter-spacing: 0;
+    text-transform: none;
+    font-style: italic;
+}
+
 /* Attack pipeline funnel */
 .pipeline-section {
     margin-top: 0.75rem;

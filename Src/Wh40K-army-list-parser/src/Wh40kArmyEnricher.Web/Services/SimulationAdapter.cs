@@ -54,38 +54,61 @@ public class SimulationAdapter
             WoundRerollAll  = request.WoundRerolls == "all",
         };
 
+        // Cover bonus cancelled by Ignores Cover.
+        int coverBonus = (request.InCover && !request.IgnoresCover) ? 1 : 0;
+
         var simWeapons = weaponGroups.Select(g =>
         {
             var aggregatedAttacks = AggregateAttacks(g.Contributions);
+
+            // Apply abilities overrides: OR flags / merge Anti.
+            var abilities = ApplyAbilityOverrides(g.Variant.Abilities, request);
+
+            // BS/WS characteristic modifier: +1 means target number -1 (e.g. 4+ → 3+).
+            int effectiveSkill = g.Variant.Skill - request.BsWsModifier;
+
+            // Strength modifier.
+            int effectiveStrength = g.Variant.Strength + request.StrengthModifier;
+
+            // AP modifier: contracts AP is negative; sim AP is positive; +1 modifier = more AP (higher positive).
+            int effectiveSimAp = -g.Variant.Ap + request.ApModifier;
+
             return new SimWeaponProfile
             {
                 Name            = g.WeaponName,
                 Attacks         = aggregatedAttacks,
-                Skill           = g.Variant.Skill,
-                Strength        = g.Variant.Strength,
-                Ap              = -g.Variant.Ap,   // Contracts: negative int → Sim: positive int
+                Skill           = Math.Clamp(effectiveSkill, 2, 6),
+                Strength        = Math.Max(1, effectiveStrength),
+                Ap              = Math.Max(0, effectiveSimAp),
                 Damage          = ParseDice(g.Variant.Damage),
                 WithinHalfRange = request.WithinHalfRange,
-                Abilities       = MapAbilities(g.Variant.Abilities),
+                Abilities       = abilities,
+                AttackModifier  = request.AttackModifier,
+                DamageModifier  = request.DamageModifier,
+                RerollDamageDice = request.RerollDamageDice,
+                RerollAttackDice = request.RerollAttackDice,
             };
         }).ToList();
 
         var attackerName = string.Join(" + ", attackerUnits.Select(u => u.Name));
         var attacker = new SimAttackerProfile
         {
-            Name             = attackerName,
-            Weapons          = simWeapons,
-            Rerolls          = rerolls,
-            CriticalHitsOn   = request.CriticalHitsOn5 ? 5 : attackerUnits.Min(u => u.CriticalHitsOn),
-            WoundRollModifier = request.PlusOneToWound ? 1 : 0,
+            Name               = attackerName,
+            Weapons            = simWeapons,
+            Rerolls            = rerolls,
+            CriticalHitsOn     = request.CriticalHitsOn5 ? 5 : attackerUnits.Min(u => u.CriticalHitsOn),
+            CriticalWoundsOn   = request.CritWoundOn5 ? 5 : 6,
+            WoundRollModifier  = request.WoundRollModifier,
+            HitRollModifier    = request.HitRollModifier,
+            FishForCriticalHits   = request.FishForCriticalHits,
+            FishForCriticalWounds = request.FishForCriticalWounds,
         };
 
-        int coverBonus = request.InCover ? 1 : 0;
         var defenderProfile = new SimDefenderProfile
         {
             Name             = defender.Name,
             Models           = defender.ModelCount,
-            Toughness        = defender.Toughness,
+            Toughness        = Math.Max(1, defender.Toughness + request.ToughnessModifier),
             Save             = defender.Save + coverBonus,
             InvulnerableSave = defender.InvulnerableSave,
             Wounds           = defender.Wounds,
@@ -132,6 +155,39 @@ public class SimulationAdapter
             MaxDamage            = result.Max,
             StageStats           = aggregate,
             WeaponBreakdown      = breakdown,
+        };
+    }
+
+    // ---------------------------------------------------------------------------
+    // Abilities override — merges user toggles into the base weapon abilities.
+    // ---------------------------------------------------------------------------
+
+    private static SimWeaponAbilities ApplyAbilityOverrides(WeaponAbilities source, SimulationRequest request)
+    {
+        // Merge Anti: combine existing Anti with any override (lower threshold wins).
+        var mergedAnti = new Dictionary<string, int>(
+            source.Anti, StringComparer.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrEmpty(request.AntiOverrideKeyword))
+        {
+            mergedAnti.TryGetValue(request.AntiOverrideKeyword, out int existing);
+            mergedAnti[request.AntiOverrideKeyword] = existing == 0
+                ? request.AntiOverrideThreshold
+                : Math.Min(existing, request.AntiOverrideThreshold);
+        }
+
+        return new SimWeaponAbilities
+        {
+            Torrent           = source.Torrent,
+            Blast             = source.Blast || request.BlastOverride,
+            Melta             = source.Melta,
+            RapidFire         = source.RapidFire,
+            SustainedHits     = source.SustainedHits > 0 ? source.SustainedHits : (request.SustainedHitsOverride ? 1 : 0),
+            LethalHits        = source.LethalHits || request.LethalHitsOverride,
+            DevastatingWounds = source.DevastatingWounds || request.DevastatingWoundsOverride,
+            TwinLinked        = source.TwinLinked,
+            IndirectFire      = request.IndirectFireOverride,
+            Anti              = mergedAnti,
         };
     }
 

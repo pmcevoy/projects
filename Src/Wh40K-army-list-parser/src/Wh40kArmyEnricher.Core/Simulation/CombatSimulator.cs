@@ -121,12 +121,27 @@ public sealed class CombatSimulator
         for (int wi = 0; wi < attacker.Weapons.Count; wi++)
         {
             var weapon = attacker.Weapons[wi];
-            int attacks = _dice.Roll(weapon.Attacks);
+
+            int attacks = weapon.RerollAttackDice
+                ? _dice.RollWithReroll(weapon.Attacks)
+                : _dice.Roll(weapon.Attacks);
+
+            // Blast: +1 attack per 5 defender models
+            if (weapon.Abilities.Blast && defender.Models > 0)
+                attacks += defender.Models / 5;
+
+            // Rapid Fire: +X attacks at half range
+            if (weapon.Abilities.RapidFire > 0 && weapon.WithinHalfRange)
+                attacks += weapon.Abilities.RapidFire;
+
+            // Attack modifier applied last, minimum 0
+            attacks = Math.Max(0, attacks + weapon.AttackModifier);
+
             weaponTallies[wi].Attacks = attacks;
-            int criticalWoundsOn = ComputeCriticalWoundsOn(weapon, defender);
+
+            int criticalWoundsOn = ComputeCriticalWoundsOn(weapon, defender, attacker.CriticalWoundsOn);
             for (int i = 0; i < attacks; i++)
-                totalDamage += ResolveOneAttack(weapon, attacker.Rerolls, defender,
-                    attacker.CriticalHitsOn, criticalWoundsOn, attacker.WoundRollModifier,
+                totalDamage += ResolveOneAttack(weapon, attacker, defender, criticalWoundsOn,
                     isFromSustainedHits: false, ref weaponTallies[wi]);
         }
         return totalDamage;
@@ -134,11 +149,9 @@ public sealed class CombatSimulator
 
     private int ResolveOneAttack(
         SimWeaponProfile weapon,
-        SimRerollOptions rerolls,
+        SimAttackerProfile attacker,
         SimDefenderProfile defender,
-        int criticalHitsOn,
         int criticalWoundsOn,
-        int woundRollModifier,
         bool isFromSustainedHits,
         ref RunTally tally)
     {
@@ -156,7 +169,7 @@ public sealed class CombatSimulator
         }
         else
         {
-            bool hit = RollHit(weapon, rerolls, criticalHitsOn, out isCriticalHit);
+            bool hit = RollHit(weapon, attacker, out isCriticalHit);
             if (!hit) return 0;
             tally.Hits++;
             if (isCriticalHit) tally.CritHits++;
@@ -165,19 +178,19 @@ public sealed class CombatSimulator
         if (isCriticalHit && weapon.Abilities.SustainedHits > 0 && !isFromSustainedHits)
         {
             for (int s = 0; s < weapon.Abilities.SustainedHits; s++)
-                damage += ResolveOneAttack(weapon, rerolls, defender, criticalHitsOn, criticalWoundsOn,
-                    woundRollModifier, isFromSustainedHits: true, ref tally);
+                damage += ResolveOneAttack(weapon, attacker, defender, criticalWoundsOn,
+                    isFromSustainedHits: true, ref tally);
         }
 
         bool isLethalHit = isCriticalHit && weapon.Abilities.LethalHits && !isFromSustainedHits;
 
-        bool wounded = RollWound(weapon, defender, rerolls, isLethalHit, criticalWoundsOn,
-            woundRollModifier, out bool devastatingWound, ref tally);
+        bool wounded = RollWound(weapon, attacker, defender, isLethalHit, criticalWoundsOn,
+            out bool devastatingWound, ref tally);
 
         if (devastatingWound)
         {
             tally.DevastatingWoundsTriggers++;
-            int rawDmg = _dice.Roll(weapon.Damage);
+            int rawDmg = RollDamage(weapon);
             if (weapon.WithinHalfRange && weapon.Abilities.Melta > 0)
                 rawDmg += weapon.Abilities.Melta;
             damage += ApplyDamageWithFnp(rawDmg, defender, ref tally);
@@ -190,40 +203,52 @@ public sealed class CombatSimulator
         if (savedRoll) return damage;
 
         tally.FailedSaves++;
-        int d = _dice.Roll(weapon.Damage);
+        int d = RollDamage(weapon);
         if (weapon.WithinHalfRange && weapon.Abilities.Melta > 0)
             d += weapon.Abilities.Melta;
         damage += ApplyDamageWithFnp(d, defender, ref tally);
         return damage;
     }
 
-    private bool RollHit(SimWeaponProfile weapon, SimRerollOptions rerolls, int criticalHitsOn, out bool isCriticalHit)
+    private int RollDamage(SimWeaponProfile weapon)
     {
+        int raw = weapon.RerollDamageDice
+            ? _dice.RollWithReroll(weapon.Damage)
+            : _dice.Roll(weapon.Damage);
+        return Math.Max(0, raw + weapon.DamageModifier);
+    }
+
+    private bool RollHit(SimWeaponProfile weapon, SimAttackerProfile attacker, out bool isCriticalHit)
+    {
+        // Indirect Fire overrides BS/WS with a flat 4+ (Torrent takes precedence and is handled before this call).
+        int skillTarget = weapon.Abilities.IndirectFire ? 4 : weapon.Skill;
+        int criticalHitsOn = attacker.CriticalHitsOn;
+
         int raw = _dice.RollD6();
 
         bool shouldReroll =
-            rerolls.HitRerollAll  ? (raw < criticalHitsOn && raw < weapon.Skill) :
-            rerolls.HitRerollOnes ? (raw == 1) :
+            attacker.Rerolls.HitRerollAll && attacker.FishForCriticalHits ? raw < criticalHitsOn :
+            attacker.Rerolls.HitRerollAll                                  ? (raw < criticalHitsOn && raw < skillTarget) :
+            attacker.Rerolls.HitRerollOnes                                 ? raw == 1 :
             false;
 
         if (shouldReroll)
             raw = _dice.RollD6();
 
         if (raw == 1) { isCriticalHit = false; return false; }
-
         if (raw >= criticalHitsOn) { isCriticalHit = true; return true; }
 
         isCriticalHit = false;
-        return raw >= weapon.Skill;
+        int mod = Math.Clamp(attacker.HitRollModifier, -1, 1);
+        return raw + mod >= skillTarget;
     }
 
     private bool RollWound(
         SimWeaponProfile weapon,
+        SimAttackerProfile attacker,
         SimDefenderProfile defender,
-        SimRerollOptions rerolls,
         bool isLethalHit,
         int criticalWoundsOn,
-        int woundRollModifier,
         out bool devastatingWound,
         ref RunTally tally)
     {
@@ -239,10 +264,11 @@ public sealed class CombatSimulator
         int threshold = AbilityProcessor.WoundThreshold(weapon.Strength, defender.Toughness);
 
         // Rerolls are applied before modifiers (per rules). Reroll decision uses raw die only.
-        bool canRerollAll = rerolls.WoundRerollAll || weapon.Abilities.TwinLinked;
+        bool canRerollAll = attacker.Rerolls.WoundRerollAll || weapon.Abilities.TwinLinked;
         bool shouldReroll =
-            canRerollAll              ? (raw < criticalWoundsOn && raw < threshold) :
-            rerolls.WoundRerollOnes   ? (raw == 1) :
+            canRerollAll && attacker.FishForCriticalWounds ? raw < criticalWoundsOn :
+            canRerollAll                                    ? (raw < criticalWoundsOn && raw < threshold) :
+            attacker.Rerolls.WoundRerollOnes                ? raw == 1 :
             false;
 
         if (shouldReroll)
@@ -251,8 +277,7 @@ public sealed class CombatSimulator
         // Natural 1 always fails regardless of modifier.
         if (raw == 1) { devastatingWound = false; return false; }
 
-        // Critical wound check uses the raw (unmodified) die — Anti and crit wound thresholds
-        // are always stated as "unmodified wound roll" in the rules.
+        // Critical wound check uses the raw (unmodified) die.
         if (raw >= criticalWoundsOn)
         {
             tally.Wounds++;
@@ -263,8 +288,8 @@ public sealed class CombatSimulator
             return true;
         }
 
-        // Apply modifier (capped at +1/-1 per 40K rules) to the threshold comparison.
-        int mod = Math.Clamp(woundRollModifier, -1, 1);
+        // Apply wound roll modifier (capped at +1/-1 per 40K rules) to the threshold comparison.
+        int mod = Math.Clamp(attacker.WoundRollModifier, -1, 1);
         devastatingWound = false;
         if (raw + mod >= threshold)
         {
@@ -274,9 +299,9 @@ public sealed class CombatSimulator
         return false;
     }
 
-    private static int ComputeCriticalWoundsOn(SimWeaponProfile weapon, SimDefenderProfile defender)
+    private static int ComputeCriticalWoundsOn(SimWeaponProfile weapon, SimDefenderProfile defender, int attackerCritWoundsOn)
     {
-        int threshold = 6;
+        int threshold = attackerCritWoundsOn; // may already be 5 from "Crit Wound on 5+" toggle
         foreach (var (keyword, value) in weapon.Abilities.Anti)
         {
             if (defender.Keywords.Any(k => string.Equals(k, keyword, StringComparison.OrdinalIgnoreCase)))

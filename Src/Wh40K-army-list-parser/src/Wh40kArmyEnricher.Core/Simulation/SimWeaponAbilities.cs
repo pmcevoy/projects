@@ -12,4 +12,6 @@ public sealed record SimWeaponAbilities
     /// <summary>Anti ability: maps defender keyword → minimum unmodified wound roll for a Critical Wound.</summary>
     public IReadOnlyDictionary<string, int> Anti { get; init; } = new Dictionary<string, int>();
     public bool TwinLinked { get; init; }
+    /// <summary>Weapon hits on a flat 4+ regardless of BS/WS. Torrent takes precedence if both active.</summary>
+    public bool IndirectFire { get; init; }
 }

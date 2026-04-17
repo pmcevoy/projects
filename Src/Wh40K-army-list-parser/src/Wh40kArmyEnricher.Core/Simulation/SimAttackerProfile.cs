@@ -12,9 +12,26 @@ public sealed record SimAttackerProfile
     public SimRerollOptions Rerolls { get; init; } = new();
     /// <summary>Minimum raw die roll that counts as a Critical Hit. Default 6; can be lowered e.g. to 5.</summary>
     public int CriticalHitsOn { get; init; } = 6;
+    /// <summary>Minimum raw die roll that counts as a Critical Wound (base; Anti can lower further). Default 6.</summary>
+    public int CriticalWoundsOn { get; init; } = 6;
     /// <summary>
     /// Flat modifier applied to wound rolls after rerolls. Capped at +1/-1 per the 40K rules.
-    /// Default 0 (no modifier). Set to 1 for "+1 to wound" detachment rules.
+    /// Default 0 (no modifier).
     /// </summary>
     public int WoundRollModifier { get; init; } = 0;
+    /// <summary>
+    /// Flat modifier applied to hit rolls after rerolls. Capped at +1/-1 per the 40K rules.
+    /// Default 0 (no modifier). Tracked separately from BsWsModifier.
+    /// </summary>
+    public int HitRollModifier { get; init; } = 0;
+    /// <summary>
+    /// When true and HitRerollAll is set, rerolls any result below CriticalHitsOn
+    /// (including successful non-critical hits) rather than only rerolling failures.
+    /// </summary>
+    public bool FishForCriticalHits { get; init; }
+    /// <summary>
+    /// When true and WoundRerollAll is set, rerolls any result below CriticalWoundsOn
+    /// (including successful non-critical wounds) rather than only rerolling failures.
+    /// </summary>
+    public bool FishForCriticalWounds { get; init; }
 }
