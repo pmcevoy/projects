@@ -141,6 +141,32 @@
                 }
             </div>
         }
+
+        <!-- Leading Abilities (active only when this model is attached as a leader) -->
+        @if (Model.LeadingAbilities.Count > 0)
+        {
+            <div class="abilities-section mt-2">
+                <div class="abilities-label leading-abilities-label">While Leading</div>
+                @for (int ai = 0; ai < Model.LeadingAbilities.Count; ai++)
+                {
+                    var ability = Model.LeadingAbilities[ai];
+                    string abilityCollapseId = $"{collapseId}-leading-{ai}";
+                    <div class="ability-item">
+                        <div class="ability-item-header"
+                             data-bs-toggle="collapse"
+                             data-bs-target="#@abilityCollapseId"
+                             aria-expanded="false"
+                             aria-controls="@abilityCollapseId">
+                            <span class="ability-item-name leading-ability-name">@ability.Name</span>
+                            <span class="ability-item-chevron">›</span>
+                        </div>
+                        <div class="collapse" id="@abilityCollapseId">
+                            <div class="ability-item-body">@ability.Text</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
     </div>
 </div>
 

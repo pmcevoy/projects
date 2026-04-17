@@ -215,6 +215,19 @@ body {
     margin-bottom: 0.3rem;
 }
 
+.leading-abilities-label {
+    color: #f1a94e;
+}
+
+.leading-ability-name {
+    color: #f1a94e;
+}
+
+.unit-card[data-role="attacker"] .leading-ability-name,
+.unit-card[data-role="defender"] .leading-ability-name {
+    color: #f1a94e;
+}
+
 .ability-item {
     border-bottom: 1px solid #1e1e36;
 }
