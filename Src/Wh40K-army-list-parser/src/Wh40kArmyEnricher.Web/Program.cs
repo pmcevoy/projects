@@ -109,6 +109,26 @@ app.MapPost("/api/simulate", (
 });
 
 // ---------------------------------------------------------------------------
+// Selective catalogue refresh endpoint
+// ---------------------------------------------------------------------------
+
+app.MapPost("/api/refresh-catalogues", async (
+    HttpContext ctx,
+    CatalogueStore store) =>
+{
+    var idsJson = ctx.Session.GetString("used_catalogue_ids");
+    if (idsJson == null)
+        return Results.Json(new { success = false, error = "No catalogues in session." });
+
+    var ids = System.Text.Json.JsonSerializer.Deserialize<List<string>>(idsJson) ?? [];
+    if (ids.Count == 0)
+        return Results.Json(new { success = false, error = "No catalogue IDs to refresh." });
+
+    var refreshed = await store.RefreshCataloguesAsync(ids, ctx.RequestAborted);
+    return Results.Json(new { success = true, refreshed });
+});
+
+// ---------------------------------------------------------------------------
 // Initialise catalogue store before serving requests
 // ---------------------------------------------------------------------------
 

@@ -75,6 +75,8 @@ public record CatalogueData
     public string Name { get; init; } = "";
     /// <summary>The revision number from the catalogue's root XML attribute.</summary>
     public int Revision { get; init; }
+    /// <summary>The filename used to fetch this catalogue from the BSData repository.</summary>
+    public string Filename { get; init; } = "";
     public bool IsGameSystem { get; init; }
     public IReadOnlyList<CatalogueLinkData> CatalogueLinks { get; init; } = [];
     public IReadOnlyList<CatalogueEntry> Entries { get; init; } = [];

@@ -22,6 +22,8 @@ public class CatalogueStore
     private readonly bool _forceRefresh;
 
     private readonly Dictionary<string, CatalogueData> _loaded = new();
+    // Retained after initialisation so selective refresh can re-parse with cross-catalogue resolution.
+    private Dictionary<string, XElement> _globalProfiles = new();
 
     private bool _initialised;
 
@@ -77,7 +79,7 @@ public class CatalogueStore
             try
             {
                 var catalogue = _parser.Parse(doc, globalProfiles);
-                _loaded[catalogue.Id] = catalogue;
+                _loaded[catalogue.Id] = catalogue with { Filename = filename };
                 _logger.LogDebug("Loaded '{Name}'", catalogue.Name);
             }
             catch (Exception ex)
@@ -86,6 +88,7 @@ public class CatalogueStore
             }
         }
 
+        _globalProfiles = globalProfiles;
         _logger.LogInformation("Catalogue store ready: {Count} catalogues loaded", _loaded.Count);
     }
 
@@ -119,6 +122,46 @@ public class CatalogueStore
             .Select(c => (c.Name, c.Revision))
             .Distinct()
             .ToList();
+
+    /// <summary>
+    /// Re-downloads and re-parses the catalogues identified by the given IDs, bypassing the disk cache.
+    /// Uses the retained global shared-profile map so cross-catalogue infoLink resolution remains correct.
+    /// Returns the names of the catalogues that were successfully refreshed.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> RefreshCataloguesAsync(
+        IEnumerable<string> catalogueIds, CancellationToken ct = default)
+    {
+        var refreshed = new List<string>();
+
+        foreach (var id in catalogueIds.Distinct())
+        {
+            if (!_loaded.TryGetValue(id, out var existing) || string.IsNullOrEmpty(existing.Filename))
+                continue;
+
+            var filename = existing.Filename;
+            try
+            {
+                var stream = await _fetcher.FetchAsync(filename, forceRefresh: true, ct);
+                var doc = await _parser.LoadDocumentAsync(stream, filename, ct);
+
+                // Merge any updated shared profiles back into the global map (local catalogue wins)
+                foreach (var (profileId, profile) in _parser.GetSharedProfiles(doc))
+                    _globalProfiles[profileId] = profile;
+
+                var catalogue = _parser.Parse(doc, _globalProfiles);
+                _loaded[catalogue.Id] = catalogue with { Filename = filename };
+
+                refreshed.Add(catalogue.Name);
+                _logger.LogInformation("Refreshed catalogue '{Name}' (r{Revision})", catalogue.Name, catalogue.Revision);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to refresh catalogue '{Filename}'", filename);
+            }
+        }
+
+        return refreshed;
+    }
 
     /// <summary>Returns all loaded catalogue entries of a given type (all depths, all catalogues).</summary>
     public IEnumerable<CatalogueEntry> GetAllEntriesOfType(string entryType)

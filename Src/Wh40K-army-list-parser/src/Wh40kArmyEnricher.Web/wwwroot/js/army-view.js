@@ -503,6 +503,39 @@
     }
 
     // ---------------------------------------------------------------------------
+    // Catalogue refresh
+    // ---------------------------------------------------------------------------
+
+    const refreshBtn    = document.getElementById('refresh-catalogues-btn');
+    const refreshStatus = document.getElementById('refresh-status');
+
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+            refreshBtn.disabled = true;
+            refreshStatus.style.color = '#adb5bd';
+            refreshStatus.textContent = 'Refreshing…';
+
+            try {
+                const res  = await fetch('/api/refresh-catalogues', { method: 'POST' });
+                const data = await res.json();
+
+                if (data.success) {
+                    refreshStatus.style.color = '#57cc99';
+                    refreshStatus.textContent = `Updated: ${data.refreshed.join(', ')}`;
+                } else {
+                    refreshStatus.style.color = '#e63946';
+                    refreshStatus.textContent = data.error ?? 'Refresh failed.';
+                }
+            } catch (e) {
+                refreshStatus.style.color = '#e63946';
+                refreshStatus.textContent = 'Network error.';
+            } finally {
+                refreshBtn.disabled = false;
+            }
+        });
+    }
+
+    // ---------------------------------------------------------------------------
     // Utilities
     // ---------------------------------------------------------------------------
 
