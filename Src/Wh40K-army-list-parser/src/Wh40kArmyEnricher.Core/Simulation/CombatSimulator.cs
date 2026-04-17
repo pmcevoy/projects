@@ -215,7 +215,7 @@ public sealed class CombatSimulator
         int raw = weapon.RerollDamageDice
             ? _dice.RollWithReroll(weapon.Damage)
             : _dice.Roll(weapon.Damage);
-        return Math.Max(0, raw + weapon.DamageModifier);
+        return Math.Max(1, raw + weapon.DamageModifier);
     }
 
     private bool RollHit(SimWeaponProfile weapon, SimAttackerProfile attacker, out bool isCriticalHit)

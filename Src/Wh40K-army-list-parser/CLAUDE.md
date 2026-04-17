@@ -516,7 +516,7 @@ Each accordion section header shows a live one-line summary of its active modifi
 
 | Control | Effect |
 |---|---|
-| **+1/-1 Damage** | Adds or subtracts 1 from each individual damage roll after rolling (applied per wound, before FNP). |
+| **+1/-1 Damage** | Adds or subtracts 1 from each individual damage roll after rolling (applied per wound, before FNP). Damage is clamped to a minimum of 1 — a failed save always deals at least 1 damage. |
 | **Reroll damage dice** | For variable-damage weapons (e.g. D3 damage, D6 damage), reroll the damage dice once if the result is below the expected average (reroll 1–3 on D6, reroll 1 on D3). Applied per wound resolution. |
 | **Feel No Pain** | Override — grants the defender a FNP save (4+++, 5+++, or 6+++) if they do not already have one. Defenders with a native FNP are unaffected. Lives in this section because FNP rolls are made after the damage value is determined, not at the save step. |
 
