@@ -36,9 +36,9 @@ Sample input data lives in `./data` folder
 - `Moq` (for mocking `HttpClient` / `ICatalogueFetcher` in unit tests)
 
 ### HTTP / Caching
-Use `IHttpClientFactory` with a named client. Cache downloaded `.cat` files to disk under a configurable path (default `~/.wh40k-enricher/cache/`). On each run, use the cached file if it exists; only re-download when `--refresh-cache` is passed. **Do not** use the GitHub Commits API for staleness checking — it is aggressively rate-limited even for unauthenticated reads.
+Use `IHttpClientFactory` with a named client. Cache downloaded `.cat` files to disk under a configurable path (default `~/.wh40k-enricher/cache/`). On startup, use cached files if they exist. Re-downloading specific catalogues is done at runtime via `POST /api/refresh-catalogues` (see Catalogue version display and selective refresh). **Do not** use the GitHub Commits API for staleness checking — it is aggressively rate-limited even for unauthenticated reads.
 
-The GitHub Contents API listing (`GET https://api.github.com/repos/BSData/wh40k-10e/contents/`) is also rate-limited; cache the resulting filename list to `~/.wh40k-enricher/cache/catalogue-list.json` and only re-fetch with `--refresh-cache`.
+The GitHub Contents API listing (`GET https://api.github.com/repos/BSData/wh40k-10e/contents/`) is also rate-limited; cache the resulting filename list to `~/.wh40k-enricher/cache/catalogue-list.json`.
 
 ---
 
@@ -439,12 +439,13 @@ docker compose up                # subsequent runs: cache is on the volume, star
 ### User flow
 
 1. **Index page** — paste attacker and defender army list text, submit
-2. Server enriches both lists (BSData catalogue lookup) and stores `List<UnitProfile>` in ASP.NET Core session
-3. **ArmyView page** — two columns of collapsed unit cards; click a card header to expand it
+2. Server enriches both lists (BSData catalogue lookup) and stores `List<UnitProfile>` in ASP.NET Core session; stores the set of catalogue IDs used in `used_catalogue_ids`
+3. **ArmyView page** — two columns of collapsed unit cards; click a card header to expand it. Catalogue names and revision numbers used by these armies are shown at the top.
 4. In an expanded attacker card, **click a weapon variant row** to select it (highlights red; auto-selects the unit)
 5. Click a defender unit card to select it (highlights blue)
 6. The **combat panel** appears at the bottom; configure options and click **Run Simulation**
 7. Results display inline: mean damage, expected kills, P(kill ≥ 1 model), std deviation
+8. A **"Re-download catalogues"** button on the ArmyView page calls `POST /api/refresh-catalogues`, which re-fetches the cached `.cat` files for the catalogues used by the current session and re-parses them without a full server restart.
 
 ### Session storage and JSON
 
@@ -452,6 +453,30 @@ Enriched armies are stored in session as JSON using `SessionJson.Options` (`Help
 - **`ScalarValueJsonConverter`** is mandatory — `ScalarValue` has only private backing fields and serialises to `{}` by default; without the converter every `Attacks`/`Damage` value comes back as empty string and `DiceExpression.Parse` throws.
 - **`PropertyNameCaseInsensitive = true`** — session data uses PascalCase (no naming policy); case-insensitive matching ensures round-trips work correctly. Do NOT set `PropertyNamingPolicy = CamelCase` on `SessionJson.Options` — that causes `WeaponAbilities` booleans (`LethalHits`, `DevastatingWounds`, etc.) to deserialise as `false` because the default STJ matcher is case-sensitive.
 - The `data-unit` HTML attribute in `ArmyView.cshtml` uses a **separate** `camelCaseJson` variable so the JavaScript receives camelCase property names — this is independent of session serialisation.
+
+**Session keys:**
+
+| Key | Content |
+|---|---|
+| `attacker_army` | JSON-serialised `List<UnitProfile>` for the attacker |
+| `defender_army` | JSON-serialised `List<UnitProfile>` for the defender |
+| `used_catalogue_ids` | JSON-serialised `List<string>` of BSData catalogue IDs touched during enrichment of both armies |
+
+### Catalogue version display and selective refresh
+
+`Enricher.Enrich()` returns `(IReadOnlyList<EnrichedUnit> Units, IReadOnlySet<string> UsedCatalogueIds)` — the set of BSData catalogue IDs that were actually accessed during enrichment (unit entries, model entries). `EnrichmentService.Enrich()` surfaces the same pair. After enrichment the IDs are stored in `used_catalogue_ids` session.
+
+`ArmyView.cshtml.cs` reads `used_catalogue_ids` from session and calls `CatalogueStore.GetCataloguesByIds()` to populate `CatalogueInfo: IReadOnlyList<(string Name, int Revision)>`, which the page renders as a catalogue version list.
+
+**`CatalogueData`** carries two new fields:
+- `Revision` (int) — parsed from the `revision` XML attribute on the catalogue root element
+- `Filename` (string) — the BSData repository filename used to fetch this catalogue; stored via `catalogue with { Filename = filename }` during `InitialiseAsync`
+
+**`CatalogueStore.RefreshCataloguesAsync(IEnumerable<string> catalogueIds)`** — re-downloads and re-parses the specified catalogues by ID, bypassing the disk cache (`forceRefresh: true`). Uses `_globalProfiles` (retained from `InitialiseAsync`) so cross-catalogue infoLink resolution remains correct. Merges any updated shared profiles from the refreshed documents back into `_globalProfiles`. Only works for catalogues whose `Filename` is known.
+
+**`POST /api/refresh-catalogues`** — reads `used_catalogue_ids` from session, calls `RefreshCataloguesAsync`, returns `{ success, refreshed: string[] }`.
+
+**Gotcha:** `_globalProfiles` is retained as a field on `CatalogueStore` after `InitialiseAsync` completes specifically to support `RefreshCataloguesAsync`. Do not discard it or scope it to `InitialiseAsync` only.
 
 ### Combat options (user-controlled)
 
@@ -628,9 +653,19 @@ Bridges `UnitProfile` (Contracts) → `SimulationConfig` (Core.Simulation):
 
 ---
 
-## Planned: Leader Attachments & AttachedUnit (not yet implemented)
+## Leader Attachments & AttachedUnit
 
-This section records agreed design decisions for the next major feature. **Do not implement until instructed.**
+Leader support is partially implemented. The foundational data (`LeadingAbilities` on `UnitProfile`, `LeaderResolver`, `AttachedUnit`) is in place; the web UI simulation does not yet accept an `AttachedUnit` — that integration is still planned.
+
+### What is implemented
+
+- **`UnitProfile.LeadingAbilities`** (`List<AbilityProfile>`) — populated at enrichment time by filtering abilities whose text starts with `"While this model is leading a unit"`. Already in `SimulationProfiles.cs` and populated by `Enricher.cs`.
+- **`LeaderResolver`** — resolves leader eligibility and constructs `AttachedUnit` objects. Lives in `Wh40kArmyEnricher.Core`.
+- **`_UnitCard.cshtml`** displays `LeadingAbilities` in a collapsible "While Leading" section, styled in amber (`#f1a94e`), distinct from regular abilities.
+
+### What is still planned — do not implement until instructed
+
+The `/api/simulate` endpoint still accepts a plain `UnitProfile` attacker; it will need to accept `AttachedUnit` once leader attachment simulation is wired up. A baseline run (0 leaders) should always be included alongside leader combinations.
 
 ### Background
 
@@ -638,12 +673,8 @@ In Warhammer 40K 10th edition, CHARACTER units with the `Leader` ability can att
 
 ### Layer separation
 
-- **`UnitProfile`** — pure enriched output from the army list. One per unit listed in the export. Indivisible. No knowledge of attachments. Gains one new field: `leadingAbilities`.
+- **`UnitProfile`** — pure enriched output from the army list. One per unit listed in the export. Indivisible. No knowledge of attachments. Has `leadingAbilities` field (implemented).
 - **`AttachedUnit`** — simulation-layer composition. Not produced by the enricher directly; constructed by `LeaderResolver` from enriched profiles. Used in pairing files.
-
-### Changes to `UnitProfile`
-
-Add `leadingAbilities: AbilityProfile[]` — populated at enrichment time by filtering the unit's abilities whose text **starts with** `"While this model is leading a unit"`. These abilities only apply when the unit is acting as a leader; they must not be applied when simulating the unit standalone. All other abilities remain in `abilities`.
 
 ### `AttachedUnit` type (in `Wh40kArmyEnricher.Contracts`)
 
@@ -676,7 +707,7 @@ record AttachedUnit(
 - **Support leaders** (Lieutenants, Apothecaries, etc.) have text like `"...can be attached to a unit that already contains a Leader..."` — they can join a unit that already has a primary leader.
 - Generally 1 leader per unit; exceptions exist. Do **not** reject primary+primary combinations outright — instead add a note to the pairing: `"Second leader eligibility unverified — confirm manually"`.
 
-### `LeaderResolver` (new class in `Wh40kArmyEnricher.Core`)
+### `LeaderResolver` (implemented in `Wh40kArmyEnricher.Core`)
 
 Responsibilities:
 1. Given a list of enriched `UnitProfile` objects (one army), identify all CHARACTER units.
@@ -690,12 +721,6 @@ Responsibilities:
    - `"re-roll wound rolls of 1"` → `woundRerollOnes: true`
    - `"re-roll wound rolls"` (all) → `woundRerollAll: true`
    - `"Critical Hits are scored on a 5+"` → `criticalHitsOn: 5`
-
-### Web app simulation changes
-
-- The `/api/simulate` attacker payload will need to accept an `AttachedUnit` instead of a plain `UnitProfile`.
-- A baseline run (0 leaders) is always included alongside leader combinations.
-- Selecting leader combinations will be done in the web UI, not via command-line flags.
 
 ### Retinue models
 
