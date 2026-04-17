@@ -581,7 +581,7 @@ Ported from the retired `wh40k-sim` standalone project. The combat rules spec li
 | `IDiceRoller` / `DiceRoller` | Abstracts randomness; injectable for deterministic testing; `RollWithReroll(expr)` rerolls each die independently if ≤ sides/2 |
 | `SimAttackerProfile` | Name, Weapons, Rerolls, `CriticalHitsOn`, `CriticalWoundsOn` (default 6), `HitRollModifier`, `WoundRollModifier`, `FishForCriticalHits`, `FishForCriticalWounds` |
 | `SimDefenderProfile` | Name, model count, T, Sv, invuln, W, FNP, keywords |
-| `CombatSimulator` | Runs N iterations; returns `(IReadOnlyList<int> Damage, CombatStageStats Aggregate, IReadOnlyList<WeaponGroupStats> PerWeapon)` |
+| `CombatSimulator` | Runs N iterations; returns `(IReadOnlyList<int> Damage, IReadOnlyList<int> Kills, CombatStageStats Aggregate, IReadOnlyList<WeaponGroupStats> PerWeapon)` |
 | `CombatStageStats` | Per-run averages for each pipeline stage and ability contribution |
 | `WeaponGroupStats` | `{ WeaponName, CombatStageStats Stats }` — per-weapon breakdown entry |
 | `SimulationResult` | Computed statistics: mean, median, stddev, min, max, probability/cumulative distributions |
@@ -589,7 +589,9 @@ Ported from the retired `wh40k-sim` standalone project. The combat rules spec li
 
 ### Simulation flow
 
-Per run: loop over each weapon in `Attacker.Weapons` — for each weapon, roll attack dice (with optional per-die reroll) → apply Blast bonus → apply Rapid Fire bonus → apply `AttackModifier` offset → for each attack: hit roll (skip if Torrent; use 4+ if Indirect Fire) → Sustained Hits bonus attacks → wound roll (skip if Lethal Hit) → save roll (skip if Devastating Wounds) → roll damage (with optional per-die reroll) → apply `DamageModifier` → FNP rolls. Each die may only be rerolled once. Natural 1 always fails, natural 6 (or lower if `CriticalHitsOn`/`CriticalWoundsOn` is reduced) always succeeds.
+Per run: loop over each weapon in `Attacker.Weapons` — for each weapon, roll attack dice (with optional per-die reroll) → apply Blast bonus → apply Rapid Fire bonus → apply `AttackModifier` offset → for each attack: hit roll (skip if Torrent; use 4+ if Indirect Fire) → Sustained Hits bonus attacks → wound roll (skip if Lethal Hit) → save roll (skip if Devastating Wounds) → roll damage (with optional per-die reroll) → apply `DamageModifier` → FNP rolls → apply damage to wound pool. Each die may only be rerolled once. Natural 1 always fails, natural 6 (or lower if `CriticalHitsOn`/`CriticalWoundsOn` is reduced) always succeeds.
+
+**Wound pool (no damage spillover):** a `WoundPool` struct is initialised once per run and shared across all weapon groups. Each call to `ApplyDamageWithFnp` (after FNP rolls) calls `pool.Apply(damage)`, which caps the damage at the current model's remaining wounds — excess is lost, not carried over to the next model. When a model reaches 0 wounds it is removed and `Kills` is incremented. `SimulateOneRun` returns `(totalDamage, pool.Kills)`. The `Kills` list drives `ExpectedKills` and `P(kill ≥ 1)` in `SimulationAdapter`; `totalDamage` (raw post-FNP, before capping) drives `Mean Damage`. This means the two metrics are independent: a 3-damage weapon killing a 1-wound model shows 3 Mean Damage but 1 kill.
 
 ### Multi-weapon selection and attack aggregation
 

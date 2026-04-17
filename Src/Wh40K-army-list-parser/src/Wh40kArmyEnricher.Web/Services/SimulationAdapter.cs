@@ -123,12 +123,11 @@ public class SimulationAdapter
             Defender       = defenderProfile,
         };
 
-        var (raw, aggregate, perWeapon) = _simulator.Run(config);
+        var (raw, kills, aggregate, perWeapon) = _simulator.Run(config);
         var result = SimulationResult.Compute(raw);
 
-        int woundsPerModel = defender.Wounds > 0 ? defender.Wounds : 1;
-        double expectedKills = result.Mean / woundsPerModel;
-        double probKillAtLeastOne = raw.Count(d => d >= woundsPerModel) / (double)raw.Count;
+        double expectedKills     = kills.Count > 0 ? kills.Average() : 0.0;
+        double probKillAtLeastOne = kills.Count > 0 ? kills.Count(k => k >= 1) / (double)kills.Count : 0.0;
 
         // Weapon description: single weapon uses variant label; multiple uses comma-separated names.
         string weaponDescription = weaponGroups.Count == 1

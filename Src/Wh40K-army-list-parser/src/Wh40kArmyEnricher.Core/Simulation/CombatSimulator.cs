@@ -61,10 +61,43 @@ public sealed class CombatSimulator
         }
     }
 
-    public (IReadOnlyList<int> Damage, CombatStageStats Aggregate, IReadOnlyList<WeaponGroupStats> PerWeapon) Run(SimulationConfig config)
+    // Tracks per-model wound state across all weapon attacks in a single simulation run.
+    // Damage from each failed save is capped at the current model's remaining wounds; excess is lost.
+    private struct WoundPool
+    {
+        private readonly int _woundsPerModel;
+        public int ModelsRemaining;
+        public int CurrentModelWoundsRemaining;
+        public int Kills;
+
+        public WoundPool(SimDefenderProfile defender)
+        {
+            _woundsPerModel = Math.Max(1, defender.Wounds);
+            ModelsRemaining = defender.Models;
+            CurrentModelWoundsRemaining = _woundsPerModel;
+            Kills = 0;
+        }
+
+        public void Apply(int damage)
+        {
+            if (ModelsRemaining <= 0 || damage <= 0) return;
+            int absorbed = Math.Min(damage, CurrentModelWoundsRemaining);
+            CurrentModelWoundsRemaining -= absorbed;
+            if (CurrentModelWoundsRemaining == 0)
+            {
+                Kills++;
+                ModelsRemaining--;
+                if (ModelsRemaining > 0)
+                    CurrentModelWoundsRemaining = _woundsPerModel;
+            }
+        }
+    }
+
+    public (IReadOnlyList<int> Damage, IReadOnlyList<int> Kills, CombatStageStats Aggregate, IReadOnlyList<WeaponGroupStats> PerWeapon) Run(SimulationConfig config)
     {
         int weaponCount = config.Attacker.Weapons.Count;
         var results = new List<int>(config.SimulationRuns);
+        var kills   = new List<int>(config.SimulationRuns);
 
         var weaponTotals = new RunTotals[weaponCount];
         var weaponTallies = new RunTally[weaponCount]; // reused buffer, cleared each run
@@ -72,7 +105,9 @@ public sealed class CombatSimulator
         for (int i = 0; i < config.SimulationRuns; i++)
         {
             Array.Clear(weaponTallies, 0, weaponCount);
-            results.Add(SimulateOneRun(config.Attacker, config.Defender, weaponTallies));
+            var (dmg, k) = SimulateOneRun(config.Attacker, config.Defender, weaponTallies);
+            results.Add(dmg);
+            kills.Add(k);
             for (int w = 0; w < weaponCount; w++)
                 weaponTotals[w].Add(weaponTallies[w]);
         }
@@ -94,7 +129,7 @@ public sealed class CombatSimulator
             })
             .ToList();
 
-        return (results, aggregate, perWeapon);
+        return (results, kills, aggregate, perWeapon);
     }
 
     private static CombatStageStats ToStats(in RunTotals t, double n) => new()
@@ -115,9 +150,11 @@ public sealed class CombatSimulator
         AvgInvulnSaveRolls           = t.InvulnSaveRolls / n,
     };
 
-    private int SimulateOneRun(SimAttackerProfile attacker, SimDefenderProfile defender, RunTally[] weaponTallies)
+    private (int damage, int kills) SimulateOneRun(SimAttackerProfile attacker, SimDefenderProfile defender, RunTally[] weaponTallies)
     {
         int totalDamage = 0;
+        var pool = new WoundPool(defender);
+
         for (int wi = 0; wi < attacker.Weapons.Count; wi++)
         {
             var weapon = attacker.Weapons[wi];
@@ -142,9 +179,9 @@ public sealed class CombatSimulator
             int criticalWoundsOn = ComputeCriticalWoundsOn(weapon, defender, attacker.CriticalWoundsOn);
             for (int i = 0; i < attacks; i++)
                 totalDamage += ResolveOneAttack(weapon, attacker, defender, criticalWoundsOn,
-                    isFromSustainedHits: false, ref weaponTallies[wi]);
+                    isFromSustainedHits: false, ref weaponTallies[wi], ref pool);
         }
-        return totalDamage;
+        return (totalDamage, pool.Kills);
     }
 
     private int ResolveOneAttack(
@@ -153,7 +190,8 @@ public sealed class CombatSimulator
         SimDefenderProfile defender,
         int criticalWoundsOn,
         bool isFromSustainedHits,
-        ref RunTally tally)
+        ref RunTally tally,
+        ref WoundPool pool)
     {
         int damage = 0;
         bool isCriticalHit = false;
@@ -179,7 +217,7 @@ public sealed class CombatSimulator
         {
             for (int s = 0; s < weapon.Abilities.SustainedHits; s++)
                 damage += ResolveOneAttack(weapon, attacker, defender, criticalWoundsOn,
-                    isFromSustainedHits: true, ref tally);
+                    isFromSustainedHits: true, ref tally, ref pool);
         }
 
         bool isLethalHit = isCriticalHit && weapon.Abilities.LethalHits && !isFromSustainedHits;
@@ -193,7 +231,7 @@ public sealed class CombatSimulator
             int rawDmg = RollDamage(weapon);
             if (weapon.WithinHalfRange && weapon.Abilities.Melta > 0)
                 rawDmg += weapon.Abilities.Melta;
-            damage += ApplyDamageWithFnp(rawDmg, defender, ref tally);
+            damage += ApplyDamageWithFnp(rawDmg, defender, ref tally, ref pool);
             return damage;
         }
 
@@ -206,7 +244,7 @@ public sealed class CombatSimulator
         int d = RollDamage(weapon);
         if (weapon.WithinHalfRange && weapon.Abilities.Melta > 0)
             d += weapon.Abilities.Melta;
-        damage += ApplyDamageWithFnp(d, defender, ref tally);
+        damage += ApplyDamageWithFnp(d, defender, ref tally, ref pool);
         return damage;
     }
 
@@ -328,22 +366,30 @@ public sealed class CombatSimulator
         return raw >= effectiveSave;
     }
 
-    private int ApplyDamageWithFnp(int rawDamage, SimDefenderProfile defender, ref RunTally tally)
+    private int ApplyDamageWithFnp(int rawDamage, SimDefenderProfile defender, ref RunTally tally, ref WoundPool pool)
     {
         tally.DamageBeforeFnp += rawDamage;
 
+        int throughFnp;
         if (!defender.FeelNoPain.HasValue)
-            return rawDamage;
-
-        int fnpValue = defender.FeelNoPain.Value;
-        int damageThroughFnp = 0;
-        for (int i = 0; i < rawDamage; i++)
         {
-            if (_dice.RollD6() < fnpValue)
-                damageThroughFnp++;
-            else
-                tally.FnpSaved++;
+            throughFnp = rawDamage;
         }
-        return damageThroughFnp;
+        else
+        {
+            int fnpValue = defender.FeelNoPain.Value;
+            throughFnp = 0;
+            for (int i = 0; i < rawDamage; i++)
+            {
+                if (_dice.RollD6() < fnpValue)
+                    throughFnp++;
+                else
+                    tally.FnpSaved++;
+            }
+        }
+
+        // Each failed save allocates all its damage to one model; excess is lost (no spillover).
+        pool.Apply(throughFnp);
+        return throughFnp;
     }
 }
