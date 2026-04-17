@@ -34,11 +34,14 @@ public class IndexModel : PageModel
 
         try
         {
-            var attackerUnits = _enricher.Enrich(AttackerText);
-            var defenderUnits = _enricher.Enrich(DefenderText);
+            var (attackerUnits, attackerIds) = _enricher.Enrich(AttackerText);
+            var (defenderUnits, defenderIds) = _enricher.Enrich(DefenderText);
+
+            var usedIds = attackerIds.Union(defenderIds).ToList();
 
             HttpContext.Session.SetString("attacker_army", JsonSerializer.Serialize(attackerUnits, SessionJson.Options));
             HttpContext.Session.SetString("defender_army",  JsonSerializer.Serialize(defenderUnits, SessionJson.Options));
+            HttpContext.Session.SetString("used_catalogue_ids", JsonSerializer.Serialize(usedIds));
 
             return RedirectToPage("/ArmyView");
         }

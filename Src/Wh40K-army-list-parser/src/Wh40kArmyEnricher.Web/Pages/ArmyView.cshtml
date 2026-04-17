@@ -56,6 +56,19 @@
     </div>
 </div>
 
+<!-- Catalogue data sources -->
+<details class="mb-3" style="font-size:0.72rem; color:#6c757d;">
+    <summary style="cursor:pointer; user-select:none; list-style:none; display:flex; align-items:center; gap:0.3rem;">
+        <span style="font-size:0.6rem;">▶</span> BSData sources (@Model.CatalogueInfo.Count catalogues)
+    </summary>
+    <div class="mt-2" style="columns: 2 14rem; column-gap: 1.5rem; padding: 0.4rem 0.5rem; background:#0f1221; border-radius:3px;">
+        @foreach (var cat in Model.CatalogueInfo)
+        {
+            <div style="break-inside: avoid;">@cat.Name <span style="opacity:0.5;">r@(cat.Revision)</span></div>
+        }
+    </div>
+</details>
+
 <!-- Combat panel — shown when attacker(s) and defender are selected -->
 <div id="combat-panel" class="mb-3" style="display:none;">
     <div class="combat-panel-title">⚡ Combat Setup</div>

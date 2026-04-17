@@ -22,12 +22,12 @@ public class EnrichmentService
 
     /// <summary>
     /// Parses and enriches an army list text export.
-    /// Returns the enriched unit profiles, or throws on parse/enrichment failure.
+    /// Returns the enriched unit profiles and the set of BSData catalogue IDs that were used.
     /// </summary>
-    public IReadOnlyList<UnitProfile> Enrich(string armyListText)
+    public (IReadOnlyList<UnitProfile> Profiles, IReadOnlySet<string> UsedCatalogueIds) Enrich(string armyListText)
     {
         var armyList = _parser.Parse(armyListText);
-        var enriched = _enricher.Enrich(armyList);
-        return enriched.Select(e => e.Profile).ToList();
+        var (units, usedIds) = _enricher.Enrich(armyList);
+        return (units.Select(e => e.Profile).ToList(), usedIds);
     }
 }

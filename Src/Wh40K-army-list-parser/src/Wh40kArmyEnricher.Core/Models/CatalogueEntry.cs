@@ -73,6 +73,8 @@ public record CatalogueData
 {
     public string Id { get; init; } = "";
     public string Name { get; init; } = "";
+    /// <summary>The revision number from the catalogue's root XML attribute.</summary>
+    public int Revision { get; init; }
     public bool IsGameSystem { get; init; }
     public IReadOnlyList<CatalogueLinkData> CatalogueLinks { get; init; } = [];
     public IReadOnlyList<CatalogueEntry> Entries { get; init; } = [];

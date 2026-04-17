@@ -103,6 +103,23 @@ public class CatalogueStore
             await InitialiseAsync(ct);
     }
 
+    /// <summary>Name and revision of every loaded catalogue, sorted by name.</summary>
+    public IReadOnlyList<(string Name, int Revision)> LoadedCatalogues
+        => _loaded.Values
+            .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(c => (c.Name, c.Revision))
+            .ToList();
+
+    /// <summary>Name and revision for the given catalogue IDs, sorted by name. Unknown IDs are silently skipped.</summary>
+    public IReadOnlyList<(string Name, int Revision)> GetCataloguesByIds(IEnumerable<string> ids)
+        => ids
+            .Where(id => _loaded.ContainsKey(id))
+            .Select(id => _loaded[id])
+            .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(c => (c.Name, c.Revision))
+            .Distinct()
+            .ToList();
+
     /// <summary>Returns all loaded catalogue entries of a given type (all depths, all catalogues).</summary>
     public IEnumerable<CatalogueEntry> GetAllEntriesOfType(string entryType)
         => GetAllEntries()

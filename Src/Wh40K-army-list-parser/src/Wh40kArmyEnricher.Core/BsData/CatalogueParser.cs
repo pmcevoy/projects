@@ -77,6 +77,7 @@ public class CatalogueParser
 
         var id = (string?)root.Attribute("id") ?? "";
         var name = (string?)root.Attribute("name") ?? "";
+        var revision = int.TryParse((string?)root.Attribute("revision"), out var rev) ? rev : 0;
 
         // Build local shared profile map for this document.
         // Merge with any cross-catalogue external profiles so infoLinks that reference shared
@@ -126,6 +127,7 @@ public class CatalogueParser
         {
             Id = id,
             Name = name,
+            Revision = revision,
             IsGameSystem = isGst,
             CatalogueLinks = catalogueLinks,
             Entries = entries.Concat(sharedTopEntries).Concat(sharedGroupEntries).Concat(rootLinkEntries).ToList()

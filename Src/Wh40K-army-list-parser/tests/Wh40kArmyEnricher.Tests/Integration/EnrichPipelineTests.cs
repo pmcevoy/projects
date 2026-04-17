@@ -48,7 +48,7 @@ public class EnrichPipelineTests
         var resolver = new NameResolver(NullLogger<NameResolver>.Instance);
         var enricher = new Enricher(store, resolver, NullLogger<Enricher>.Instance);
 
-        return (enricher.Enrich(army), army.Name);
+        return (enricher.Enrich(army).Units, army.Name);
     }
 
     private static void InjectCatalogue(CatalogueStore store, CatalogueData data)

@@ -34,18 +34,20 @@ public class Enricher
     // Public API
     // ---------------------------------------------------------------------------
 
-    public IReadOnlyList<EnrichedUnit> Enrich(ArmyList army)
+    public (IReadOnlyList<EnrichedUnit> Units, IReadOnlySet<string> UsedCatalogueIds) Enrich(ArmyList army)
     {
-        return army.Units
-            .Select((u, i) => EnrichUnit(u, army.Faction, i + 1))
+        var usedIds = new HashSet<string>();
+        var units = army.Units
+            .Select((u, i) => EnrichUnit(u, army.Faction, i + 1, usedIds))
             .ToList();
+        return (units, usedIds);
     }
 
     // ---------------------------------------------------------------------------
     // Unit enrichment
     // ---------------------------------------------------------------------------
 
-    private EnrichedUnit EnrichUnit(UnitEntry unit, string faction, int armyListIndex)
+    private EnrichedUnit EnrichUnit(UnitEntry unit, string faction, int armyListIndex, HashSet<string> usedIds)
     {
         var unitEntry = _resolver.ResolveUnit(unit.Name, _store);
         if (unitEntry == null)
@@ -58,6 +60,9 @@ public class Enricher
             };
         }
 
+        if (!string.IsNullOrEmpty(unitEntry.CatalogueId))
+            usedIds.Add(unitEntry.CatalogueId);
+
         var modelProfiles = new List<ModelProfile>();
         var defenderStatline = unitEntry.Statline;
         int defenderWounds = defenderStatline?.Wounds ?? 1;
@@ -67,6 +72,9 @@ public class Enricher
         {
             var bsModel = _resolver.ResolveModel(modelEntry.Name, unitEntry, _store)
                           ?? unitEntry; // Fall back to unit entry for single-model units
+
+            if (!string.IsNullOrEmpty(bsModel.CatalogueId))
+                usedIds.Add(bsModel.CatalogueId);
 
             // Use model's own statline if available, otherwise use unit statline
             var statline = bsModel.Statline ?? unitEntry.Statline;

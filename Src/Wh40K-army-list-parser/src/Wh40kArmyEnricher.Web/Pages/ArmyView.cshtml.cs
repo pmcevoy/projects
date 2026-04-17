@@ -2,14 +2,23 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Wh40kArmyEnricher.Contracts;
+using Wh40kArmyEnricher.Core.BsData;
 using Wh40kArmyEnricher.Web.Helpers;
 
 namespace Wh40kArmyEnricher.Web.Pages;
 
 public class ArmyViewModel : PageModel
 {
+    private readonly CatalogueStore _store;
+
+    public ArmyViewModel(CatalogueStore store)
+    {
+        _store = store;
+    }
+
     public IReadOnlyList<UnitProfile> AttackerArmy { get; private set; } = [];
     public IReadOnlyList<UnitProfile> DefenderArmy { get; private set; } = [];
+    public IReadOnlyList<(string Name, int Revision)> CatalogueInfo { get; private set; } = [];
 
     public IActionResult OnGet()
     {
@@ -21,6 +30,12 @@ public class ArmyViewModel : PageModel
 
         AttackerArmy = JsonSerializer.Deserialize<List<UnitProfile>>(attackerJson, SessionJson.Options) ?? [];
         DefenderArmy = JsonSerializer.Deserialize<List<UnitProfile>>(defenderJson, SessionJson.Options) ?? [];
+
+        var idsJson = HttpContext.Session.GetString("used_catalogue_ids");
+        var ids = idsJson != null
+            ? JsonSerializer.Deserialize<List<string>>(idsJson) ?? []
+            : [];
+        CatalogueInfo = _store.GetCataloguesByIds(ids);
 
         return Page();
     }
