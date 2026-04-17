@@ -107,7 +107,7 @@ public class SimulationAdapter
         var defenderProfile = new SimDefenderProfile
         {
             Name             = defender.Name,
-            Models           = defender.ModelCount,
+            Models           = request.DefenderModelCount > 0 ? request.DefenderModelCount : defender.ModelCount,
             Toughness        = Math.Max(1, defender.Toughness + request.ToughnessModifier),
             Save             = defender.Save + coverBonus,
             InvulnerableSave = defender.InvulnerableSave,

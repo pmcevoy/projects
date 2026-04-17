@@ -78,6 +78,10 @@ public class SimulationRequest
     // ── General ───────────────────────────────────────────────────────────────
     public bool WithinHalfRange { get; set; }
     public int Runs { get; set; } = 10000;
+    /// <summary>
+    /// Override for the number of surviving defender models. 0 means use the value from the unit profile.
+    /// </summary>
+    public int DefenderModelCount { get; set; }
 }
 
 public class WeaponSelection

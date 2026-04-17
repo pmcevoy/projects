@@ -16,14 +16,16 @@
     const selectedWeapons = new Map();
     let activeWeaponType = null; // 'Melee' | 'Ranged' | null
 
-    const combatPanel         = document.getElementById('combat-panel');
-    const selectionSummary    = document.getElementById('selection-summary');
-    const weaponDisplay       = document.getElementById('weapon-display');
+    const combatPanel          = document.getElementById('combat-panel');
+    const selectionSummary     = document.getElementById('selection-summary');
+    const weaponDisplay        = document.getElementById('weapon-display');
     const attackingModelsInput = document.getElementById('attacking-models');
-    const attackingModelsCol  = document.getElementById('attacking-models-col');
-    const runSimBtn           = document.getElementById('run-sim-btn');
-    const resultsPanel        = document.getElementById('results-panel');
-    const loadingOverlay      = document.getElementById('loading-overlay');
+    const attackingModelsCol   = document.getElementById('attacking-models-col');
+    const defendingModelsInput = document.getElementById('defending-models');
+    const defendingModelsCol   = document.getElementById('defending-models-col');
+    const runSimBtn            = document.getElementById('run-sim-btn');
+    const resultsPanel         = document.getElementById('results-panel');
+    const loadingOverlay       = document.getElementById('loading-overlay');
 
     // ---------------------------------------------------------------------------
     // Unit card click handling (header — selection toggle)
@@ -77,6 +79,7 @@
             selectedDefenderIndex = index;
             selectedDefenderUnit  = unit;
             card.classList.add('selected-defender');
+            defendingModelsInput.value = unit.modelCount || 1;
         }
     }
 
@@ -128,6 +131,18 @@
 
             updateUI();
         });
+    });
+
+    // Keep per-weapon model count in sync when user edits inline inputs in multi-weapon display.
+    weaponDisplay.addEventListener('input', function (e) {
+        const input = e.target.closest('.models-count-input');
+        if (!input) return;
+        const key = input.dataset.weaponKey;
+        const w = selectedWeapons.get(key);
+        if (w) {
+            const val = parseInt(input.value, 10);
+            if (val > 0) w.modelCount = val;
+        }
     });
 
     // ---------------------------------------------------------------------------
@@ -252,6 +267,7 @@
         const hasDefender  = selectedDefenderIndex !== null;
 
         combatPanel.style.display = (hasAttackers || hasDefender) ? 'block' : 'none';
+        defendingModelsCol.style.display = hasDefender ? '' : 'none';
 
         const attackerNames  = [...selectedAttackers.values()].map(u => u.name).join(' + ');
         const defenderNameStr = selectedDefenderUnit ? selectedDefenderUnit.name : '—';
@@ -282,11 +298,16 @@
             weaponDisplay.textContent = `${w.weaponName}${variantStr}  —  ${w.modelName} ×${w.modelCount}`;
             attackingModelsCol.style.display = '';
         } else {
-            const lines = [...selectedWeapons.values()].map(w => {
+            const rows = [...selectedWeapons.entries()].map(([key, w]) => {
                 const variantStr = w.variantName === 'default' ? '' : ` [${w.variantName}]`;
-                return `${w.weaponName}${variantStr} — ${w.modelName} ×${w.modelCount}`;
+                const label = escHtml(`${w.weaponName}${variantStr} — ${w.modelName}`);
+                return `<div class="d-flex align-items-center gap-2 mb-1">` +
+                    `<span class="flex-grow-1 small">${label}</span>` +
+                    `<input type="number" class="form-control form-control-sm bg-dark text-light border-secondary models-count-input"` +
+                    ` data-weapon-key="${escHtml(key)}" value="${w.modelCount}" min="1" style="width:70px" />` +
+                    `</div>`;
             });
-            weaponDisplay.innerHTML = lines.map(l => escHtml(l)).join('<br>');
+            weaponDisplay.innerHTML = rows.join('');
             attackingModelsCol.style.display = 'none';
         }
     }
@@ -322,8 +343,10 @@
             weaponName:  w.weaponName,
             variantName: w.variantName,
             modelName:   w.modelName,
-            modelCount:  (isSingleWeapon && modelsOverride > 0) ? modelsOverride : w.modelCount,
+            modelCount:  isSingleWeapon && modelsOverride > 0 ? modelsOverride : w.modelCount,
         }));
+
+        const defenderModelCount = parseInt(defendingModelsInput.value, 10) || 0;
 
         const antiKeyword = selectVal('anti-keyword');
 
@@ -331,6 +354,7 @@
             attackerUnitIndices: [...selectedAttackers.keys()],
             defenderUnitIndex:   selectedDefenderIndex,
             weaponSelections,
+            defenderModelCount,
             withinHalfRange:  checkVal('within-half-range'),
             runs: 10000,
 

@@ -482,7 +482,9 @@ Enriched armies are stored in session as JSON using `SessionJson.Options` (`Help
 
 All simulation modifiers are set explicitly by the user — ability text is not auto-parsed. The combat panel is organised into five collapsible modifier sections plus a top-level "Models firing" control.
 
-**Models firing** — pre-filled from the weapon's model count; can be overridden (e.g. only 3 of 5 models in range). Hidden when multiple weapons are selected.
+**Models firing** — pre-filled from the weapon's model count; can be overridden (e.g. only 3 of 5 models in range). In single-weapon mode this is a dedicated input above the modifier sections. In multi-weapon mode, an inline number input is rendered next to each weapon in the weapon display area — editing it updates that weapon group's model count independently, allowing partial casualty states (e.g. 2 of 3 chainsword Initiates remaining).
+
+**Surviving models** — a separate input that appears whenever a defender is selected; pre-seeded from the unit's `modelCount` in the army list. Overrides `SimDefenderProfile.Models` (the wound pool size) for that simulation run via `SimulationRequest.DefenderModelCount`. Set to 0 to use the profile value. Allows simulating degraded defender units mid-game.
 
 Each accordion section header shows a live one-line summary of its active modifiers (e.g. `½ Range · RR All · Crit 5+`) so the user can see at a glance what is set without expanding the section.
 
@@ -608,7 +610,9 @@ The simulation supports firing multiple weapons simultaneously (e.g. a Marshal, 
 
 **Phase constraint** — shooting and melee occur in different game phases; it is invalid to simulate both simultaneously. The UI enforces this: the first weapon selected locks in a type (`Melee` or `Ranged`); rows of the opposite type get `.weapon-type-locked` styling (35% opacity, `cursor: not-allowed`) and clicks on them are silently rejected. The constraint resets when all weapon selections are cleared.
 
-**`SimulationRequest.WeaponSelections`** — replaces the old single `WeaponName`/`VariantName`/`ModelName` fields with `List<WeaponSelection>`. Each entry carries `{ WeaponName, VariantName, ModelName, ModelCount }`. For single-weapon selections the `ModelCount` may be overridden by the user via the "models firing" input; for multi-weapon it is taken directly from the unit profile. The adapter groups selections by equality key, aggregates attacks, and builds one `SimWeaponProfile` per group.
+**`SimulationRequest.WeaponSelections`** — replaces the old single `WeaponName`/`VariantName`/`ModelName` fields with `List<WeaponSelection>`. Each entry carries `{ WeaponName, VariantName, ModelName, ModelCount }`. For single-weapon selections the `ModelCount` may be overridden by the user via the dedicated "Models firing" input; for multi-weapon, each weapon group has its own inline count input rendered inside the weapon display — the JS keeps `selectedWeapons[key].modelCount` in sync via event delegation on `weaponDisplay`. The adapter groups selections by equality key, aggregates attacks, and builds one `SimWeaponProfile` per group.
+
+**`SimulationRequest.DefenderModelCount`** — 0 means use `defender.ModelCount` from the session profile; any positive value overrides it in `SimulationAdapter` when building `SimDefenderProfile.Models`.
 
 ### Combat stage statistics (`CombatStageStats` and `WeaponGroupStats`)
 
