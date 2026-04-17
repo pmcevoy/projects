@@ -1,5 +1,9 @@
 # CLAUDE.md — wh40k-army-enricher
 
+## Documentation Maintenance
+
+**After every implementation change — feature, bug fix, or design decision — update this file to keep it in sync.** Document the behaviour, gotchas, and design decisions introduced by the change. Do not let CLAUDE.md drift from the actual implementation.
+
 ## Project Overview
 
 A .NET solution consisting of:
