@@ -66,6 +66,8 @@ public class SimulationRequest
     public bool IgnoresCover { get; set; }
     /// <summary>AP modifier applied to all weapon AP values. +1 means AP becomes more negative (better). -1, 0, or +1.</summary>
     public int ApModifier { get; set; }
+    /// <summary>Feel No Pain override for defenders without FNP. 0 = no override; e.g. 5 = 5+++.</summary>
+    public int FnpOverride { get; set; }
 
     // ── Damage Modifiers ──────────────────────────────────────────────────────
     /// <summary>Flat modifier applied to each individual damage roll after rolling, before FNP. -1, 0, or +1.</summary>

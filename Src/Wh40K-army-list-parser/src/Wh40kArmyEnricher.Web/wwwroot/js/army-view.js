@@ -238,6 +238,8 @@
         const dMod = parseInt(radioVal('dmg-mod'), 10);
         if (dMod !== 0) parts.push(dMod > 0 ? `+${dMod} Dmg` : `${dMod} Dmg`);
         if (checkVal('reroll-damage')) parts.push('RR Dmg');
+        const fnp = parseInt(selectVal('fnp-override'), 10);
+        if (fnp > 0) parts.push(`FNP ${fnp}+++`);
         return parts.join(' · ');
     }
 
@@ -362,6 +364,7 @@
             inCover:       checkVal('in-cover'),
             ignoresCover:  checkVal('ignores-cover'),
             apModifier:    parseInt(radioVal('ap-mod'), 10),
+            fnpOverride:   parseInt(selectVal('fnp-override'), 10),
 
             // Damage modifiers
             damageModifier:   parseInt(radioVal('dmg-mod'), 10),

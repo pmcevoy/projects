@@ -455,6 +455,8 @@ All simulation modifiers are set explicitly by the user — ability text is not 
 
 **Models firing** — pre-filled from the weapon's model count; can be overridden (e.g. only 3 of 5 models in range). Hidden when multiple weapons are selected.
 
+Each accordion section header shows a live one-line summary of its active modifiers (e.g. `½ Range · RR All · Crit 5+`) so the user can see at a glance what is set without expanding the section.
+
 ---
 
 #### Attack Modifiers
@@ -471,6 +473,7 @@ All simulation modifiers are set explicitly by the user — ability text is not 
 
 | Control | Effect |
 |---|---|
+| **Within half range** | Enables Rapid Fire and Melta bonuses for weapons that have them. Lives in this section because it gates weapon abilities that affect the hit-through-damage pipeline. |
 | **+1/-1 Hit** | Roll modifier — added to the raw dice result after rolling, capped at a net total of +1/-1 (bonuses cancel penalties; cannot exceed ±1). Natural 1 still always fails; natural 6 always hits. |
 | **+1/-1 BS/WS** | Characteristic modifier — changes the effective BS/WS target number by ±1 step (e.g. BS 4+ → 3+). Tracked separately from the roll modifier; the two stack independently (e.g. +1 Hit roll AND -1 BS can combine to the equivalent of a +2 shift, unlike two roll modifiers which cap at +1). |
 | **Reroll 1s** | Reroll hit rolls of 1 once. Mutually exclusive with Reroll All. |
@@ -515,6 +518,7 @@ All simulation modifiers are set explicitly by the user — ability text is not 
 |---|---|
 | **+1/-1 Damage** | Adds or subtracts 1 from each individual damage roll after rolling (applied per wound, before FNP). |
 | **Reroll damage dice** | For variable-damage weapons (e.g. D3 damage, D6 damage), reroll the damage dice once if the result is below the expected average (reroll 1–3 on D6, reroll 1 on D3). Applied per wound resolution. |
+| **Feel No Pain** | Override — grants the defender a FNP save (4+++, 5+++, or 6+++) if they do not already have one. Defenders with a native FNP are unaffected. Lives in this section because FNP rolls are made after the damage value is determined, not at the save step. |
 
 ---
 
@@ -524,6 +528,11 @@ All simulation modifiers are set explicitly by the user — ability text is not 
 - **Ability overrides (Blast, Sustained, Lethals, Dev Wounds, Anti):** the override simply ORs the flag / merges the value into `SimWeaponAbilities` before the run. Weapons that already have the ability are unaffected — the sim engine already handles them correctly.
 - **Fish for Criticals** replaces the normal reroll condition: instead of `raw < threshold`, the reroll triggers when `raw < criticalHitsOn` (hits) or `raw < criticalWoundsOn` (wounds).
 - **Ignores Cover + Cover:** both flags flow through to `SimulationAdapter`; if both are set, the cover bonus is not applied (they cancel).
+- **FNP override:** applied in `SimulationAdapter` via `defender.FeelNoPain ?? (request.FnpOverride > 0 ? request.FnpOverride : null)` — the native value always wins; the override only fills in when `FeelNoPain` is null.
+- **Blast and Rapid Fire** are fully simulated in `CombatSimulator.SimulateOneRun`: Blast adds `defender.Models / 5` attacks; Rapid Fire adds `RapidFire` attacks when `WithinHalfRange` is true. Both applied after the attack dice roll and before the `AttackModifier` offset.
+- **`AttackModifier`** is a field on `SimWeaponProfile` (not encoded in the `DiceExpression`) so it is applied after Blast/Rapid Fire: `attacks = Math.Max(0, attacks + weapon.AttackModifier)`.
+- **`RollWithReroll(DiceExpression)`** on `IDiceRoller` — rolls each die individually and rerolls once if ≤ `sides/2` (D6 threshold: 3; D3 threshold: 1). Used for both attack-dice and damage-dice reroll controls. Fixed expressions pass through unchanged.
+- **`IndirectFire`** on `SimWeaponAbilities` — when true, `RollHit` uses a fixed skill target of 4 instead of `weapon.Skill`. Torrent still takes priority (hit roll is skipped entirely before `RollHit` is called).
 
 ### AP sign convention
 
@@ -540,8 +549,8 @@ Ported from the retired `wh40k-sim` standalone project. The combat rules spec li
 | Type | Purpose |
 |---|---|
 | `DiceExpression` | Parses `"D6"`, `"2D3+1"`, fixed integers; `Count=0` means fixed value in `Modifier`; has `Scale(n)` and `Add(other)` for attack aggregation |
-| `IDiceRoller` / `DiceRoller` | Abstracts randomness; injectable for deterministic testing |
-| `SimAttackerProfile` | Name, `IReadOnlyList<SimWeaponProfile>` Weapons, rerolls, `CriticalHitsOn` |
+| `IDiceRoller` / `DiceRoller` | Abstracts randomness; injectable for deterministic testing; `RollWithReroll(expr)` rerolls each die independently if ≤ sides/2 |
+| `SimAttackerProfile` | Name, Weapons, Rerolls, `CriticalHitsOn`, `CriticalWoundsOn` (default 6), `HitRollModifier`, `WoundRollModifier`, `FishForCriticalHits`, `FishForCriticalWounds` |
 | `SimDefenderProfile` | Name, model count, T, Sv, invuln, W, FNP, keywords |
 | `CombatSimulator` | Runs N iterations; returns `(IReadOnlyList<int> Damage, CombatStageStats Aggregate, IReadOnlyList<WeaponGroupStats> PerWeapon)` |
 | `CombatStageStats` | Per-run averages for each pipeline stage and ability contribution |
@@ -551,7 +560,7 @@ Ported from the retired `wh40k-sim` standalone project. The combat rules spec li
 
 ### Simulation flow
 
-Per run: loop over each weapon in `Attacker.Weapons` — for each weapon, resolve attack count (already aggregated, includes Blast/Rapid Fire adjustments) → for each attack: hit roll (skip if Torrent) → Sustained Hits bonus attacks → wound roll (skip if Lethal Hit) → save roll (skip if Devastating Wounds) → damage + FNP. Each die may only be rerolled once. Natural 1 always fails, natural 6 (or lower if `CriticalHitsOn` is reduced) always succeeds.
+Per run: loop over each weapon in `Attacker.Weapons` — for each weapon, roll attack dice (with optional per-die reroll) → apply Blast bonus → apply Rapid Fire bonus → apply `AttackModifier` offset → for each attack: hit roll (skip if Torrent; use 4+ if Indirect Fire) → Sustained Hits bonus attacks → wound roll (skip if Lethal Hit) → save roll (skip if Devastating Wounds) → roll damage (with optional per-die reroll) → apply `DamageModifier` → FNP rolls. Each die may only be rerolled once. Natural 1 always fails, natural 6 (or lower if `CriticalHitsOn`/`CriticalWoundsOn` is reduced) always succeeds.
 
 ### Multi-weapon selection and attack aggregation
 

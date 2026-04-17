@@ -112,7 +112,7 @@ public class SimulationAdapter
             Save             = defender.Save + coverBonus,
             InvulnerableSave = defender.InvulnerableSave,
             Wounds           = defender.Wounds,
-            FeelNoPain       = defender.FeelNoPain,
+            FeelNoPain       = defender.FeelNoPain ?? (request.FnpOverride > 0 ? request.FnpOverride : null),
             Keywords         = defender.Keywords,
         };
 
