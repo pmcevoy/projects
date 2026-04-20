@@ -6,7 +6,7 @@ public sealed record SimWeaponProfile
     public DiceExpression Attacks { get; init; } = DiceExpression.Fixed(1);
     public int Skill { get; init; }
     public int Strength { get; init; }
-    /// <summary>AP as a positive integer (e.g. AP-2 → 2). Stored positively for EffectiveSave calculation.</summary>
+    /// <summary>AP as a positive integer (e.g. AP-2 → 2).</summary>
     public int Ap { get; init; }
     public DiceExpression Damage { get; init; } = DiceExpression.Fixed(1);
     public SimWeaponAbilities Abilities { get; init; } = new();

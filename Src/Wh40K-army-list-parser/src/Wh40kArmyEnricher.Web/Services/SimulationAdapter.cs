@@ -293,16 +293,4 @@ public class SimulationAdapter
     private static DiceExpression ParseDice(ScalarValue scalar) =>
         scalar.IsInt ? DiceExpression.Fixed(scalar.IntValue) : DiceExpression.Parse(scalar.StringValue);
 
-    private static SimWeaponAbilities MapAbilities(WeaponAbilities a) => new()
-    {
-        Torrent           = a.Torrent,
-        Blast             = a.Blast,
-        Melta             = a.Melta,
-        RapidFire         = a.RapidFire,
-        SustainedHits     = a.SustainedHits,
-        LethalHits        = a.LethalHits,
-        DevastatingWounds = a.DevastatingWounds,
-        TwinLinked        = a.TwinLinked,
-        Anti              = a.Anti,
-    };
 }

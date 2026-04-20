@@ -3,7 +3,7 @@ namespace Wh40kArmyEnricher.Core.Simulation;
 public interface IDiceRoller
 {
     int RollD6();
-    int Roll(int sides);
+
     int Roll(DiceExpression expression);
     /// <summary>
     /// Rolls each die in the expression independently, rerolling once if the result is at or below
@@ -22,8 +22,6 @@ public sealed class DiceRoller : IDiceRoller
     }
 
     public int RollD6() => _rng.Next(1, 7);
-
-    public int Roll(int sides) => _rng.Next(1, sides + 1);
 
     public int Roll(DiceExpression expression)
     {
