@@ -3,6 +3,15 @@ namespace Wh40kArmyEnricher.Core.Models;
 /// <summary>Parsed BSData selectionEntry (unit, model, or upgrade).</summary>
 public record CatalogueEntry
 {
+    /// <summary>Yields this entry and every descendant, depth-first.</summary>
+    public IEnumerable<CatalogueEntry> Flatten()
+    {
+        yield return this;
+        foreach (var child in ChildEntries)
+            foreach (var desc in child.Flatten())
+                yield return desc;
+    }
+
     public string Id { get; init; } = "";
     public string Name { get; init; } = "";
     /// <summary>"unit" | "model" | "upgrade" | "rootEntry"</summary>

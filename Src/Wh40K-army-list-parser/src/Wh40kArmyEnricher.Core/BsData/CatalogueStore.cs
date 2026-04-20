@@ -213,22 +213,5 @@ public class CatalogueStore
     }
 
     private static IEnumerable<CatalogueEntry> GetAllEntriesFlat(CatalogueData catalogue)
-    {
-        foreach (var entry in catalogue.Entries)
-        {
-            yield return entry;
-            foreach (var child in FlattenChildren(entry))
-                yield return child;
-        }
-    }
-
-    private static IEnumerable<CatalogueEntry> FlattenChildren(CatalogueEntry entry)
-    {
-        foreach (var child in entry.ChildEntries)
-        {
-            yield return child;
-            foreach (var grandchild in FlattenChildren(child))
-                yield return grandchild;
-        }
-    }
+        => catalogue.Entries.SelectMany(e => e.Flatten());
 }

@@ -111,11 +111,9 @@ public class NameResolver
         // Black Templars has the same weapon with "Lethal Hits").
         var profileCandidates = new List<WeaponProfileData>();
         if (modelEntry != null)
-            foreach (var e in FlattenEntry(modelEntry))
-                profileCandidates.AddRange(e.Weapons);
+            profileCandidates.AddRange(modelEntry.Flatten().SelectMany(e => e.Weapons));
         if (unitEntry != null)
-            foreach (var e in FlattenEntry(unitEntry))
-                profileCandidates.AddRange(e.Weapons);
+            profileCandidates.AddRange(unitEntry.Flatten().SelectMany(e => e.Weapons));
         var byProfile = ResolveWeaponByProfile(weaponName, profileCandidates);
         if (byProfile != null) return [byProfile];
 
@@ -125,8 +123,8 @@ public class NameResolver
 
         // --- Pass 2: search by entry name (handles weapons whose profile names differ) ---
         var scopedEntries = new List<CatalogueEntry>();
-        if (modelEntry != null) scopedEntries.AddRange(FlattenEntry(modelEntry));
-        if (unitEntry != null) scopedEntries.AddRange(FlattenEntry(unitEntry));
+        if (modelEntry != null) scopedEntries.AddRange(modelEntry.Flatten());
+        if (unitEntry != null) scopedEntries.AddRange(unitEntry.Flatten());
 
         var byEntry = ResolveEntryByName(weaponName, scopedEntries.Where(e => e.Weapons.Count > 0).ToList());
         if (byEntry?.Weapons.Count > 0) return byEntry.Weapons.ToList();
@@ -143,6 +141,16 @@ public class NameResolver
     // ---------------------------------------------------------------------------
 
     private CatalogueEntry? Resolve(string displayName, List<CatalogueEntry> candidates, string context)
+        => ResolveByName(displayName, candidates, e => e.Name, context);
+
+    private WeaponProfileData? ResolveWeaponByProfile(string weaponName, List<WeaponProfileData> candidates)
+        => ResolveByName(weaponName, candidates, w => w.Name, "Weapon");
+
+    private CatalogueEntry? ResolveEntryByName(string name, List<CatalogueEntry> candidates)
+        => ResolveByName(name, candidates, e => e.Name, "Weapon/entry");
+
+    private T? ResolveByName<T>(string displayName, List<T> candidates, Func<T, string> getName, string context)
+        where T : class
     {
         if (candidates.Count == 0) return null;
 
@@ -152,7 +160,7 @@ public class NameResolver
 
         // 2. Exact match
         var exact = candidates.FirstOrDefault(e =>
-            string.Equals(e.Name, displayName, StringComparison.OrdinalIgnoreCase));
+            string.Equals(getName(e), displayName, StringComparison.OrdinalIgnoreCase));
         if (exact != null) return exact;
 
         // 3. Count-stripped exact match
@@ -160,112 +168,28 @@ public class NameResolver
         if (stripped != displayName)
         {
             exact = candidates.FirstOrDefault(e =>
-                string.Equals(e.Name, stripped, StringComparison.OrdinalIgnoreCase));
+                string.Equals(getName(e), stripped, StringComparison.OrdinalIgnoreCase));
             if (exact != null) return exact;
         }
 
         // 4. Fuzzy match
         var best = candidates
-            .Select(e => (entry: e, score: Fuzz.TokenSortRatio(displayName, e.Name)))
+            .Select(e => (item: e, score: Fuzz.TokenSortRatio(displayName, getName(e))))
             .Where(x => x.score >= FuzzyThreshold)
             .OrderByDescending(x => x.score)
             .FirstOrDefault();
 
-        if (best.entry != null)
+        if (best.item != null)
         {
             var msg = "[{Context}] Fuzzy matched '{Input}' -> '{Match}' (score: {Score})";
             if (best.score >= 90)
-                _logger.LogInformation(msg, context, displayName, best.entry.Name, best.score);
+                _logger.LogInformation(msg, context, displayName, getName(best.item), best.score);
             else
-                _logger.LogWarning(msg, context, displayName, best.entry.Name, best.score);
-            return best.entry;
+                _logger.LogWarning(msg, context, displayName, getName(best.item), best.score);
+            return best.item;
         }
 
         return null;
-    }
-
-    private WeaponProfileData? ResolveWeaponByProfile(string weaponName, List<WeaponProfileData> candidates)
-    {
-        if (candidates.Count == 0) return null;
-
-        if (_overrides.TryGetValue(weaponName, out var overrideName))
-            weaponName = overrideName;
-
-        var exact = candidates.FirstOrDefault(w =>
-            string.Equals(w.Name, weaponName, StringComparison.OrdinalIgnoreCase));
-        if (exact != null) return exact;
-
-        var stripped = CountPrefixRegex.Replace(weaponName, "");
-        if (stripped != weaponName)
-        {
-            exact = candidates.FirstOrDefault(w =>
-                string.Equals(w.Name, stripped, StringComparison.OrdinalIgnoreCase));
-            if (exact != null) return exact;
-        }
-
-        var best = candidates
-            .Select(w => (weapon: w, score: Fuzz.TokenSortRatio(weaponName, w.Name)))
-            .Where(x => x.score >= FuzzyThreshold)
-            .OrderByDescending(x => x.score)
-            .FirstOrDefault();
-
-        if (best.weapon != null)
-        {
-            var msg = "[Weapon] Fuzzy matched '{Input}' -> '{Match}' (score: {Score})";
-            if (best.score >= 90)
-                _logger.LogInformation(msg, weaponName, best.weapon.Name, best.score);
-            else
-                _logger.LogWarning(msg, weaponName, best.weapon.Name, best.score);
-            return best.weapon;
-        }
-
-        return null;
-    }
-
-    private CatalogueEntry? ResolveEntryByName(string name, List<CatalogueEntry> candidates)
-    {
-        if (candidates.Count == 0) return null;
-
-        if (_overrides.TryGetValue(name, out var overrideName))
-            name = overrideName;
-
-        var exact = candidates.FirstOrDefault(e =>
-            string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
-        if (exact != null) return exact;
-
-        var stripped = CountPrefixRegex.Replace(name, "");
-        if (stripped != name)
-        {
-            exact = candidates.FirstOrDefault(e =>
-                string.Equals(e.Name, stripped, StringComparison.OrdinalIgnoreCase));
-            if (exact != null) return exact;
-        }
-
-        var best = candidates
-            .Select(e => (entry: e, score: Fuzz.TokenSortRatio(name, e.Name)))
-            .Where(x => x.score >= FuzzyThreshold)
-            .OrderByDescending(x => x.score)
-            .FirstOrDefault();
-
-        if (best.entry != null)
-        {
-            var msg = "[Weapon/entry] Fuzzy matched '{Input}' -> '{Match}' (score: {Score})";
-            if (best.score >= 90)
-                _logger.LogInformation(msg, name, best.entry.Name, best.score);
-            else
-                _logger.LogWarning(msg, name, best.entry.Name, best.score);
-            return best.entry;
-        }
-
-        return null;
-    }
-
-    private static IEnumerable<CatalogueEntry> FlattenEntry(CatalogueEntry entry)
-    {
-        yield return entry;
-        foreach (var child in entry.ChildEntries)
-            foreach (var desc in FlattenEntry(child))
-                yield return desc;
     }
 
     // ---------------------------------------------------------------------------
