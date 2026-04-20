@@ -410,7 +410,7 @@ feelNoPain: null                 # null if absent; integer if present (e.g. 5 = 
 
 - Use `XDocument` / LINQ to XML throughout — it handles the BSData XML namespace cleanly with the `Ns + "elementName"` pattern and is more readable than `XmlDocument` for the nested query patterns needed here
 - Declare the BSData XML namespace constant once in `CatalogueParser.cs` and reference it everywhere; do not scatter the namespace string literal
-- `CatalogueStore` eagerly loads all catalogues on startup — no lazy loading or `catalogueLink` traversal needed. The `LoadCatalogueAsync(filename)` method is retained for API compatibility but is a no-op after initialisation
+- `CatalogueStore` eagerly loads all catalogues on startup — no lazy loading or `catalogueLink` traversal needed
 - GitHub raw URL pattern: `https://raw.githubusercontent.com/BSData/wh40k-10e/main/{Uri.EscapeDataString(filename)}` — note spaces in filenames like `Imperium - Black Templars.cat` must be encoded as `%20`
 - `.catz` files are raw deflate compressed (no zlib header). Use `new DeflateStream(stream, CompressionMode.Decompress)` — do **not** use `ZLibStream` or `GZipStream`
 - Register `HttpClient` via `IHttpClientFactory` in DI; set a `User-Agent` header identifying this tool — the GitHub API rejects requests without one

@@ -96,16 +96,6 @@ public class CatalogueStore
     // Public API
     // ---------------------------------------------------------------------------
 
-    /// <summary>
-    /// No-op if InitialiseAsync has already been called (all catalogues are pre-loaded).
-    /// Kept for API compatibility; callers no longer need to specify a filename.
-    /// </summary>
-    public async Task LoadCatalogueAsync(string filename, CancellationToken ct = default)
-    {
-        if (!_initialised)
-            await InitialiseAsync(ct);
-    }
-
     /// <summary>Name and revision of every loaded catalogue, sorted by name.</summary>
     public IReadOnlyList<(string Name, int Revision)> LoadedCatalogues
         => _loaded.Values
