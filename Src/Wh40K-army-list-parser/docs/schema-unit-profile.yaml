@@ -18,7 +18,7 @@ abilities:                       # Unit special rules from BSData; not yet consu
   - name: "Righteous Zeal"
     text: "..."
 leadingAbilities:                # Abilities that start with "While this model is leading a unit"
-  - name: "Rites of Battle"      # Only apply when unit is acting as an attached leader
+  - name: "Rites of Battle"      # Displayed in the "While Leading" section of the unit card
     text: "..."
 enhancements: []                 # Enhancement names from army list
 
