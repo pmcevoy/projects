@@ -7,254 +7,239 @@ implementing or modifying any combat-related code.
 
 ## The Attack Sequence
 
-Each attack resolves through up to four sequential steps. Some special rules skip or modify steps.
-Simulate each attack individually, not in aggregate, so that per-attack special rule triggers
-(e.g. Critical Hits) are correctly detected.
+Each attack resolves through up to four sequential steps. Some special rules skip or modify
+steps. Simulate each attack individually so that per-attack special rule triggers (e.g.
+Critical Hits) are correctly detected.
 
 ### Step 1 — Hit Roll
 
 - Roll a D6 against the weapon's BS (ranged) or WS (melee). Meet or beat the value to hit.
 - **Natural 1** always fails, regardless of modifiers.
-- **Natural 6** always hits, regardless of modifiers. See Critical Hit below.
+- **Natural 6** always hits, regardless of modifiers — this is a Critical Hit.
 - Apply rerolls before applying modifiers.
 - Sum all modifiers, then cap the total at +1/-1 before applying to the target number.
+- If `IndirectFire` is true, use a fixed skill target of 4 regardless of BS/WS.
+- If `Torrent` is true, skip the hit roll entirely — all attacks auto-hit.
+- Torrent takes priority over Indirect Fire.
 
 ### Step 2 — Wound Roll
 
 Compare the weapon's **Strength (S)** to the target's **Toughness (T)**:
 
-| Condition       | Required roll |
-|-----------------|---------------|
-| S >= 2 × T      | 2+            |
-| S > T           | 3+            |
-| S == T          | 4+            |
-| S < T           | 5+            |
-| S <= T / 2      | 6+            |
+| Condition     | Required roll |
+|---------------|---------------|
+| S >= 2 × T    | 2+            |
+| S > T         | 3+            |
+| S == T        | 4+            |
+| S < T         | 5+            |
+| S <= T / 2    | 6+            |
 
-- Same natural 1/6 rules and modifier cap (+1/-1) as hit rolls. See Critical Wound section below
+- Same natural 1/6 rules and +1/-1 modifier cap as hit rolls.
 - Apply rerolls before modifiers.
+- Critical wound threshold checks always use the **raw unmodified die result**.
+- If `LethalHits` is true and the triggering hit was a Critical Hit, skip the wound roll —
+  the wound is automatic.
 
 ### Step 3 — Saving Throw
 
-- Defender rolls D6 against their Save, modified by the weapon's AP (subtract AP from save value).
-- If the defender has an **invulnerable save**, they choose whichever save is easier to make.
-  AP does **not** apply to invulnerable saves.
+- Defender rolls D6 against their Save value. The weapon's AP modifies the save:
+  `effectiveSave = save + ap` where ap is stored as a positive integer in `SimWeaponProfile`
+  (already negated from Contracts representation by `SimulationAdapter`).
+- If the defender has an **invulnerable save**, use whichever of armour save (AP-modified)
+  or invulnerable save is numerically lower (easier to make).
+- AP does **not** apply to invulnerable saves.
 - **Natural 1** always fails.
 - A passed save negates the wound entirely.
+- If `DevastatingWounds` triggered on this wound, skip the saving throw entirely.
 
 ### Step 4 — Damage
 
-- On a failed save, apply the weapon's **Damage** characteristic to the target's wounds.
-- Damage may be a fixed number or a dice expression (see Dice Expressions below).
-- Track total wounds inflicted across the unit. Do not model individual model wound pools unless
-  required by a future feature — for now, sum damage against total unit wounds.
-- Apply **Feel No Pain** after the save fails and before recording damage (see Special Rules).
+- On a failed save (or Devastating Wounds bypass), roll the weapon's Damage characteristic.
+- Damage may be a fixed integer or a dice expression (see Dice Expressions below).
+- Apply `DamageModifier` (±1 per wound, minimum 1) after rolling.
+- Apply Melta bonus if `withinHalfRange` is true: add `MeltaBonus` to each damage roll.
+- Apply **Feel No Pain** after damage is determined and before recording (see Special Rules).
+- Apply damage to the **wound pool** (see Wound Pool below).
+
+---
+
+## Wound Pool
+
+A `WoundPool` struct is initialised once per simulation run, shared across all weapon groups.
+
+- Models are tracked individually with their full wound count.
+- `pool.Apply(damage)` caps damage at the current model's remaining wounds — excess is
+  **lost**, not carried over to the next model.
+- When a model reaches 0 wounds it is removed and `Kills` is incremented.
+- `totalDamage` (raw post-FNP, before capping) and `pool.Kills` are tracked independently:
+  a 3-damage weapon killing a 1-wound model shows 3 Mean Damage but 1 kill.
 
 ---
 
 ## Dice Expressions
 
-Support the following formats wherever attacks or damage values are specified in YAML:
+`DiceExpression` supports:
 
-| Expression | Meaning                        |
-|------------|--------------------------------|
-| `1`        | Fixed value of 1               |
-| `D3`       | Roll 1 three-sided die         |
-| `D6`       | Roll 1 six-sided die           |
-| `2D6`      | Roll 2 six-sided dice, sum     |
-| `D6+2`     | Roll D6, add 2                 |
-| `2D3+1`    | Roll 2D3, add 1                |
+| Expression | Meaning               |
+|------------|-----------------------|
+| `1`        | Fixed value of 1      |
+| `D3`       | Roll 1 three-sided die |
+| `D6`       | Roll 1 six-sided die  |
+| `2D6`      | Roll 2D6, sum         |
+| `D6+2`     | Roll D6, add 2        |
+| `2D3+1`    | Roll 2D3, add 1       |
 
-Parse these at load time into a structured type (`DiceExpression`) with `count`, `sides`,
-and `modifier` fields. Roll them in `DiceRoller`.
+`Count=0` means a fixed value stored in `Modifier`. Has `Scale(n)` and `Add(other)` for
+attack aggregation (see Multi-Weapon Aggregation below).
+
+`RollWithReroll(DiceExpression)` on `IDiceRoller` — rolls each die individually and rerolls
+once if ≤ `sides/2` (D6 threshold: 3; D3 threshold: 1). Fixed expressions pass through
+unchanged.
+
+---
+
+## Multi-Weapon Aggregation
+
+The simulation supports firing multiple weapons simultaneously (e.g. multiple models with
+the same weapon profile firing in the same phase).
+
+**Weapon equality key:** `(Type, Skill, Strength, Ap, Damage, Abilities)`. Attacks are
+**excluded** — they are the quantity being aggregated, not part of the weapon's identity.
+
+**Attack aggregation:**
+- Fixed attacks: Σ(attacks × modelCount) → `DiceExpression.Fixed(total)`
+- Dice attacks: 3 models × D6 → `3D6` (correct distribution, not roll-once-multiply)
+- `DiceExpression.Add` requires same `Sides` when both have dice
+
+**Phase constraint:** shooting and melee are mutually exclusive per simulation run. The UI
+enforces this — first weapon selected locks the phase type.
 
 ---
 
 ## Weapon Abilities
 
-All abilities are opt-in. Absence of an ability in the YAML means it does not apply.
+All abilities are opt-in. `0` or `false` means the ability is not present.
 
 ### Torrent
-- The weapon automatically hits. Skip the hit roll entirely for all attacks.
+Auto-hits. Skip the hit roll entirely.
 
 ### Blast
-- Each time you determine how many attacks are made with a Blast weapon, add 1 to the result for every five models that were in the target unit when you selected it as the target (rounding down).
-- Model count comes from `defender.models` in the profile.
+Add 1 attack per 5 defender models (rounded down) each time attacks are determined.
+`defender.Models` is the value after any `DefenderModelCount` override.
 
 ### Melta X
-- If `withinHalfRange: true` on the attacker profile, add X to each damage roll.
-- X is the numeric value of the Melta ability (e.g. `melta: 2` adds 2 to damage).
+Add X to each damage roll when `withinHalfRange` is true. Stored as a positive integer;
+`0` = not present.
 
 ### Rapid Fire X
-- If `withinHalfRange: true`, add X additional attacks to the weapon's attack count.
+Add X additional attacks when `withinHalfRange` is true. Stored as a positive integer;
+`0` = not present. Applied after attack dice roll, before `AttackModifier`.
 
 ### Sustained Hits X
-- Each **Critical Hit** on the hit roll generates X additional hits.
-- These additional hits do not trigger further Sustained Hits.
+Each Critical Hit on the hit roll generates X additional hits. Additional hits do not
+trigger further Sustained Hits.
 
 ### Lethal Hits
-- A **Critical Hit** on the hit roll causes an automatic wound. Skip the wound roll for that hit.
-- The automatic wound still proceeds to the saving throw.
-- Compatible with Sustained Hits — additional hits from Sustained Hits do not benefit from
-  Lethal Hits unless that hit roll is itself a Critical Hit.
+A Critical Hit on the hit roll causes an automatic wound — skip the wound roll.
+The auto-wound still proceeds to the saving throw.
+Sustained Hits additional hits do not benefit from Lethal Hits (only original Critical Hits do).
 
 ### Devastating Wounds
-- A **Critical Wound** on the wound roll causes **mortal wounds** equal to the weapon's Damage.
-- Skip the saving throw for that wound. Feel No Pain still applies.
-- Roll damage dice separately for each Devastating Wounds trigger.
+A Critical Wound bypasses the saving throw. The wound deals mortal wounds equal to the
+weapon's Damage characteristic. FNP still applies. Roll damage dice separately per trigger.
 
-### Anti
-- If a weapon has `abilities.anti.keyword: x` and `defender.keywords` contains `keyword`, then an unmodified Wound roll of ‘x+’ scores a Critical Wound.
+### Anti (keyword: threshold)
+If the weapon has `anti[keyword]: x` and the defender has that keyword, an unmodified wound
+roll of x or higher scores a Critical Wound. The lower of Anti threshold and `CriticalWoundsOn`
+wins. Stored as `Dictionary<string, int>`.
 
-### Twin-linked
-- Each time an attack is made with a Twin-Linked weapon, you can re-roll that attack’s Wound roll.
-- Identfied by `twinLinked: true` on the weapon's abilities
+### Twin-Linked
+Re-roll the wound roll for each attack made with this weapon. Applied as `woundRerollAll`
+scoped to this weapon.
+
+### Indirect Fire
+Use a fixed skill target of 4 regardless of BS/WS. Torrent takes priority.
 
 ---
 
-## Core Special Rules
+## Special Rules
 
 ### Critical Hit
-- The hit is always successful
-- Usually a natural 6 on the hit roll
-- Some attacker profiles can adjust this lower, specified by `criticalHitsOn: 5`, meaning that a natural 5 or 6 on the dice roll is a Critical Hit
+Natural 6 on the hit roll (or lower if `CriticalHitsOn` is reduced, e.g. `criticalHitsOn: 5`
+means natural 5 or 6). Detection uses the **raw unmodified die result**.
 
 ### Critical Wound
-- The wound is always successful
-- Usually a natural 6 on the wound roll
-- Some weapon abilities can adjust this lower
+Natural 6 on the wound roll (or lower if `CriticalWoundsOn` is reduced by Anti or the
+Crit Wound on 5+ modifier). Detection uses the **raw unmodified die result**.
 
 ### Rerolls
 
-Support the following independently for hit and wound steps:
+Configured on `SimAttackerProfile`:
 
-- `hitRerollOnes: true` — reroll hit roll results of 1 (before modifiers)
-- `hitRerollAll: true` — reroll all failed hit rolls (before modifiers)
-- `woundRerollOnes: true` — reroll wound roll results of 1
-- `woundRerollAll: true` — reroll all failed wound rolls
+| Field | Effect |
+|---|---|
+| `HitRerollOnes` | Reroll hit rolls of 1 before modifiers |
+| `HitRerollAll` | Reroll all failed hit rolls before modifiers |
+| `WoundRerollOnes` | Reroll wound rolls of 1 |
+| `WoundRerollAll` | Reroll all failed wound rolls |
+| `FishForCriticalHits` | Sub-option of HitRerollAll — reroll any result below `criticalHitsOn` |
+| `FishForCriticalWounds` | Sub-option of WoundRerollAll — reroll any result below `criticalWoundsOn` |
 
-Each die may only be rerolled once. `rerollAll` takes precedence over `rerollOnes` if both
-are somehow set.
+Each die may only be rerolled once. `RerollAll` takes precedence over `RerollOnes`.
 
 ### Feel No Pain (FNP)
-
-- After a failed save (or after a Devastating Wounds trigger), roll a D6 for each wound.
-- On a result equal to or greater than the FNP value, the wound is ignored.
-- Specified as `feelNoPain: 5` (meaning 5+) in the defender profile.
+After a failed save or Devastating Wounds trigger, roll a D6 per wound point. On a result
+≥ the FNP value, that wound is ignored. Stored as a raw integer (e.g. `5` means 5+++).
 
 ### Invulnerable Save
-
-- A separate save value unaffected by AP.
-- The defender always uses whichever of their armour save (modified by AP) or invulnerable
-  save is numerically lower (easier to make).
-- Specified as `invulnerableSave: 4` in the defender profile.
+Unaffected by AP. Defender uses whichever of armour save (AP-modified) or invulnerable save
+is numerically lower. Stored as a raw integer (e.g. `4` means 4++). `null` if absent.
 
 ---
 
-## YAML Profile Schema
+## AP Sign Convention
 
-### Top-level config keys
+**In `UnitProfile` / Contracts:** AP is stored as a **negative integer** matching the game
+value (e.g. AP-2 → `-2`).
 
-```yaml
-simulationRuns: 100000       # optional, default 100000
-attacker:
-  ...
-defender:
-  ...
-```
+**In `SimWeaponProfile` / the engine:** AP is stored as a **positive integer**. 
+`SimulationAdapter` negates it: `simAp = -contractsAp`.
 
-### Attacker profile
-
-```yaml
-attacker:
-  name: "Intercessor Squad"
-  models: 5
-  weapon:
-    name: "Bolt Rifle"
-    attacks: 2               # fixed int or dice expression string e.g. "D6"
-    skill: 3                 # hit on 3+
-    strength: 4
-    ap: 1                    # stored as positive int; subtract from save
-    damage: 1                # fixed int or dice expression string
-    abilities:
-      torrent: false
-      blast: false
-      melta: 0               # 0 means not active; set to X for Melta X
-      rapidFire: 1           # 0 means not active; set to X for Rapid Fire X
-      sustainedHits: 0       # 0 means not active; set to X for Sustained Hits X
-      lethalHits: false
-      devastatingWounds: false
-      anti:
-        Psyker: 4
-        Character: 2
-      twinLinked: false
-    withinHalfRange: false
-  rerolls:
-    hitRerollOnes: false
-    hitRerollAll: false
-    woundRerollOnes: false
-    woundRerollAll: false
-  criticalHitsOn: 5          # the minimum value on the hit roll to count as a Critical Hit
-```
-
-### Defender profile
-
-```yaml
-defender:
-  name: "Space Marine Squad"
-  models: 10
-  toughness: 4
-  save: 3                    # armour save, e.g. 3 means 3+
-  invulnerableSave: null     # null or an int e.g. 4
-  wounds: 2                  # wounds per model (used for total pool = models × wounds)
-  feelNoPain: null           # null or an int e.g. 5
-  keywords:
-    - Psyker
-    - Vehicle
-    - Character
-```
+`AbilityProcessor.EffectiveSave` does: `effectiveSave = save + ap` (positive ap value).
+Do not change either side without updating both.
 
 ---
 
-## Output Requirements
+## Simulation Output
 
-### Console summary
+`CombatSimulator.Run()` returns:
+- `IReadOnlyList<int> Damage` — raw total damage per run (post-FNP, pre-wound-pool-cap)
+- `IReadOnlyList<int> Kills` — model kills per run
+- `CombatStageStats Aggregate` — per-stage averages across all weapon groups
+- `IReadOnlyList<WeaponGroupStats> PerWeapon` — per-group breakdown (one entry per distinct weapon group)
 
-After simulation, print:
-
-```
---- Results: Intercessors vs Space Marines (100,000 runs) ---
-Mean damage  : 4.21
-Median       : 4
-Std deviation: 1.87
-Min          : 0
-Max          : 12
-
-Damage  Probability  Cumulative
-0       3.21%        3.21%
-1       7.45%        10.66%
-...
-```
-
-### ASCII bar chart
-
-Render using **Spectre.Console**. Damage values on the X axis, probability % on the Y axis.
-Keep it readable in an 80-column terminal.
-
-### CSV export (`--csv` flag)
-
-Write a file named `<config-filename>-results.csv` in the same directory as the config file.
-Columns: `Damage,Probability,CumulativeProbability`
+`SimulationResponse` exposes: mean damage, expected kills, P(kill ≥ 1), stddev, `StageStats`,
+and `WeaponBreakdown` (empty for single-group runs).
 
 ---
 
-## Implementation Notes
+## Combat Stage Statistics Fields
 
-- Simulate each **individual attack** through the full sequence — do not batch rolls.
-- For each simulation run, loop over `attacker.models × weapon.attacks` attacks.
-- Resolve Blast minimum attack count once per run, before the attack loop.
-- Roll Melta and Rapid Fire additional attacks/damage only when `withinHalfRange: true`.
-- Natural 6 detection must happen on the **raw die result**, before any modifier is applied.
-- Rerolls must be applied **before** modifier caps are calculated.
-- Total damage per run = sum of all damage that passes the full sequence (including FNP).
-- Record total damage per run in a results list; derive the distribution from that list.
+Tracked per weapon group, summed for aggregate:
+
+| Field | What it counts |
+|---|---|
+| `AvgAttacks` | Attack dice rolled (including Rapid Fire, excluding SH bonus hits) |
+| `AvgHits` | Attacks that hit (including SH bonus hits; Torrent auto-hits counted) |
+| `AvgCritHits` | Hits that were Critical Hits |
+| `AvgSustainedHitsBonus` | Extra hits from Sustained Hits |
+| `AvgWounds` | Successful wound rolls (including Lethal Hits auto-wounds) |
+| `AvgCritWounds` | Wounds scoring a Critical Wound |
+| `AvgLethalHitsAutoWounds` | Wounds that bypassed the wound roll via Lethal Hits |
+| `AvgAntiCritWounds` | Wounds that became crit wounds only because Anti lowered threshold below 6 |
+| `AvgFailedSaves` | Save rolls that failed (excludes DevW bypasses) |
+| `AvgDevastatingWoundsTriggers` | Wounds that bypassed the save via Devastating Wounds |
+| `AvgArmourSaveRolls` | Rolls made against the armour save |
+| `AvgInvulnSaveRolls` | Rolls made against the invulnerable save |
+| `AvgDamageBeforeFnp` | Raw damage reaching the FNP step |
+| `AvgFnpSaved` | Damage points negated by FNP |
