@@ -36,11 +36,38 @@ Feature acceptance criteria:
 
 ---
 
+### Session 1 — Project Scaffolding
+**Status:** Complete  
+**What happened:**
+- Created `Wh40kArmyEnricher.sln` with three projects: Core (classlib), Web (Razor Pages), Tests (xUnit)
+- Added all package dependencies: FuzzySharp 2.0.2, YamlDotNet 17.0.1, FluentAssertions 8.9.0, Moq 4.20.72
+- Wired Core → Web and Core → Tests project references
+- Set up directory structure: `Core/{Contracts,Parsing,Catalogue,Enrichment,Simulation}/`, `Web/Pages/`, `Web/wwwroot/`, `Tests/Fixtures/`, `Tests/Parsing/`
+- Wrote stub Program.cs with Razor Pages, session, IHttpClientFactory
+- Created placeholder Index and ArmyView Razor Pages (Index returns HTTP 200)
+- Created SessionJson.cs stub (ScalarValueJsonConverter to be added in Session 5)
+- Created Dockerfile and docker-compose.yml with catalogue-cache volume
+- Copied sample fixture files (black-templars-sample.txt, death-guard.txt) into Tests/Fixtures/
+- Created 2 skipped stub tests in ArmyListParserTests.cs
+
+**Build state:** `dotnet build` → 0 errors, 0 warnings. `dotnet test` → 2 skipped. `dotnet run` → HTTP 200 on `/`.
+
+**Decisions made:**
+- Used `dotnet new web` (minimal API template) then converted to Razor Pages manually in Program.cs — avoids MVC overhead
+- YamlDotNet 17.0.1 installed (spec mentions 16.3.0 new interface; 17.x should have same interface — verify in Session 2 when implementing YAML serialisation)
+- FluentAssertions 8.9.0 installed (major version bump from any previous — check for breaking API changes in Session 2 when writing tests)
+- `ScalarValueJsonConverter` not yet implemented (placeholder in SessionJson.cs) — Session 2 will define `DiceExpression`/`ScalarValue` and the converter together
+
+**Spec gaps discovered:**
+- None in this session — scaffolding is structure-only and the spec covers it well
+
+---
+
 ## Current State
 
 | Layer | Status | Notes |
 |---|---|---|
-| Project scaffolding | ❌ Not started | |
+| Project scaffolding | ✅ Complete | Builds, tests pass (2 skipped), serves HTTP 200 |
 | Domain model / types | ❌ Not started | |
 | Simulation engine | ❌ Not started | |
 | BSData parsing | ❌ Not started | |
@@ -58,7 +85,7 @@ Record gaps discovered during generation here. Each entry should note:
 - What Claude Code assumed or asked about
 - Whether the spec was updated as a result
 
-*(Empty — no sessions run yet)*
+*(Empty — no gaps found in Session 1)*
 
 ---
 
@@ -67,12 +94,17 @@ Record gaps discovered during generation here. Each entry should note:
 > Paste this at the start of the next Claude Code session:
 
 "Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for current
-build state. Your goal this session is **Session 1: Project Scaffolding**. Create
-the project directory structure, package.json, tsconfig (if applicable), any
-config files, and entry point stubs — but no business logic. The app should
-start and serve something (even a placeholder) by the end of this session.
-When done, update PROGRESS.md: mark scaffolding complete, record any decisions
-made or spec gaps discovered, and rewrite the Resume Prompt section for Session 2."
+build state. Your goal this session is **Session 2: Domain Model and Types**.
+Implement all domain records (ArmyList, UnitEntry, ModelEntry, WeaponEntry,
+UnitProfile, WeaponVariantProfile, WeaponAbilities, AbilityProfile, etc.) in
+`src/Wh40kArmyEnricher.Core/Contracts/`. Implement `ArmyListParser` (all three
+format variants: iOS current, iOS legacy, Android) in
+`src/Wh40kArmyEnricher.Core/Parsing/`. Implement `DiceExpression` and
+`ScalarValue` (needed for UnitProfile serialisation) in Core. Add
+`ScalarValueJsonConverter` to `SessionJson.cs`. Write real tests for the parser
+in `tests/Wh40kArmyEnricher.Tests/Parsing/` (replacing the stubs) — both iOS
+Black Templars and Android Death Guard fixtures. All tests must pass. Done-state:
+`dotnet test` green, no skipped tests."
 
 ---
 
@@ -80,7 +112,7 @@ made or spec gaps discovered, and rewrite the Resume Prompt section for Session 
 
 | Session | Goal | Done-state |
 |---|---|---|
-| 1 | Project scaffolding | App starts and serves a placeholder |
+| 1 | Project scaffolding | App starts and serves a placeholder ✅ |
 | 2 | Domain model and types | Parser records, UnitProfile, name matching — no UI deps |
 | 3 | Simulation engine | Engine types, modifier tables, wound pool — unit-testable |
 | 4 | BSData parsing | Catalogue load, XML two-pass — testable with a sample file |

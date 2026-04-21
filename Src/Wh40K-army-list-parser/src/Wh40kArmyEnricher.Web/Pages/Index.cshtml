@@ -1,0 +1,30 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Army Lists";
+}
+
+<main class="index-page">
+    <h1>Wh40K Combat Simulator</h1>
+    <p>Paste two army list exports below and click Enrich to begin.</p>
+
+    <form method="post">
+        <div class="army-inputs">
+            <div class="army-input">
+                <label for="AttackerList">Attacker Army List</label>
+                <textarea id="AttackerList" name="AttackerList" rows="20" placeholder="Paste attacker army list here...">@Model.AttackerList</textarea>
+            </div>
+            <div class="army-input">
+                <label for="DefenderList">Defender Army List</label>
+                <textarea id="DefenderList" name="DefenderList" rows="20" placeholder="Paste defender army list here...">@Model.DefenderList</textarea>
+            </div>
+        </div>
+
+        @if (Model.ErrorMessage is not null)
+        {
+            <div class="error-message">@Model.ErrorMessage</div>
+        }
+
+        <button type="submit">Enrich</button>
+    </form>
+</main>
