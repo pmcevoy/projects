@@ -63,12 +63,38 @@ Feature acceptance criteria:
 
 ---
 
+### Session 2 — Domain Model and Types
+**Status:** Complete  
+**What happened:**
+- Implemented all domain records in `Core/Contracts/`: `ArmyList`, `UnitEntry`, `ModelEntry`, `WeaponEntry`
+- Implemented all enriched profile types: `UnitProfile`, `ModelProfile`, `WeaponProfile`, `WeaponVariantProfile`, `WeaponAbilities`, `AbilityProfile`, `RerollProfile`, `WeaponType`
+- Implemented `ScalarValue` (string-wrapper struct with private backing field) and `ScalarValueJsonConverter` in `Core/Contracts/ScalarValue.cs`
+- Implemented `DiceExpression` (Count/Sides/Modifier; `Parse`, `Fixed`, `Scale`, `Add`) in `Core/Simulation/DiceExpression.cs`
+- Implemented `ArmyListParser` in `Core/Parsing/ArmyListParser.cs` — handles all three format variants (iOS current, iOS legacy, Android) via unified `ClassifyBulletLine`
+- Updated `SessionJson.cs` to add `ScalarValueJsonConverter` to `Options.Converters`
+- Replaced parser stubs with 20 iOS tests (`ArmyListParserTests.cs`) and 18 Android tests (`ArmyListParserAndroidTests.cs`)
+- Added fixture `CopyToOutputDirectory` to test csproj
+
+**Build state:** `dotnet build` (Core + Tests) → 0 errors. `dotnet test` → 38 passed, 0 skipped, 0 failed.
+
+**Decisions made:**
+- Format detection: presence of `◦` (U+25E6) anywhere in the text → iOS; absence → Android
+- `ClassifyBulletLine` unified for all formats: `◦` always Level 1; `•` at < 4 spaces → Level 0; `•` at ≥ 4 spaces → Level 1 (Android squad weapon); 4+ space text → Level 1, no-bullet (Android continuation)
+- Model mode detected by presence of any Level-1 + IsBullet line in the unit block
+- Single-model units (no model-mode): all bullet and continuation items become weapons; synthetic `ModelEntry` named after the unit
+- `ScalarValue` has no dependency on `DiceExpression` — the sim engine calls `DiceExpression.Parse(scalarValue.ToString())` directly
+
+**Spec gaps discovered:**
+- None — the format specs in domain-model.md and implementation-notes.md were sufficient
+
+---
+
 ## Current State
 
 | Layer | Status | Notes |
 |---|---|---|
 | Project scaffolding | ✅ Complete | Builds, tests pass (2 skipped), serves HTTP 200 |
-| Domain model / types | ❌ Not started | |
+| Domain model / types | ✅ Complete | 38 tests, all passing |
 | Simulation engine | ❌ Not started | |
 | BSData parsing | ❌ Not started | |
 | Web app shell | ❌ Not started | |
@@ -94,16 +120,16 @@ Record gaps discovered during generation here. Each entry should note:
 > Paste this at the start of the next Claude Code session:
 
 "Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for current
-build state. Your goal this session is **Session 2: Domain Model and Types**.
-Implement all domain records (ArmyList, UnitEntry, ModelEntry, WeaponEntry,
-UnitProfile, WeaponVariantProfile, WeaponAbilities, AbilityProfile, etc.) in
-`src/Wh40kArmyEnricher.Core/Contracts/`. Implement `ArmyListParser` (all three
-format variants: iOS current, iOS legacy, Android) in
-`src/Wh40kArmyEnricher.Core/Parsing/`. Implement `DiceExpression` and
-`ScalarValue` (needed for UnitProfile serialisation) in Core. Add
-`ScalarValueJsonConverter` to `SessionJson.cs`. Write real tests for the parser
-in `tests/Wh40kArmyEnricher.Tests/Parsing/` (replacing the stubs) — both iOS
-Black Templars and Android Death Guard fixtures. All tests must pass. Done-state:
+build state. Your goal this session is **Session 3: Simulation Engine**.
+Implement the full Monte Carlo simulation engine in
+`src/Wh40kArmyEnricher.Core/Simulation/`: `IDiceRoller` / `DiceRoller`,
+`WoundPool`, `SimAttackerProfile`, `SimDefenderProfile`, `SimWeaponProfile`,
+`SimWeaponAbilities`, `CombatStageStats`, `WeaponGroupStats`, `RunTally`,
+`RunTotals`, `AbilityProcessor`, and `CombatSimulator`. Follow the attack
+sequence and all weapon ability rules in `.claude/rules/combat-rules.md` exactly.
+Implement `SimulationAdapter` in `Core/Simulation/` that bridges `UnitProfile`
+(Contracts) → `SimulationConfig`. Write unit tests for all engine components in
+`tests/Wh40kArmyEnricher.Tests/Simulation/`. All tests must pass. Done-state:
 `dotnet test` green, no skipped tests."
 
 ---
