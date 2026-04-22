@@ -36,11 +36,11 @@ public record DiceExpression
     public static DiceExpression Fixed(int value) =>
         new() { Count = 0, Sides = 0, Modifier = value };
 
-    /// <summary>Multiply this expression by n (e.g. 3 models × D6 → 3D6).</summary>
+    /// <summary>Multiply this expression by n (e.g. 3 models × D6+1 → 3D6+3).</summary>
     public DiceExpression Scale(int n)
     {
         if (Count == 0) return Fixed(Modifier * n);
-        return this with { Count = Count * n };
+        return this with { Count = Count * n, Modifier = Modifier * n };
     }
 
     /// <summary>Add two dice expressions. Both dice components must have the same Sides.</summary>

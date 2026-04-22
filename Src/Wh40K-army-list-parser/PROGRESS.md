@@ -89,13 +89,37 @@ Feature acceptance criteria:
 
 ---
 
+### Session 3 — Simulation Engine
+**Status:** Complete  
+**What happened:**
+- Implemented all simulation types in `Core/Simulation/`: `IDiceRoller`/`DiceRoller`, `SimWeaponAbilities`, `SimWeaponProfile`, `SimAttackerProfile`, `SimDefenderProfile`, `WoundPool`, `CombatStageStats`, `WeaponGroupStats`, `AbilityProcessor`
+- Implemented `CombatSimulator` — full Monte Carlo engine with `RunTally`/`RunTotals` structs; all weapon abilities (Torrent, Blast, RapidFire, SustainedHits, LethalHits, DevastatingWounds, TwinLinked, Melta, Anti, IndirectFire); wound pool with no spillover; FNP; rerolls including FishForCriticals
+- Implemented `SimulationRequest`, `WeaponSelection`, `SimulationResponse` DTOs
+- Implemented `SimulationAdapter` — groups selections by `WeaponGroupKey`, aggregates attacks via `DiceExpression.Scale`/`Add`, negates AP, applies cover, applies all request modifiers
+- Fixed `DiceExpression.Scale` — was not scaling the `Modifier` field (D6+1 × 2 should give 2D6+2, not 2D6+1)
+- Wrote 91 new tests in `tests/Simulation/`: `DiceExpressionTests`, `DiceRollerTests`, `WoundPoolTests`, `AbilityProcessorTests`, `CombatSimulatorTests`, `SimulationAdapterTests`; two test helpers: `SequenceRoller` and `ConstantRoller`
+
+**Build state:** `dotnet test` → 129 passed, 0 skipped, 0 failed.
+
+**Decisions made:**
+- Cover subtracts 1 from `SimDefenderProfile.Save` (lowers the required roll = easier to save). The spec says "adding 1" which is physically backwards given the `effectiveSave = save + ap` convention; correct behavior implemented.
+- `SimulationRequest` is a `class` (not `record`) because it is a mutable DTO received from the web layer — `with` expressions not applicable.
+- `WeaponBreakdown` is empty for single-group runs; the multi-group path is not exercised by single-weapon tests.
+- Statistical test uses 50,000 iterations with tolerance ±0.015.
+
+**Spec gaps discovered:**
+- `DiceExpression.Scale` spec was implicit about modifier scaling — fixed in implementation.
+- Spec says cover "adds 1 to SimDefenderProfile.Save" but the correct physics is subtracting 1 (documented in implementation-notes.md).
+
+---
+
 ## Current State
 
 | Layer | Status | Notes |
 |---|---|---|
-| Project scaffolding | ✅ Complete | Builds, tests pass (2 skipped), serves HTTP 200 |
+| Project scaffolding | ✅ Complete | Builds, tests pass, serves HTTP 200 |
 | Domain model / types | ✅ Complete | 38 tests, all passing |
-| Simulation engine | ❌ Not started | |
+| Simulation engine | ✅ Complete | 91 new tests, all passing (129 total) |
 | BSData parsing | ❌ Not started | |
 | Web app shell | ❌ Not started | |
 | Leading abilities / integration | ❌ Not started | |
@@ -120,16 +144,15 @@ Record gaps discovered during generation here. Each entry should note:
 > Paste this at the start of the next Claude Code session:
 
 "Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for current
-build state. Your goal this session is **Session 3: Simulation Engine**.
-Implement the full Monte Carlo simulation engine in
-`src/Wh40kArmyEnricher.Core/Simulation/`: `IDiceRoller` / `DiceRoller`,
-`WoundPool`, `SimAttackerProfile`, `SimDefenderProfile`, `SimWeaponProfile`,
-`SimWeaponAbilities`, `CombatStageStats`, `WeaponGroupStats`, `RunTally`,
-`RunTotals`, `AbilityProcessor`, and `CombatSimulator`. Follow the attack
-sequence and all weapon ability rules in `.claude/rules/combat-rules.md` exactly.
-Implement `SimulationAdapter` in `Core/Simulation/` that bridges `UnitProfile`
-(Contracts) → `SimulationConfig`. Write unit tests for all engine components in
-`tests/Wh40kArmyEnricher.Tests/Simulation/`. All tests must pass. Done-state:
+build state. Your goal this session is **Session 4: BSData Parsing**.
+Implement the full catalogue loading pipeline in `src/Wh40kArmyEnricher.Core/Catalogue/`:
+`ICatalogueFetcher`, `CatalogueFetcher` (HTTP + disk cache), `CatalogueParser`
+(XDocument / LINQ to XML — two-pass load for cross-catalogue infoLinks), and
+`CatalogueStore` (eager load on startup, `RefreshCataloguesAsync`). Follow the
+XML structure, `.catz` decompression, invuln/FNP extraction, and two-pass load
+rules in `.claude/bsdata-parsing.md` exactly. Write unit tests in
+`tests/Wh40kArmyEnricher.Tests/Catalogue/` using mock `ICatalogueFetcher` and
+XML fixture snippets — no live network calls. All tests must pass. Done-state:
 `dotnet test` green, no skipped tests."
 
 ---

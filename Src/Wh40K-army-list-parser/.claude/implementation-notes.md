@@ -66,6 +66,16 @@ Static classes cannot be used as type parameters for `ILogger<T>`. Use `ILoggerF
 
 ---
 
+## Cover and SimDefenderProfile.Save
+
+Cover in 40K adds +1 to the defender's armour save roll (i.e. the die result is easier to meet the threshold). In `SimulationAdapter`, this is implemented by **subtracting 1 from `SimDefenderProfile.Save`** before the run, which lowers the required roll from `effectiveSave = save + ap`.
+
+The spec document says "adding 1 to SimDefenderProfile.Save" which is physically backwards given the `effectiveSave = save + ap` convention (a higher Save value means a harder save). Do **not** add 1; subtract 1.
+
+Cover does not affect invulnerable saves.
+
+---
+
 ## name_overrides.json
 
 Must be present in the **current working directory** when the web app starts. Example entry: `{ "Deathshroud Champion": "Deathshroud Terminator Champion" }`. The file is optional — if absent, resolution proceeds without overrides.
