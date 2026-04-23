@@ -27,8 +27,20 @@ public sealed class CatalogueFetcher : ICatalogueFetcher
         if (File.Exists(cacheFile))
         {
             var cached = await File.ReadAllTextAsync(cacheFile, ct);
-            var result = JsonSerializer.Deserialize<List<CatalogueFileInfo>>(cached);
-            if (result is { Count: > 0 }) return result;
+            // Try current object format first; fall back to legacy string-array format
+            try
+            {
+                var result = JsonSerializer.Deserialize<List<CatalogueFileInfo>>(cached);
+                if (result is { Count: > 0 }) return result;
+            }
+            catch (JsonException) { }
+            try
+            {
+                var strings = JsonSerializer.Deserialize<List<string>>(cached);
+                if (strings is { Count: > 0 })
+                    return strings.Select(s => new CatalogueFileInfo(s)).ToList();
+            }
+            catch (JsonException) { }
         }
 
         _logger.LogInformation("Fetching BSData catalogue list from GitHub");

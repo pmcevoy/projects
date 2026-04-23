@@ -1,47 +1,244 @@
-/* Placeholder styles — full implementation in Session 5 */
+:root {
+    --bg: #1a1a2e;
+    --bg2: #16213e;
+    --bg3: #0f3460;
+    --accent: #c0392b;
+    --text: #e0e0e0;
+    --text-dim: #a0a0b0;
+    --amber: #f1a94e;
+    --border: #2a2a4e;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
     font-family: system-ui, sans-serif;
-    margin: 0;
-    padding: 1rem;
-    background: #1a1a2e;
-    color: #e0e0e0;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.4;
 }
 
-h1 { color: #c0392b; }
+h1 { color: var(--accent); margin-bottom: 0.75rem; }
+h2 { color: var(--accent); font-size: 1rem; margin-bottom: 0.5rem; }
 
-.army-inputs {
-    display: flex;
-    gap: 1rem;
-}
+/* ── Index page ── */
 
-.army-input {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
+.index-page { padding: 1rem; max-width: 1200px; margin: 0 auto; }
+.index-page p { margin-bottom: 1rem; color: var(--text-dim); }
+
+.army-inputs { display: flex; gap: 1rem; }
+.army-input { flex: 1; display: flex; flex-direction: column; gap: 0.4rem; }
+.army-input label { font-weight: 600; color: var(--text-dim); font-size: 0.85rem; }
 
 textarea {
     width: 100%;
-    background: #16213e;
-    color: #e0e0e0;
-    border: 1px solid #0f3460;
+    background: var(--bg2);
+    color: var(--text);
+    border: 1px solid var(--bg3);
     padding: 0.5rem;
     font-family: monospace;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    resize: vertical;
+    min-height: 300px;
 }
+
+textarea:focus { outline: 1px solid var(--accent); }
 
 button[type="submit"] {
     margin-top: 1rem;
-    padding: 0.75rem 2rem;
-    background: #c0392b;
+    padding: 0.65rem 2rem;
+    background: var(--accent);
     color: white;
     border: none;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
 }
 
-.error-message {
-    color: #e74c3c;
+button[type="submit"]:hover { opacity: 0.85; }
+
+.error-message { color: #e74c3c; margin-top: 0.5rem; font-size: 0.9rem; }
+
+/* ── Army view layout ── */
+
+.army-view { padding: 0.75rem; }
+
+.catalogue-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.catalogue-versions { display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1; }
+
+.catalogue-badge {
+    background: var(--bg3);
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+
+.catalogue-badge small { opacity: 0.7; }
+
+.btn-refresh {
+    padding: 0.3rem 0.75rem;
+    background: var(--bg3);
+    color: var(--text);
+    border: 1px solid #3a4a6e;
+    cursor: pointer;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.btn-refresh:hover { background: #1a3468; }
+.btn-refresh:disabled { opacity: 0.6; cursor: default; }
+
+.army-columns {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.army-column { flex: 1; min-width: 0; }
+
+/* ── Unit card ── */
+
+.unit-card {
+    margin-bottom: 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.unit-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg2);
+    cursor: pointer;
+    user-select: none;
+}
+
+.unit-card-header:hover { background: var(--bg3); }
+
+.unit-name { font-weight: 600; flex: 1; font-size: 0.9rem; }
+
+.unit-statline {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    font-family: monospace;
+}
+
+.invuln { color: #7ec8e3; }
+.fnp { color: #7ecc88; }
+
+.collapse-icon {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    transition: transform 0.15s;
+}
+
+.unit-card.open .collapse-icon { transform: rotate(90deg); }
+
+.unit-card-body {
+    background: var(--bg);
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+/* ── Keywords ── */
+
+.keywords {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+    font-variant: small-caps;
+    letter-spacing: 0.03em;
+}
+
+/* ── Model section ── */
+
+.model-section { margin-bottom: 0.5rem; }
+.model-label { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 0.25rem; }
+
+/* ── Weapon table ── */
+
+.weapon-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+}
+
+.weapon-table th {
+    text-align: left;
+    color: var(--text-dim);
+    font-weight: 400;
+    padding: 0.15rem 0.4rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.weapon-table td {
+    padding: 0.2rem 0.4rem;
+    border-bottom: 1px solid #1e1e3e;
+    white-space: nowrap;
+}
+
+.weapon-table td.weapon-name { font-weight: 500; white-space: normal; }
+.weapon-table td.abilities-cell { white-space: normal; color: var(--text-dim); font-size: 0.73rem; }
+
+.weapon-row:hover td { background: var(--bg2); cursor: pointer; }
+.weapon-row.selected-attacker td { background: rgba(192, 57, 43, 0.25); }
+.weapon-row.weapon-type-locked td { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Unit card selection states ── */
+
+.unit-card.selected-defender .unit-card-header { background: #1a2e4a; border-left: 3px solid #4a90d9; }
+
+/* ── Ability blocks ── */
+
+.ability-block {
     margin-top: 0.5rem;
+    font-size: 0.78rem;
+}
+
+.ability-block summary {
+    cursor: pointer;
+    color: var(--text-dim);
+    padding: 0.2rem 0;
+    user-select: none;
+}
+
+.ability-block.leading summary { color: var(--amber); }
+
+.ability { margin: 0.25rem 0; line-height: 1.5; }
+.ability strong { color: var(--text); }
+
+/* ── Combat panel (placeholder for Session 6) ── */
+
+.combat-panel {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 700px) {
+    .army-columns { flex-direction: column; }
+    .army-inputs { flex-direction: column; }
+    .catalogue-bar { flex-direction: column; align-items: flex-start; }
 }

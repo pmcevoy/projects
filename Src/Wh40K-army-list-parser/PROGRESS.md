@@ -113,6 +113,35 @@ Feature acceptance criteria:
 
 ---
 
+### Session 5 — Web App Shell
+**Status:** Complete  
+**What happened:**
+- Implemented `Enricher.cs` — full name matching (exact → count-stripped → fuzzy ≥85 → prefix), weapon resolution (model scope → unit scope → global fallback), statline resolution (single-model vs squad), ability/keyword gathering, leading abilities, ability-upgrade silent skip
+- Implemented `CatalogueStartupService.cs` — `IHostedService` that calls `CatalogueStore.InitialiseAsync` on startup; errors logged but don't crash the app
+- Updated `Program.cs` — registered named "github" HTTP client (User-Agent), `ICatalogueFetcher`/`CatalogueFetcher` (singleton with factory), `CatalogueStore`, `ArmyListParser`, `Enricher` (all singletons), `POST /api/refresh-catalogues` minimal API endpoint
+- Updated `SessionJson.cs` — added `CamelCaseOptions` (separate from `Options`; safe to use `PropertyNamingPolicy = CamelCase` here)
+- Updated `Index.cshtml.cs` — full POST handler: parses both armies, enriches, stores JSON in session, redirects to ArmyView; returns error if catalogues not yet loaded
+- Updated `ArmyView.cshtml.cs` — loads armies from session, resolves catalogue versions from `used_catalogue_ids`, redirects to Index if session empty
+- Updated `ArmyView.cshtml` — two-column layout, catalogue version bar, Re-download button, `<partial>` for each unit card
+- Created `_UnitCard.cshtml` — collapsed unit card with header (T/Sv/W/invuln/FNP), weapon table, ability blocks, `data-unit` camelCase JSON attribute
+- Updated `site.css` — dark theme styles for all army-view elements, weapon table, unit cards, responsive breakpoints
+- Updated `army-view.js` — `toggleCard()` expand/collapse
+- Fixed `CatalogueFetcher` — cache reader now handles legacy string-array format (stale cache compatibility)
+- Updated `_ViewImports.cshtml` — added `Core.Contracts`, `Core.Catalogue`, `Web.Helpers`, `System.Text.Json` usings
+
+**Build state:** `dotnet test` → 166 passed, 0 failed. App starts, loads 46 catalogues, Index page enriches and redirects to ArmyView.
+
+**Decisions made:**
+- `Enricher` is a singleton (stateless except `_nameOverrides` which is loaded once at construction)
+- `IndirectFire` is dropped from `CatalogueWeaponAbilities` → `WeaponAbilities` mapping — spec says it's a UI-only modifier, set via `req.IndirectFire` in `SimulationAdapter`
+- Cache format compatibility: `CatalogueFetcher` tries object format then string-array format when reading `catalogue-list.json`
+- `defenderStatlineSet` boolean used to ensure the first model's child entry can override unit-level invuln/FNP
+
+**Spec gaps discovered:**
+- Cache format migration not covered by spec — handled with try/catch fallback in `GetCatalogueListAsync`
+
+---
+
 ### Session 4 — BSData Parsing
 **Status:** Complete  
 **What happened:**
@@ -145,7 +174,7 @@ Feature acceptance criteria:
 | Domain model / types | ✅ Complete | 38 tests, all passing |
 | Simulation engine | ✅ Complete | 91 new tests, all passing (129 total) |
 | BSData parsing | ✅ Complete | 37 new tests, all passing (166 total) |
-| Web app shell | ❌ Not started | |
+| Web app shell | ✅ Complete | 166 tests, app starts, enriches armies, renders unit cards |
 | Leading abilities / integration | ❌ Not started | |
 | Gherkin scenario coverage | ❌ Not started | |
 
@@ -168,14 +197,13 @@ Record gaps discovered during generation here. Each entry should note:
 > Paste this at the start of the next Claude Code session:
 
 "Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for current
-build state. Your goal this session is **Session 5: Web App Shell**.
-Implement the ASP.NET Core web application in `src/Wh40kArmyEnricher.Web/`:
-- Register `CatalogueStore`, `CatalogueFetcher`, `IHttpClientFactory` named client 'github' (User-Agent header), and `IHostedService` that calls `CatalogueStore.InitialiseAsync` on startup
-- `SessionJson.cs` — ensure `ScalarValueJsonConverter` is in options; `PropertyNameCaseInsensitive = true`; no `PropertyNamingPolicy = CamelCase`
-- Index page — two textareas (attacker/defender army list), submit button, POST enriches both lists and stores them in session (`attacker_army`, `defender_army`, `used_catalogue_ids`)
-- ArmyView page — reads session, renders two columns of collapsed unit cards; catalogue version display; Re-download catalogues button (`POST /api/refresh-catalogues`)
-- Wire `Enricher.cs` stub (or real implementation if straightforward) to bridge `ArmyList` → `List<UnitProfile>` using `CatalogueStore`
-Follow `.claude/web-app.md` for session keys and non-obvious serialisation requirements. Done-state: app starts, Index page accepts a paste and redirects to ArmyView, `dotnet test` still green."
+build state. Your goal this session is **Session 6: Leading Abilities + Integration**.
+- Wire `SimulationAdapter` and `CombatSimulator` into the web layer: add `POST /api/simulate` endpoint that reads attacker/defender from session, deserialises `SimulationRequest` from request body, runs the simulation, and returns `SimulationResponse` as JSON
+- Implement weapon selection UI in `army-view.js`: clicking a weapon variant row on an attacker card highlights it red and stores the selection; clicking a second weapon of the same type adds it (multi-weapon); clicking a defender card highlights it blue; locking phase type on first weapon selection; clearing selections resets the phase lock
+- Implement the combat panel (`#combat-panel`) that appears when both attacker weapon(s) and defender are selected; panel contains: modifier controls (organised per simulation-engine.md section headings), Models firing input, Run Simulation button
+- Implement `displayPipeline()` in `army-view.js` to render `SimulationResponse` results: mean damage, expected kills, P(kill≥1), stddev, and the attack pipeline funnel (single-group full table vs multi-group labelled sections + combined)
+- Validate against Gherkin scenarios in `features/`
+Done-state: full round-trip works — paste armies, select weapon + defender, run simulation, see results."
 
 ---
 
