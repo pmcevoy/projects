@@ -9,8 +9,16 @@ public sealed class SimulationAdapter
     public SimulationAdapter() : this(new CombatSimulator()) { }
     public SimulationAdapter(CombatSimulator simulator) => _simulator = simulator;
 
+    // Backward-compat overload used by existing tests
     public SimulationResponse Adapt(SimulationRequest request, UnitProfile attacker, UnitProfile defender)
+        => Adapt(request, (IReadOnlyList<UnitProfile>)[attacker], defender);
+
+    public SimulationResponse Adapt(SimulationRequest request, IReadOnlyList<UnitProfile> attackers, UnitProfile defender)
     {
+        var primaryAttacker = attackers.FirstOrDefault(a =>
+            string.Equals(a.Name, request.AttackerName, StringComparison.OrdinalIgnoreCase))
+            ?? attackers[0];
+
         // Build defender profile
         int defenderModels = request.DefenderModelCount > 0 ? request.DefenderModelCount : defender.ModelCount;
         int defenderSave = defender.Save;
@@ -40,7 +48,7 @@ public sealed class SimulationAdapter
 
         foreach (var sel in request.WeaponSelections)
         {
-            var (model, weaponProfile, variant) = FindWeapon(attacker, sel);
+            var (model, weaponProfile, variant) = FindWeapon(attackers, sel);
             if (model == null || weaponProfile == null || variant == null) continue;
 
             int modelCount = sel.ModelCount > 0 ? sel.ModelCount : model.Count;
@@ -98,7 +106,7 @@ public sealed class SimulationAdapter
 
         var simAttacker = new SimAttackerProfile
         {
-            Name = attacker.Name,
+            Name = primaryAttacker.Name,
             Weapons = simWeapons,
             HitRerollOnes = request.RerollHitOnes,
             HitRerollAll = request.RerollHitAll,
@@ -106,7 +114,7 @@ public sealed class SimulationAdapter
             WoundRerollOnes = request.RerollWoundOnes,
             WoundRerollAll = request.RerollWoundAll,
             FishForCriticalWounds = request.FishForCritWounds,
-            CriticalHitsOn = request.CritHitOn5Plus ? 5 : attacker.CriticalHitsOn,
+            CriticalHitsOn = request.CritHitOn5Plus ? 5 : primaryAttacker.CriticalHitsOn,
             CriticalWoundsOn = request.CritWoundOn5Plus ? 5 : 6,
         };
 
@@ -129,8 +137,14 @@ public sealed class SimulationAdapter
     }
 
     private static (ModelProfile? model, WeaponProfile? weapon, WeaponVariantProfile? variant)
-        FindWeapon(UnitProfile attacker, WeaponSelection sel)
+        FindWeapon(IReadOnlyList<UnitProfile> attackers, WeaponSelection sel)
     {
+        var attacker = string.IsNullOrEmpty(sel.UnitName)
+            ? attackers[0]
+            : attackers.FirstOrDefault(a =>
+                string.Equals(a.Name, sel.UnitName, StringComparison.OrdinalIgnoreCase))
+              ?? attackers[0];
+
         foreach (var model in attacker.Models)
         {
             if (!string.IsNullOrEmpty(sel.ModelName) &&

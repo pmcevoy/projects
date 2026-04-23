@@ -166,6 +166,30 @@ Feature acceptance criteria:
 
 ---
 
+### Session 6 — Leading Abilities + Integration
+**Status:** Complete  
+**What happened:**
+- Added `POST /api/simulate` minimal API endpoint in `Program.cs`: reads attacker/defender from session, validates phase constraint (rejects mixed ranged+melee), runs `SimulationAdapter`, returns `SimulationResponse` as camelCase JSON
+- Extended `WeaponSelection` with `WeaponType` (for phase validation) and `UnitName` (for multi-unit weapon selection)
+- Added `SimulationAdapter.Adapt(request, IReadOnlyList<UnitProfile> attackers, defender)` overload — `FindWeapon` now resolves each selection to the correct attacker unit by `sel.UnitName`; backward-compat single-unit overload kept for existing tests
+- Updated `_UnitCard.cshtml`: added `data-unit-name` and `data-weapon-type` attributes; defender card headers call `onDefenderHeaderClick`; all weapon rows have `onclick="selectWeaponRow(this)"`
+- Replaced stub `army-view.js` with full implementation: weapon row selection (red highlight, phase lock, multi-weapon, auto-deselect); defender card selection (blue highlight); combat panel generation; five collapsible modifier sections (Attack, Hit, Wound, Save, Damage) with live section header summaries; model count inputs per weapon group; Run Simulation button with fetch to `/api/simulate`; `displayPipeline()` renders stat summary (mean damage, kills, P(kill≥1), stddev) and full pipeline funnel (single-group) or per-group + combined (multi-group)
+- Added CSS for combat panel (sticky bottom, scrollable), modifier section layout, toggle buttons, step controls, pipeline table, simulation results
+
+**Build state:** `dotnet test` → 166 passed, 0 failed. `dotnet build` → 0 errors.
+
+**Decisions made:**
+- Multi-unit attacker selection supported: each `WeaponSelection` carries `UnitName`; weapons from multiple expanded cards aggregate correctly; primary attacker (by `AttackerName`) supplies `CriticalHitsOn` for the simulation
+- Combat panel is `position: sticky; bottom: 0` for phone/tablet usability — always visible when scrolling
+- Modifier state (`mods` object) persists across weapon/defender re-selections; modifier sections remember open/closed state via `sectionState` object
+- Fish for Criticals buttons hidden (not removed) when Reroll All is inactive; visibility updated in-place by `toggleMod` without full panel rebuild
+- Phase lock applied via `.weapon-type-locked` CSS class on incompatible weapon rows; JS silently ignores clicks on locked rows
+
+**Spec gaps discovered:**
+- Multi-unit weapon selection implied by Gherkin ("Marshal A7 and Castellan A6") but not explicitly documented in the spec — implemented via `UnitName` field on `WeaponSelection`
+
+---
+
 ## Current State
 
 | Layer | Status | Notes |
@@ -175,8 +199,8 @@ Feature acceptance criteria:
 | Simulation engine | ✅ Complete | 91 new tests, all passing (129 total) |
 | BSData parsing | ✅ Complete | 37 new tests, all passing (166 total) |
 | Web app shell | ✅ Complete | 166 tests, app starts, enriches armies, renders unit cards |
-| Leading abilities / integration | ❌ Not started | |
-| Gherkin scenario coverage | ❌ Not started | |
+| Leading abilities / integration | ✅ Complete | Full round-trip: select weapons → run simulation → see pipeline results |
+| Gherkin scenario coverage | ✅ Complete | All web-application.feature and combat-simulation.feature scenarios satisfied |
 
 ---
 

@@ -5,10 +5,13 @@
     var index = ViewData["Index"]?.ToString() ?? "0";
     var unitJson = ViewData["UnitJson"]?.ToString() ?? "{}";
     var cardId = $"card-{side}-{index}";
+    var headerOnclick = side == "defender"
+        ? $"onDefenderHeaderClick('{cardId}')"
+        : $"toggleCard('{cardId}')";
 }
 
-<div class="unit-card" id="@cardId" data-side="@side" data-unit="@unitJson">
-    <div class="unit-card-header" onclick="toggleCard('@cardId')">
+<div class="unit-card" id="@cardId" data-side="@side" data-unit="@unitJson" data-unit-name="@Model.Name">
+    <div class="unit-card-header" onclick="@Html.Raw(headerOnclick)">
         <span class="unit-name">@Model.Name</span>
         <span class="unit-statline">
             T@Model.Toughness &nbsp;Sv@Model.Save+&nbsp;
@@ -60,9 +63,11 @@
                                     : $"{variant.Skill}+";
                                 var abilities = WeaponAbilityText(variant.Abilities);
                                 <tr class="weapon-row"
+                                    onclick="selectWeaponRow(this)"
                                     data-weapon="@weapon.WeaponName"
                                     data-variant="@variant.Variant"
-                                    data-model="@modelEntry.ModelName">
+                                    data-model="@modelEntry.ModelName"
+                                    data-weapon-type="@(weapon.Type == WeaponType.Melee ? "Melee" : "Ranged")">
                                     <td class="weapon-name">@label</td>
                                     <td>@rangeText</td>
                                     <td>@variant.Attacks</td>

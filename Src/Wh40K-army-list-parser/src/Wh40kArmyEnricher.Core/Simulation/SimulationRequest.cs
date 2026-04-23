@@ -6,6 +6,8 @@ public class WeaponSelection
     public string VariantName { get; set; } = "";
     public string ModelName { get; set; } = "";
     public int ModelCount { get; set; }
+    public string WeaponType { get; set; } = "";  // "Ranged" | "Melee"
+    public string UnitName { get; set; } = "";    // attacker unit this weapon belongs to
 }
 
 public class SimulationRequest

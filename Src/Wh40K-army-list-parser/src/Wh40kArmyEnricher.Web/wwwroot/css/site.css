@@ -225,7 +225,7 @@ button[type="submit"]:hover { opacity: 0.85; }
 .ability { margin: 0.25rem 0; line-height: 1.5; }
 .ability strong { color: var(--text); }
 
-/* ── Combat panel (placeholder for Session 6) ── */
+/* ── Combat panel ── */
 
 .combat-panel {
     margin-top: 1rem;
@@ -233,7 +233,240 @@ button[type="submit"]:hover { opacity: 0.85; }
     background: var(--bg2);
     border: 1px solid var(--border);
     border-radius: 4px;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    max-height: 70vh;
+    overflow-y: auto;
 }
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.panel-title { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.panel-arrow { color: var(--accent); margin: 0 0.35rem; }
+
+/* ── Weapon selections ── */
+
+.panel-selections { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.5rem; }
+
+.panel-selection {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    background: var(--bg3);
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+}
+
+.panel-sel-name { font-weight: 500; flex: 1; }
+.panel-sel-model { color: var(--text-dim); font-size: 0.75rem; }
+.panel-count-label { display: flex; align-items: center; gap: 0.25rem; color: var(--text-dim); white-space: nowrap; }
+.panel-count-input { width: 3rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 0.1rem 0.25rem; font-size: 0.8rem; text-align: center; }
+
+/* ── Modifier sections ── */
+
+.mod-section {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    margin-bottom: 0.3rem;
+}
+
+.mod-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    background: var(--bg3);
+    font-size: 0.82rem;
+}
+.mod-section-header::-webkit-details-marker { display: none; }
+.mod-section-header::before { content: '▶'; font-size: 0.6rem; color: var(--text-dim); transition: transform 0.15s; }
+.mod-section[open] > .mod-section-header::before { transform: rotate(90deg); }
+
+.mod-section-title { font-weight: 600; color: var(--text); min-width: 4rem; }
+.mod-section-summary { font-size: 0.75rem; color: var(--amber); flex: 1; }
+
+.mod-section-body {
+    padding: 0.4rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+/* ── Modifier controls ── */
+
+.mod-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.mod-toggle {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+    background: var(--bg);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.mod-toggle:hover { border-color: #4a6090; color: var(--text); }
+.mod-toggle.active { background: #2a3a6a; color: var(--text); border-color: #6a90d9; }
+
+.mod-step {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1rem 0.3rem;
+    background: var(--bg);
+}
+
+.mod-step-btn {
+    width: 1.4rem;
+    height: 1.4rem;
+    font-size: 1rem;
+    line-height: 1;
+    background: var(--bg3);
+    color: var(--text);
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.mod-step-btn:hover { background: #2a3a6a; }
+
+.mod-step-val { min-width: 2rem; text-align: center; font-family: monospace; font-size: 0.82rem; }
+.mod-step-label { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; }
+
+.anti-row { display: flex; align-items: center; gap: 0.3rem; }
+.mod-text {
+    width: 6rem;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 0.2rem 0.35rem;
+    font-size: 0.78rem;
+    border-radius: 3px;
+}
+.mod-num {
+    width: 4rem;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 0.2rem 0.35rem;
+    font-size: 0.78rem;
+    border-radius: 3px;
+    text-align: center;
+}
+.mod-select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 0.15rem 0.3rem;
+    font-size: 0.78rem;
+    border-radius: 3px;
+}
+
+/* ── Defender count row ── */
+
+.panel-row { margin: 0.4rem 0; font-size: 0.8rem; }
+.panel-label { display: flex; align-items: center; gap: 0.4rem; color: var(--text-dim); }
+
+/* ── Run button ── */
+
+.btn-run {
+    display: block;
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.55rem 1rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 3px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.btn-run:hover { opacity: 0.85; }
+.btn-run:disabled { opacity: 0.6; cursor: default; }
+
+/* ── Simulation results ── */
+
+.sim-results { margin-top: 0.75rem; }
+
+.sim-stats {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.sim-stat {
+    flex: 1;
+    min-width: 5rem;
+    background: var(--bg3);
+    border-radius: 4px;
+    padding: 0.4rem 0.6rem;
+    text-align: center;
+}
+
+.sim-stat-label { font-size: 0.7rem; color: var(--text-dim); margin-bottom: 0.15rem; }
+.sim-stat-value { font-size: 1.1rem; font-weight: 700; color: var(--text); font-family: monospace; }
+
+/* ── Pipeline funnel ── */
+
+.pipeline-weapon-header {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--amber);
+    margin: 0.5rem 0 0.2rem;
+    padding: 0.15rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.pipeline-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    margin-bottom: 0.4rem;
+}
+
+.pipeline-table th {
+    text-align: left;
+    color: var(--text-dim);
+    font-weight: 400;
+    padding: 0.15rem 0.4rem;
+    border-bottom: 1px solid var(--border);
+}
+.pipeline-table th:last-child { text-align: right; }
+
+.pipeline-table td { padding: 0.18rem 0.4rem; border-bottom: 1px solid #1a1a3a; }
+.pipeline-table td:nth-child(2) { text-align: right; font-family: monospace; }
+.pipeline-table td:nth-child(3) { text-align: right; font-family: monospace; color: var(--text-dim); font-size: 0.73rem; }
+.pipeline-table td.rate { text-align: right; font-family: monospace; color: var(--text-dim); }
+
+.pipeline-table tr.sub-row td { color: var(--text-dim); font-size: 0.73rem; }
+.sub-label { padding-left: 1rem; }
+
+.pipeline-table tr.final td { color: var(--accent); border-top: 1px solid var(--border); }
+
+.sim-error { color: #e74c3c; padding: 0.5rem; font-size: 0.85rem; }
 
 /* ── Responsive ── */
 
