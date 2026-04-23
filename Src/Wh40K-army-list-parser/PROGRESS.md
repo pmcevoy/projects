@@ -113,6 +113,30 @@ Feature acceptance criteria:
 
 ---
 
+### Session 4 — BSData Parsing
+**Status:** Complete  
+**What happened:**
+- Implemented `ICatalogueFetcher` interface and `CatalogueFileInfo` record
+- Implemented `CatalogueFetcher` — `IHttpClientFactory` named client "github", User-Agent header, GitHub raw URL with `Uri.EscapeDataString`, disk cache to `~/.wh40k-enricher/cache/`, file list cached to `catalogue-list.json`, supports `.cat`/`.catz`/`.gst`/`.gstz`
+- Implemented `CatalogueEntry.cs` domain types: `CatalogueStatline`, `CatalogueWeaponAbilities` (includes `IndirectFire` — not in Contracts `WeaponAbilities`), `CatalogueWeaponVariant`, `CatalogueWeaponEntry`, `CatalogueEntry`, `CatalogueData` (record for `with` expressions)
+- Implemented `CatalogueParser` (static class) — compiled regexes; `LoadDocumentAsync` (raw DeflateStream for `.catz`); `ExtractSharedProfiles` (pass 1); `Parse` (pass 2 using global profiles); `ParseEntry` recursive to depth 6; invuln/FNP from ability text and infoLink resolution; weapon keyword parsing; multi-profile variant label stripping
+- Implemented `CatalogueStore` — two-pass `InitialiseAsync`; `_globalProfiles` retained as field (required by `RefreshCataloguesAsync`); `RefreshCataloguesAsync` with `forceRefresh: true`; `GetAllCatalogues`, `GetCatalogue`, `GetAllTopLevelEntries`
+- Wrote 37 new tests: `CatalogueParserTests.cs` (28 tests) and `CatalogueStoreTests.cs` (9 tests)
+
+**Build state:** `dotnet test` → 166 passed, 0 skipped, 0 failed.
+
+**Decisions made:**
+- `CatalogueWeaponAbilities` is separate from Contracts `WeaponAbilities` — it includes `IndirectFire` which Contracts doesn't have. The Enricher (Session 6) will map between them.
+- `selectionEntryGroups` are flattened into children (organisational containers, not separate entries)
+- `entryLinks` resolved via per-catalogue `localShared` map (shared entries within the same catalogue); cross-catalogue links rely on the two-pass global profiles map
+- `sharedSelectionEntryGroups` entries are unwrapped and included at the top level (consistent with how the enricher will query the store)
+- `IHttpClientFactory` named client "github" — registration via DI deferred to Session 5 (web app setup)
+
+**Spec gaps discovered:**
+- None — the bsdata-parsing.md spec was sufficient, including all the gotchas
+
+---
+
 ## Current State
 
 | Layer | Status | Notes |
@@ -120,7 +144,7 @@ Feature acceptance criteria:
 | Project scaffolding | ✅ Complete | Builds, tests pass, serves HTTP 200 |
 | Domain model / types | ✅ Complete | 38 tests, all passing |
 | Simulation engine | ✅ Complete | 91 new tests, all passing (129 total) |
-| BSData parsing | ❌ Not started | |
+| BSData parsing | ✅ Complete | 37 new tests, all passing (166 total) |
 | Web app shell | ❌ Not started | |
 | Leading abilities / integration | ❌ Not started | |
 | Gherkin scenario coverage | ❌ Not started | |
@@ -144,16 +168,14 @@ Record gaps discovered during generation here. Each entry should note:
 > Paste this at the start of the next Claude Code session:
 
 "Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for current
-build state. Your goal this session is **Session 4: BSData Parsing**.
-Implement the full catalogue loading pipeline in `src/Wh40kArmyEnricher.Core/Catalogue/`:
-`ICatalogueFetcher`, `CatalogueFetcher` (HTTP + disk cache), `CatalogueParser`
-(XDocument / LINQ to XML — two-pass load for cross-catalogue infoLinks), and
-`CatalogueStore` (eager load on startup, `RefreshCataloguesAsync`). Follow the
-XML structure, `.catz` decompression, invuln/FNP extraction, and two-pass load
-rules in `.claude/bsdata-parsing.md` exactly. Write unit tests in
-`tests/Wh40kArmyEnricher.Tests/Catalogue/` using mock `ICatalogueFetcher` and
-XML fixture snippets — no live network calls. All tests must pass. Done-state:
-`dotnet test` green, no skipped tests."
+build state. Your goal this session is **Session 5: Web App Shell**.
+Implement the ASP.NET Core web application in `src/Wh40kArmyEnricher.Web/`:
+- Register `CatalogueStore`, `CatalogueFetcher`, `IHttpClientFactory` named client 'github' (User-Agent header), and `IHostedService` that calls `CatalogueStore.InitialiseAsync` on startup
+- `SessionJson.cs` — ensure `ScalarValueJsonConverter` is in options; `PropertyNameCaseInsensitive = true`; no `PropertyNamingPolicy = CamelCase`
+- Index page — two textareas (attacker/defender army list), submit button, POST enriches both lists and stores them in session (`attacker_army`, `defender_army`, `used_catalogue_ids`)
+- ArmyView page — reads session, renders two columns of collapsed unit cards; catalogue version display; Re-download catalogues button (`POST /api/refresh-catalogues`)
+- Wire `Enricher.cs` stub (or real implementation if straightforward) to bridge `ArmyList` → `List<UnitProfile>` using `CatalogueStore`
+Follow `.claude/web-app.md` for session keys and non-obvious serialisation requirements. Done-state: app starts, Index page accepts a paste and redirects to ArmyView, `dotnet test` still green."
 
 ---
 
