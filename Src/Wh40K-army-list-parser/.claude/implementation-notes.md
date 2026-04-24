@@ -85,3 +85,26 @@ Must be present in the **current working directory** when the web app starts. Ex
 ## Multi-Profile Weapon Variant Labels
 
 BSData prefixes variant profiles with `➤ ` followed by the weapon entry name and ` - variantname`. Strip `➤ ` and the weapon entry name prefix to derive the variant label. Example: `"➤ Hellforged weapons - strike"` → `"strike"`.
+
+---
+
+## Razor Issues
+
+### Partial Tag Helper model binding
+
+Non-string tag helper attributes require the `@` prefix; `model="unit"` passes the string literal `"unit"`, `model="@unit"` passes the variable.
+
+### Razor email-address heuristic
+
+Razor treats `@` as a **literal character** (not a code expression start) when it is immediately preceded by a word character (letter, digit, or underscore). This mimics email address handling. The statline template uses inline stat labels: `T@Model.Toughness`, `Sv@Model.Save+`, `W@Model.Wounds` — the `T`, `v`, and `W` immediately before `@` trigger this heuristic, so they render as the literal strings `T@Model.Toughness` etc. instead of interpolated values.
+
+Fix: always use explicit `@(expr)` syntax when a word character precedes `@`:
+
+```razor
+T@(Model.Toughness) &nbsp;Sv@(Model.Save)+&nbsp;W@(Model.Wounds)
+```
+
+### Razor and WH40K game notation
+
+`@Model.InvulnerableSave++` and `@Model.FeelNoPain+++` are parsed as C# postfix increment expressions. Use `@(Model.InvulnerableSave)++` and `@(Model.FeelNoPain)+++` to get the `++`/`+++` as literal HTML text.
+

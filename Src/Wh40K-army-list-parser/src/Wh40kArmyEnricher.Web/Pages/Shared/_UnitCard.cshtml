@@ -14,10 +14,10 @@
     <div class="unit-card-header" onclick="@Html.Raw(headerOnclick)">
         <span class="unit-name">@Model.Name</span>
         <span class="unit-statline">
-            T@Model.Toughness &nbsp;Sv@Model.Save+&nbsp;
-            @if (Model.InvulnerableSave.HasValue) { <span class="invuln">@Model.InvulnerableSave++&nbsp;</span> }
-            W@Model.Wounds
-            @if (Model.FeelNoPain.HasValue) { <span class="fnp">&nbsp;FNP@Model.FeelNoPain+++</span> }
+            T@(Model.Toughness) &nbsp;Sv@(Model.Save)+&nbsp;
+            @if (Model.InvulnerableSave.HasValue) { <span class="invuln">@(Model.InvulnerableSave)++&nbsp;</span> }
+            W@(Model.Wounds)
+            @if (Model.FeelNoPain.HasValue) { <span class="fnp">&nbsp;FNP@(Model.FeelNoPain)+++</span> }
         </span>
         <span class="collapse-icon">▶</span>
     </div>

@@ -27,7 +27,7 @@
             {
                 var unit = Model.Attackers[i];
                 var camelCaseJson = JsonSerializer.Serialize(unit, SessionJson.CamelCaseOptions);
-                <partial name="_UnitCard" model="unit" view-data='@(new ViewDataDictionary(ViewData) { ["Side"] = "attacker", ["Index"] = i, ["UnitJson"] = camelCaseJson })'/>
+                <partial name="_UnitCard" model="@unit" view-data='@(new ViewDataDictionary(ViewData) { ["Side"] = "attacker", ["Index"] = i, ["UnitJson"] = camelCaseJson })'/>
             }
         </div>
         <div class="army-column">
@@ -36,7 +36,7 @@
             {
                 var unit = Model.Defenders[i];
                 var camelCaseJson = JsonSerializer.Serialize(unit, SessionJson.CamelCaseOptions);
-                <partial name="_UnitCard" model="unit" view-data='@(new ViewDataDictionary(ViewData) { ["Side"] = "defender", ["Index"] = i, ["UnitJson"] = camelCaseJson })'/>
+                <partial name="_UnitCard" model="@unit" view-data='@(new ViewDataDictionary(ViewData) { ["Side"] = "defender", ["Index"] = i, ["UnitJson"] = camelCaseJson })'/>
             }
         </div>
     </div>
