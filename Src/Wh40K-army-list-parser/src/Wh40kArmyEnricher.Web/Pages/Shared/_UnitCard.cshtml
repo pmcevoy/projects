@@ -90,7 +90,36 @@
                 <summary>Abilities</summary>
                 @foreach (var ability in Model.Abilities)
                 {
-                    <p class="ability"><strong>@ability.Name:</strong> @ability.Text</p>
+                    if (ability.Text.Contains('•'))
+                    {
+                        <div class="ability">
+                            <strong>@ability.Name:</strong>
+                            @foreach (var line in ability.Text.Split('\n'))
+                            {
+                                if (line.StartsWith('•'))
+                                {
+                                    var colonIdx = line.IndexOf(':', 2);
+                                    if (colonIdx >= 0)
+                                    {
+                                        var subName = line[2..colonIdx].Trim();
+                                        var subText = line[(colonIdx + 1)..].Trim();
+                                        <div class="sub-ability">
+                                            <span class="sub-ability-name">@subName</span>
+                                            <span class="sub-ability-text">@subText</span>
+                                        </div>
+                                    }
+                                }
+                                else if (!string.IsNullOrWhiteSpace(line))
+                                {
+                                    <p>@line</p>
+                                }
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="ability"><strong>@ability.Name:</strong> @ability.Text</p>
+                    }
                 }
             </details>
         }
@@ -101,7 +130,36 @@
                 <summary>While Leading</summary>
                 @foreach (var ability in Model.LeadingAbilities)
                 {
-                    <p class="ability"><strong>@ability.Name:</strong> @ability.Text</p>
+                    if (ability.Text.Contains('•'))
+                    {
+                        <div class="ability">
+                            <strong>@ability.Name:</strong>
+                            @foreach (var line in ability.Text.Split('\n'))
+                            {
+                                if (line.StartsWith('•'))
+                                {
+                                    var colonIdx = line.IndexOf(':', 2);
+                                    if (colonIdx >= 0)
+                                    {
+                                        var subName = line[2..colonIdx].Trim();
+                                        var subText = line[(colonIdx + 1)..].Trim();
+                                        <div class="sub-ability">
+                                            <span class="sub-ability-name">@subName</span>
+                                            <span class="sub-ability-text">@subText</span>
+                                        </div>
+                                    }
+                                }
+                                else if (!string.IsNullOrWhiteSpace(line))
+                                {
+                                    <p>@line</p>
+                                }
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="ability"><strong>@ability.Name:</strong> @ability.Text</p>
+                    }
                 }
             </details>
         }

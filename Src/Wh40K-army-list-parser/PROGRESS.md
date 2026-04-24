@@ -2,12 +2,17 @@
 
 ## Active Work
 
-Sub-ability rendering in unit cards — spec written, implementation pending.
+Nothing in progress.
 
 ---
 
 ## Recently Completed
 
+- Sub-ability rendering implemented in `_UnitCard.cshtml`.
+  Both Abilities and While Leading loops now detect `•` in `ability.Text`,
+  split on `\n`, and render sub-ability lines as `.sub-ability` divs with
+  `.sub-ability-name` / `.sub-ability-text` spans. Flat abilities unchanged.
+  Three CSS rules added to `site.css`. Build: 0 errors, 0 warnings.
 - Sub-ability profile parsing implemented in `CatalogueParser.ParseProfiles`.
   Two-pass approach: Pass 1 collects standard types; Pass 2 collects non-standard
   typeNames as sub-ability groups, merging into matching parent abilities or creating
@@ -39,11 +44,6 @@ Nothing outstanding.
 > Paste this at the start of the next Claude Code session:
 
 "Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for current state.
-The active task is implementing sub-ability rendering in `_UnitCard.cshtml`.
-The spec is fully written in .claude/web-app.md under 'Ability Rendering — Sub-Abilities'.
-Read that section before touching any code. The changes required are:
-1. Update both ability loops in `_UnitCard.cshtml` (Abilities and While Leading) to
-   split ability.Text on newline, detect lines starting with U+2022, and render them
-   as .sub-ability divs with .sub-ability-name / .sub-ability-text spans.
-2. Add the three CSS rules (.sub-ability, .sub-ability-name, .sub-ability-text) to site.css.
-When done, update PROGRESS.md and rewrite this Next Session Prompt."
+All sub-ability work (parsing + rendering) is complete. Review what features remain
+from the original design and decide what to implement next. Run the tests first to
+confirm the baseline is clean before making any changes."

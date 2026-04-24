@@ -225,6 +225,10 @@ button[type="submit"]:hover { opacity: 0.85; }
 .ability { margin: 0.25rem 0; line-height: 1.5; }
 .ability strong { color: var(--text); }
 
+.sub-ability { margin: 0.25rem 0; }
+.sub-ability-name { display: block; font-weight: bold; }
+.sub-ability-text { display: block; margin-left: 0.25rem; color: var(--text-dim); }
+
 /* ── Combat panel ── */
 
 .combat-panel {
