@@ -2,7 +2,7 @@
 
 ## Active Work
 
-Investigating razor tag rendering bug.
+Implementing sub-ability profile parsing in `CatalogueParser`.
 
 ---
 
@@ -10,14 +10,13 @@ Investigating razor tag rendering bug.
 
 - Regeneration v1 complete. Generated UI near-identical to original.
   No spec files were modified during generation — all gaps were minor.
+- Sub-ability spec written and merged into `.claude/` docs.
 
 ---
 
 ## Known Issues
 
-- Razor tag bug: tags are rendering incorrectly in [describe affected view].
-  Not yet root-caused. Check `.claude/web-app.md` and `combat-rules.md`
-  once fixed to see if a spec gap contributed.
+Nothing outstanding.
 
 ---
 
@@ -35,10 +34,7 @@ Nothing outstanding.
 
 > Paste this at the start of the next Claude Code session:
 
-"Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for
-current state. The active task is investigating the razor tag rendering
-bug. Root-cause the issue, implement a fix, and check whether the bug
-reveals a gap in any spec file — if so, update the spec alongside the
-code. When done, update PROGRESS.md: move the razor tag item from Known
-Issues to Recently Completed, clear Active Work, note any spec files
-updated, and rewrite this Next Session Prompt for whatever comes next."
+"Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for current state.
+The active task is implementing sub-ability profile parsing. The spec is fully
+written — read .claude/bsdata-parsing.md and .claude/implementation-notes.md before
+touching any code. When done, update PROGRESS.md and rewrite this Next Session Prompt."

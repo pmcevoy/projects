@@ -108,6 +108,27 @@ Within each `selectionEntry`, child entries live in:
 
 ---
 
+## Sub-Ability Profiles
+
+Some entries contain `<profile>` elements whose `typeName` is not one of the four standard values (`"Unit"`, `"Ranged Weapons"`, `"Melee Weapons"`, `"Abilities"`). These represent named sub-ability groups — a "choose one" mechanic where the player picks from a list of options each turn (e.g. "Lord of the Death Guard", "Crimson King", "Blessings of Khorne").
+
+- The `typeName` value is the group name.
+- Their characteristic key is `"Effect"` (not `"Description"`). Some groups also carry additional characteristics (e.g. `"Roll"` for a required dice value). All characteristic values are joined with `" — "` in document order.
+- Each sub-ability is rendered as: `"• SubName: value1 — value2"`
+
+`ParseProfiles()` does a two-pass read of the `<profiles>` element:
+
+- **Pass 1:** collect all standard-typed profiles (`Unit`, `Ranged Weapons`, `Melee Weapons`, `Abilities`) as now.
+- **Pass 2:** collect all non-standard-typed profiles, grouped by `typeName`. For each group:
+  - If an `AbilityProfile` with `Name == typeName` already exists from Pass 1, append the sub-ability lines to its `Text` (newline-separated).
+  - Otherwise, create a new `AbilityProfile` with `Name = typeName` and `Text` set to the joined sub-ability lines.
+
+The two-pass approach is required because sub-ability profiles in the XML may appear before or after their named parent ability within the same `<profiles>` element. Do not attempt to link by scanning parent ability text — the connection is sometimes implicit (e.g. the parent ability for `typeName="Crimson King"` is named `"Unearthly Power"`, not `"Crimson King"`).
+
+**`AbilityProfile.Text` may contain multiple lines** when sub-abilities are present. Sub-ability lines are `\n`-separated from the parent's intro text and from each other.
+
+---
+
 ## Two-Pass Catalogue Load (Cross-Catalogue infoLinks)
 
 `CatalogueStore.InitialiseAsync` does a two-pass load to handle cross-catalogue infoLink resolution (e.g. a Black Templars unit's infoLink may target a shared profile in `Imperium - Space Marines.cat`):

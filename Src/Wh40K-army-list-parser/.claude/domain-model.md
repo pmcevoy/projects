@@ -85,6 +85,8 @@ Three format variants exist in the wild. The parser must handle all three.
 
 A single `UnitProfile` carries both offensive and defensive data. Both attacker and defender use the same type.
 
+`AbilityProfile.Text` may contain multiple lines when sub-ability profiles are present. Sub-abilities are appended as `"• SubName: effect text"` lines, `\n`-separated from the parent intro text and from each other. This is a display-only concern; `AbilityProfile` requires no structural change.
+
 ```yaml
 name: "Crusader Squad"
 faction: "Black Templars"

@@ -82,6 +82,17 @@ Must be present in the **current working directory** when the web app starts. Ex
 
 ---
 
+## Sub-Ability Profiles (Non-Standard typeName)
+
+BSData profiles with a `typeName` that is not one of the four standard values (`"Unit"`, `"Ranged Weapons"`, `"Melee Weapons"`, `"Abilities"`) represent named sub-ability groups. There are approximately 20 such custom types across the 10e catalogues (e.g. `"Lord of the Death Guard"`, `"Crimson King"`, `"Blessings of Khorne"`).
+
+- Their text lives in the `"Effect"` characteristic, not `"Description"`.
+- Some have additional characteristics (e.g. `"Roll"` encoding a required dice result) — join **all** characteristic values with `" — "` in document order.
+- `ParseProfiles()` must do a second pass to collect and link these after the first pass collects standard ability profiles. This ordering is required because sub-ability profiles sometimes appear before their named parent in the XML.
+- Parent-ability matching is opportunistic: if an `AbilityProfile` with `Name == typeName` exists from the first pass, append to it; otherwise create a new `AbilityProfile` named `typeName`. Do **not** attempt to link by scanning parent ability text — the connection is sometimes implicit (e.g. `typeName="Crimson King"` belongs to the ability named `"Unearthly Power"`).
+
+---
+
 ## Multi-Profile Weapon Variant Labels
 
 BSData prefixes variant profiles with `➤ ` followed by the weapon entry name and ` - variantname`. Strip `➤ ` and the weapon entry name prefix to derive the variant label. Example: `"➤ Hellforged weapons - strike"` → `"strike"`.
