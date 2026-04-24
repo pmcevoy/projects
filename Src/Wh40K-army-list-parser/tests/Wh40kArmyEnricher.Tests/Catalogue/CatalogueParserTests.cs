@@ -457,6 +457,125 @@ public class CatalogueParserTests
         entry.Abilities[0].Text.Should().Contain("morale");
     }
 
+    // ── Sub-ability profiles (non-standard typeName) ────────────────────────────
+
+    [Fact]
+    public void Parse_SubAbilityProfile_NoMatchingParent_CreatesNewAbility()
+    {
+        var doc = MakeCatalogueWithSharedEntries("""
+            <selectionEntry id="e1" name="Death Guard Champion" type="model">
+              <profiles>
+                <profile id="p1" name="Plague Wind" typeName="Lord of the Death Guard">
+                  <characteristics>
+                    <characteristic name="Effect">Each time this unit makes an attack, on a Critical Hit, that attack has the [LETHAL HITS] ability.</characteristic>
+                  </characteristics>
+                </profile>
+                <profile id="p2" name="Pestilential Mucus" typeName="Lord of the Death Guard">
+                  <characteristics>
+                    <characteristic name="Effect">Improve the Armour Penetration characteristic of melee weapons by 1.</characteristic>
+                  </characteristics>
+                </profile>
+              </profiles>
+            </selectionEntry>
+            """);
+
+        var entry = Parse(doc).Entries.Single();
+        var ability = entry.Abilities.Should().ContainSingle(a => a.Name == "Lord of the Death Guard").Subject;
+        ability.Text.Should().Contain("• Plague Wind:");
+        ability.Text.Should().Contain("• Pestilential Mucus:");
+    }
+
+    [Fact]
+    public void Parse_SubAbilityProfile_AppendsToMatchingParentAbility()
+    {
+        var doc = MakeCatalogueWithSharedEntries("""
+            <selectionEntry id="e1" name="Plague Marine Champion" type="model">
+              <profiles>
+                <profile id="p1" name="Blessings of Nurgle" typeName="Abilities">
+                  <characteristics>
+                    <characteristic name="Description">At the start of your Command phase, select one blessing.</characteristic>
+                  </characteristics>
+                </profile>
+                <profile id="p2" name="Plague Wind" typeName="Blessings of Nurgle">
+                  <characteristics>
+                    <characteristic name="Effect">Critical Hits gain [LETHAL HITS].</characteristic>
+                  </characteristics>
+                </profile>
+                <profile id="p3" name="Pestilential Mucus" typeName="Blessings of Nurgle">
+                  <characteristics>
+                    <characteristic name="Effect">Improve AP of melee weapons by 1.</characteristic>
+                  </characteristics>
+                </profile>
+              </profiles>
+            </selectionEntry>
+            """);
+
+        var entry = Parse(doc).Entries.Single();
+        entry.Abilities.Should().HaveCount(1);
+        var ability = entry.Abilities[0];
+        ability.Name.Should().Be("Blessings of Nurgle");
+        ability.Text.Should().StartWith("At the start of your Command phase");
+        ability.Text.Should().Contain("\n• Plague Wind:");
+        ability.Text.Should().Contain("\n• Pestilential Mucus:");
+    }
+
+    [Fact]
+    public void Parse_SubAbilityProfile_AppearsBefore_ParentAbility_TwoPassHandlesCorrectly()
+    {
+        // Sub-ability profile appears BEFORE the matching Abilities profile in XML.
+        // Single-pass would fail to find the parent; two-pass handles it correctly.
+        var doc = MakeCatalogueWithSharedEntries("""
+            <selectionEntry id="e1" name="Some Character" type="model">
+              <profiles>
+                <profile id="p2" name="Option A" typeName="My Choices">
+                  <characteristics>
+                    <characteristic name="Effect">Do thing A.</characteristic>
+                  </characteristics>
+                </profile>
+                <profile id="p1" name="My Choices" typeName="Abilities">
+                  <characteristics>
+                    <characteristic name="Description">Choose one of the following.</characteristic>
+                  </characteristics>
+                </profile>
+                <profile id="p3" name="Option B" typeName="My Choices">
+                  <characteristics>
+                    <characteristic name="Effect">Do thing B.</characteristic>
+                  </characteristics>
+                </profile>
+              </profiles>
+            </selectionEntry>
+            """);
+
+        var entry = Parse(doc).Entries.Single();
+        entry.Abilities.Should().HaveCount(1);
+        var ability = entry.Abilities[0];
+        ability.Name.Should().Be("My Choices");
+        ability.Text.Should().StartWith("Choose one of the following.");
+        ability.Text.Should().Contain("• Option A:");
+        ability.Text.Should().Contain("• Option B:");
+    }
+
+    [Fact]
+    public void Parse_SubAbilityProfile_MultipleCharacteristics_JoinedWithEmDash()
+    {
+        var doc = MakeCatalogueWithSharedEntries("""
+            <selectionEntry id="e1" name="Warrior" type="model">
+              <profiles>
+                <profile id="p1" name="Power Surge" typeName="Battle Stances">
+                  <characteristics>
+                    <characteristic name="Roll">4+</characteristic>
+                    <characteristic name="Effect">Add 1 to Strength.</characteristic>
+                  </characteristics>
+                </profile>
+              </profiles>
+            </selectionEntry>
+            """);
+
+        var entry = Parse(doc).Entries.Single();
+        var ability = entry.Abilities.Should().ContainSingle(a => a.Name == "Battle Stances").Subject;
+        ability.Text.Should().Be("• Power Surge: 4+ — Add 1 to Strength.");
+    }
+
     // ── entryLink resolution ─────────────────────────────────────────────────────
 
     [Fact]

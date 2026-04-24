@@ -221,6 +221,7 @@ public static class CatalogueParser
         var abilities = new List<AbilityProfile>();
         var weaponData = new List<(string profileName, bool isRanged, XElement el)>();
 
+        // Pass 1: standard profile types
         foreach (var profile in profilesEl.Elements(Ns + "profile"))
         {
             var typeName = (string?)profile.Attribute("typeName") ?? "";
@@ -252,6 +253,47 @@ public static class CatalogueParser
                     Text = chars.GetValueOrDefault("Description", "")
                 });
             }
+        }
+
+        // Pass 2: non-standard typeName values are sub-ability groups (e.g. "Lord of the Death Guard").
+        // Two-pass is required because sub-ability profiles may appear before their named parent ability in XML.
+        var subGroups = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var profile in profilesEl.Elements(Ns + "profile"))
+        {
+            var typeName = (string?)profile.Attribute("typeName") ?? "";
+            if (string.IsNullOrEmpty(typeName) ||
+                typeName.Equals("Unit", StringComparison.OrdinalIgnoreCase) ||
+                typeName.Equals("Ranged Weapons", StringComparison.OrdinalIgnoreCase) ||
+                typeName.Equals("Melee Weapons", StringComparison.OrdinalIgnoreCase) ||
+                typeName.Equals("Abilities", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var profileName = (string?)profile.Attribute("name") ?? "";
+            var charsEl = profile.Element(Ns + "characteristics");
+            var charValues = charsEl == null
+                ? []
+                : charsEl.Elements(Ns + "characteristic")
+                         .Select(c => c.Value)
+                         .Where(v => !string.IsNullOrWhiteSpace(v))
+                         .ToList();
+            var joined = string.Join(" — ", charValues);
+
+            if (!subGroups.TryGetValue(typeName, out var lines))
+                subGroups[typeName] = lines = [];
+            lines.Add($"• {profileName}: {joined}");
+        }
+
+        foreach (var (typeName, lines) in subGroups)
+        {
+            var subText = string.Join("\n", lines);
+            var existing = abilities.FirstOrDefault(a =>
+                a.Name.Equals(typeName, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+                existing.Text = string.IsNullOrEmpty(existing.Text)
+                    ? subText
+                    : existing.Text + "\n" + subText;
+            else
+                abilities.Add(new AbilityProfile { Name = typeName, Text = subText });
         }
 
         List<CatalogueWeaponEntry> weapons = [];

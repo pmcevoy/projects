@@ -2,12 +2,16 @@
 
 ## Active Work
 
-Implementing sub-ability profile parsing in `CatalogueParser`.
+Nothing in progress.
 
 ---
 
 ## Recently Completed
 
+- Sub-ability profile parsing implemented in `CatalogueParser.ParseProfiles`.
+  Two-pass approach: Pass 1 collects standard types; Pass 2 collects non-standard
+  typeNames as sub-ability groups, merging into matching parent abilities or creating
+  new ones. 4 new tests added; 170 total, all passing.
 - Regeneration v1 complete. Generated UI near-identical to original.
   No spec files were modified during generation — all gaps were minor.
 - Sub-ability spec written and merged into `.claude/` docs.
@@ -35,6 +39,8 @@ Nothing outstanding.
 > Paste this at the start of the next Claude Code session:
 
 "Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for current state.
-The active task is implementing sub-ability profile parsing. The spec is fully
-written — read .claude/bsdata-parsing.md and .claude/implementation-notes.md before
-touching any code. When done, update PROGRESS.md and rewrite this Next Session Prompt."
+Sub-ability parsing is done. The next logical area to explore is verifying the
+sub-ability parsing works against real BSData catalogues — consider running the app
+against a real army list and checking that abilities like 'Lord of the Death Guard'
+display their sub-options correctly in the unit card. Alternatively, pick up any
+other backlog item."
