@@ -95,7 +95,7 @@ docker compose up           # subsequent runs: cache volume present, starts fast
 - **Shooting and melee are mutually exclusive per simulation run.** The UI enforces this — selecting the first weapon locks the phase type; opposite-type rows are disabled until selections are cleared.
 - **No damage spillover between models** in the wound pool — excess damage on a model is lost, not carried to the next.
 - **All simulation modifiers are user-controlled.** Ability text is not auto-parsed into simulation parameters.
-- **AP is stored as a negative integer** in `UnitProfile` (e.g. AP-2 → `-2`). `SimulationAdapter` negates it when building `SimWeaponProfile` for the engine.
+- **AP is stored as a negative integer** throughout — in `UnitProfile` and in `SimWeaponProfile` (e.g. AP-2 → `-2`). `SimulationAdapter` passes it through unchanged; `AbilityProcessor.EffectiveSave` uses `effectiveSave = save - ap`.
 
 ---
 

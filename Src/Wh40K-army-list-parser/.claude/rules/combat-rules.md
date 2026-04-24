@@ -43,8 +43,8 @@ Compare the weapon's **Strength (S)** to the target's **Toughness (T)**:
 ### Step 3 — Saving Throw
 
 - Defender rolls D6 against their Save value. The weapon's AP modifies the save:
-  `effectiveSave = save + ap` where ap is stored as a positive integer in `SimWeaponProfile`
-  (already negated from Contracts representation by `SimulationAdapter`).
+  `effectiveSave = save - ap`. AP is a negative integer (e.g. AP-2 → `-2`), so subtracting it
+  raises the effective save threshold (e.g. save 3, AP-2: `3 - (-2) = 5`).
 - If the defender has an **invulnerable save**, use whichever of armour save (AP-modified)
   or invulnerable save is numerically lower (easier to make).
 - AP does **not** apply to invulnerable saves.
@@ -199,14 +199,18 @@ is numerically lower. Stored as a raw integer (e.g. `4` means 4++). `null` if ab
 
 ## AP Sign Convention
 
-**In `UnitProfile` / Contracts:** AP is stored as a **negative integer** matching the game
-value (e.g. AP-2 → `-2`).
+AP is stored as a **negative integer** everywhere — in `UnitProfile`, `SimWeaponProfile`, and
+all intermediate types — matching the game value (e.g. AP-2 → `-2`).
 
-**In `SimWeaponProfile` / the engine:** AP is stored as a **positive integer**. 
-`SimulationAdapter` negates it: `simAp = -contractsAp`.
+`SimulationAdapter` passes AP through unchanged; no negation.
 
-`AbilityProcessor.EffectiveSave` does: `effectiveSave = save + ap` (positive ap value).
-Do not change either side without updating both.
+`AbilityProcessor.EffectiveSave` uses: `effectiveSave = save - ap`. Since `ap` is negative,
+subtracting it raises the effective save threshold (e.g. AP-2: `save - (-2) = save + 2`).
+A positive AP value would correspondingly lower the threshold (easier save for the defender).
+
+The `+1/-1 AP` UI modifier adds directly to the stored AP value (`ap += modifier`). A modifier
+of -1 makes AP more negative (more penetrating, harder save, more damage); +1 makes it less
+negative (less penetrating, easier save, less damage).
 
 ---
 

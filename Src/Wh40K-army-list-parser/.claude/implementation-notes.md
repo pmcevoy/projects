@@ -6,7 +6,7 @@ Defensive knowledge accumulated during development. Import this file when debugg
 
 ## AP Sign Convention
 
-`WeaponVariantProfile.Ap` in Contracts is stored as a **negative integer** (e.g. AP-2 → `-2`). `SimulationAdapter` negates it when building `SimWeaponProfile.Ap` because the simulator's `AbilityProcessor.EffectiveSave` does `save + ap` (expects a positive value). Do not change this without updating both sides.
+AP is stored as a **negative integer** in both `WeaponVariantProfile.Ap` (Contracts) and `SimWeaponProfile.Ap` (engine), matching the game value (e.g. AP-2 → `-2`). `SimulationAdapter` passes it through unchanged — no negation. `AbilityProcessor.EffectiveSave` uses `effectiveSave = save - ap`; since `ap` is negative, subtracting it correctly raises the save threshold.
 
 ---
 
@@ -68,9 +68,9 @@ Static classes cannot be used as type parameters for `ILogger<T>`. Use `ILoggerF
 
 ## Cover and SimDefenderProfile.Save
 
-Cover in 40K adds +1 to the defender's armour save roll (i.e. the die result is easier to meet the threshold). In `SimulationAdapter`, this is implemented by **subtracting 1 from `SimDefenderProfile.Save`** before the run, which lowers the required roll from `effectiveSave = save + ap`.
+Cover in 40K adds +1 to the defender's armour save roll (i.e. the die result is easier to meet the threshold). In `SimulationAdapter`, this is implemented by **subtracting 1 from `SimDefenderProfile.Save`** before the run. `effectiveSave = save - ap`; a lower `save` means a lower threshold, so the defender needs to roll less to succeed.
 
-The spec document says "adding 1 to SimDefenderProfile.Save" which is physically backwards given the `effectiveSave = save + ap` convention (a higher Save value means a harder save). Do **not** add 1; subtract 1.
+Do **not** add 1 to `Save` for cover — adding 1 raises the threshold, making the save harder.
 
 Cover does not affect invulnerable saves.
 

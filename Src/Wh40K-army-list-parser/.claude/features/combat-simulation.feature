@@ -70,6 +70,18 @@ Feature: Combat Simulation
     When the save roll is made against the invulnerable save
     Then the target is still 4+
 
+  Scenario: AP modifier of -1 increases penetration
+    Given a defender with Sv3+ facing a weapon with AP-1
+    And an AP modifier of -1 is applied
+    When the save roll is made
+    Then the effective save target is 5+
+
+  Scenario: AP modifier of +1 reduces penetration
+    Given a defender with Sv3+ facing a weapon with AP-2
+    And an AP modifier of +1 is applied
+    When the save roll is made
+    Then the effective save target is 4+
+
   Scenario: Natural 1 always fails the save roll
     Given a defender with Sv2+
     When a save roll of natural 1 is made

@@ -94,8 +94,8 @@ Bridges `UnitProfile` (Contracts) → `SimulationConfig` (Core.Simulation):
 
 - Groups `WeaponSelections` by `WeaponGroupKey` (`type + Skill + S + AP + D + Abilities`; Anti normalised to sorted `"kw:val,..."` string for dictionary equality)
 - Aggregates attacks per group via `DiceExpression.Scale` + `DiceExpression.Add`
-- **Negates AP:** `simAp = -contractsAp` (AP is negative in Contracts, positive in the sim engine)
-- Applies cover by adding 1 to `SimDefenderProfile.Save` before the run
+- **AP pass-through:** AP is a negative integer in both Contracts and the sim engine; `SimulationAdapter` passes it unchanged
+- Applies cover by subtracting 1 from `SimDefenderProfile.Save` before the run
 - Returns `SimulationResponse` with mean damage, expected kills, P(kill ≥ 1), stddev, `StageStats` (aggregate), and `WeaponBreakdown` (per-group, empty when single group)
 
 ---
@@ -145,7 +145,7 @@ The combat panel is organised into five collapsible sections plus a top-level "M
 |---|---|
 | **Cover** | Adds +1 to defender's armour save; does not affect invuln |
 | **Ignores Cover** | Negates Cover bonus if both active |
-| **+1/-1 AP** | Adjusts weapon AP by ±1 |
+| **+1/-1 AP** | Adjusts the weapon's AP value by ±1 (signed). -1 makes AP more negative (more penetrating, harder save, more damage); +1 makes it less negative (less penetrating, easier save, less damage). |
 
 ### Damage Modifiers
 | Control | Effect |

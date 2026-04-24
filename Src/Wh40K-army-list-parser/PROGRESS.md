@@ -2,7 +2,7 @@
 
 ## Active Work
 
-Nothing in progress.
+AP sign convention unification.
 
 ---
 
@@ -43,7 +43,4 @@ Nothing outstanding.
 
 > Paste this at the start of the next Claude Code session:
 
-"Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for current state.
-All sub-ability work (parsing + rendering) is complete. Review what features remain
-from the original design and decide what to implement next. Run the tests first to
-confirm the baseline is clean before making any changes."
+"Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for current state. The AP sign convention has been unified in the specs: AP is now a negative integer throughout, SimulationAdapter passes it unchanged, and AbilityProcessor.EffectiveSave uses `save - ap`. The code has not been updated yet — run the tests first to confirm the baseline is clean, then apply the convention change across SimWeaponProfile, AbilityProcessor, SimulationAdapter, and the AP modifier handling in the simulation request pipeline. Two new Gherkin tests were added for combat simulation - ensure they are added to the test suite."

@@ -139,7 +139,7 @@ feelNoPain: null                 # null if absent; int if present (e.g. 5 = 5+++
 
 ### Schema conventions (do not change without updating both sides)
 
-- `ap` is a **negative integer** matching game value (AP-2 → `-2`). `SimulationAdapter` negates it when building `SimWeaponProfile`.
+- `ap` is a **negative integer** matching game value (AP-2 → `-2`). This convention applies throughout — `SimulationAdapter` passes it unchanged into `SimWeaponProfile`.
 - `skill`, `save`, `invulnerableSave`, `feelNoPain`, `criticalHitsOn` are raw integers (e.g. `3` means hits on 3+); the `+` suffix is implied.
 - `weapons` is always a list, even for single-weapon models.
 - `rapidFire` and `melta` use `0` as the sentinel for "not present" — treat `0` as absent, not as a valid ability value.
