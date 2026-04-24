@@ -30,3 +30,24 @@ The `data-unit` HTML attribute in `ArmyView.cshtml` uses a **separate** `camelCa
 ## Leading Abilities
 
 `UnitProfile.LeadingAbilities` (`List<AbilityProfile>`) — populated at enrichment time by `Enricher.cs`, filtering abilities whose text starts with `"While this model is leading a unit"` into a separate list. Displayed in `_UnitCard.cshtml` as a collapsible "While Leading" section styled in amber (`#f1a94e`). Not consumed by the simulation engine.
+
+## Ability Rendering — Sub-Abilities
+
+`AbilityProfile.Text` may contain `\n`-separated lines where sub-ability lines start with `• ` (U+2022 + space). These must not be rendered as a raw concatenated string.
+
+**Rendering rules in `_UnitCard.cshtml`** (applies to both `Model.Abilities` and `Model.LeadingAbilities`):
+
+- If `ability.Text` contains no `•` character: render as `<strong>Name:</strong> text` on a single line (existing flat layout).
+- If `ability.Text` contains `•` lines: split on `\n`, then for each line:
+  - Lines **not** starting with `• `: render as a plain paragraph (intro text, e.g. "At the start of your Command phase, select one of the following.")
+  - Lines starting with `• `: parse as `• SubName: effect text` — render `SubName` as a sub-header (`<span class="sub-ability-name">`) and `effect text` on the next line (`<span class="sub-ability-text">`), wrapped in `<div class="sub-ability">`.
+
+**Parsing the sub-ability line:** find the first `:` after position 2; name = `line[2..colonIdx].Trim()`; text = `line[(colonIdx+1)..].Trim()`.
+
+**CSS classes required:**
+
+```css
+.sub-ability { margin: 0.25rem 0; }
+.sub-ability-name { display: block; font-weight: bold; }
+.sub-ability-text { display: block; margin-left: 0.25rem; color: var(--text-dim); }
+```

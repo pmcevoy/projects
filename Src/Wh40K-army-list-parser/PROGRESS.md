@@ -2,7 +2,7 @@
 
 ## Active Work
 
-Nothing in progress.
+Sub-ability rendering in unit cards — spec written, implementation pending.
 
 ---
 
@@ -39,8 +39,11 @@ Nothing outstanding.
 > Paste this at the start of the next Claude Code session:
 
 "Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for current state.
-Sub-ability parsing is done. The next logical area to explore is verifying the
-sub-ability parsing works against real BSData catalogues — consider running the app
-against a real army list and checking that abilities like 'Lord of the Death Guard'
-display their sub-options correctly in the unit card. Alternatively, pick up any
-other backlog item."
+The active task is implementing sub-ability rendering in `_UnitCard.cshtml`.
+The spec is fully written in .claude/web-app.md under 'Ability Rendering — Sub-Abilities'.
+Read that section before touching any code. The changes required are:
+1. Update both ability loops in `_UnitCard.cshtml` (Abilities and While Leading) to
+   split ability.Text on newline, detect lines starting with U+2022, and render them
+   as .sub-ability divs with .sub-ability-name / .sub-ability-text spans.
+2. Add the three CSS rules (.sub-ability, .sub-ability-name, .sub-ability-text) to site.css.
+When done, update PROGRESS.md and rewrite this Next Session Prompt."
