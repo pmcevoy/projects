@@ -347,10 +347,10 @@ public class CombatSimulatorTests
     [Fact]
     public void InvulnerableSave_UsedWhenBetterThanArmour()
     {
-        // Save=3, AP=3 → armour=6; invuln=4 → invuln is better
+        // AP-3 (stored as -3): armour = 3 - (-3) = 6; invuln=4 is lower → invuln used
         // roll=5 → passes invuln 4+ → no damage
         var roller = new SequenceRoller(5, 4, 5); // hit=5, wound=4, save=5
-        var weapon = MeleeWeapon(skill: 3, s: 4, ap: 3);
+        var weapon = MeleeWeapon(skill: 3, s: 4, ap: -3);
         var defender = BasicDefender(t: 4, save: 3, invuln: 4);
         var (dmg, _, stats) = Run1(roller, BasicAttacker(weapon), defender);
         dmg[0].Should().Be(0);
@@ -490,5 +490,32 @@ public class CombatSimulatorTests
         var (dmg, _, _, _) = sim.Run(BasicAttacker(weapon), BasicDefender(t: 4, save: 3), 50_000);
         double mean = dmg.Average();
         mean.Should().BeApproximately(0.111, 0.015);
+    }
+
+    // ─── AP sign convention ──────────────────────────────────────────────────
+
+    [Fact]
+    public void ApNegative2_Raises3PlusSaveTo5Plus_SaveFailsOn4()
+    {
+        // Given: weapon AP-2 (stored as -2), defender save 3+
+        // When:  hit=5, wound=4, save=4
+        // Then:  effectiveSave = 3 - (-2) = 5; roll of 4 fails → 1 damage dealt
+        var roller = new SequenceRoller(5, 4, 4);
+        var weapon = MeleeWeapon(skill: 3, s: 4, ap: -2, damage: 1);
+        var (dmg, _, stats) = Run1(roller, BasicAttacker(weapon), BasicDefender(t: 4, save: 3));
+        dmg[0].Should().Be(1);
+        stats.AvgFailedSaves.Should().Be(1);
+    }
+
+    [Fact]
+    public void ApNegative2_Raises3PlusSaveTo5Plus_SavePassesOn5()
+    {
+        // Given: weapon AP-2 (stored as -2), defender save 3+
+        // When:  hit=5, wound=4, save=5
+        // Then:  effectiveSave = 3 - (-2) = 5; roll of 5 passes → no damage
+        var roller = new SequenceRoller(5, 4, 5);
+        var weapon = MeleeWeapon(skill: 3, s: 4, ap: -2, damage: 1);
+        var (dmg, _, _) = Run1(roller, BasicAttacker(weapon), BasicDefender(t: 4, save: 3));
+        dmg[0].Should().Be(0);
     }
 }

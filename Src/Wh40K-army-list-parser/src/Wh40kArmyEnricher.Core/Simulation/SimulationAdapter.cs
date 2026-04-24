@@ -53,7 +53,7 @@ public sealed class SimulationAdapter
 
             int modelCount = sel.ModelCount > 0 ? sel.ModelCount : model.Count;
 
-            int simAp = Math.Max(0, -variant.Ap + request.ApModifier);
+            int simAp = variant.Ap + request.ApModifier;
             int effectiveSkill = variant.Skill + request.BsWsModifier;
             int effectiveStrength = variant.Strength + request.StrengthModifier;
             var anti = MergeAnti(variant.Abilities.Anti, request);

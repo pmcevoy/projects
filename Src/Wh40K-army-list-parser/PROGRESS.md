@@ -2,12 +2,17 @@
 
 ## Active Work
 
-AP sign convention unification.
+Nothing in progress.
 
 ---
 
 ## Recently Completed
 
+- AP sign convention unified across the sim engine. `SimWeaponProfile.Ap` is now a negative
+  integer matching the game value (AP-2 → -2). `AbilityProcessor.EffectiveSave` and
+  `CombatSimulator` both use `save - ap`. `SimulationAdapter` passes AP through unchanged
+  (removed the negation and `Math.Max(0,...)` guard). All tests updated; 2 new Gherkin tests
+  added for the AP-2 → 5+ save boundary. 172 tests, all passing.
 - Sub-ability rendering implemented in `_UnitCard.cshtml`.
   Both Abilities and While Leading loops now detect `•` in `ability.Text`,
   split on `\n`, and render sub-ability lines as `.sub-ability` divs with
@@ -43,4 +48,4 @@ Nothing outstanding.
 
 > Paste this at the start of the next Claude Code session:
 
-"Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for current state. The AP sign convention has been unified in the specs: AP is now a negative integer throughout, SimulationAdapter passes it unchanged, and AbilityProcessor.EffectiveSave uses `save - ap`. The code has not been updated yet — run the tests first to confirm the baseline is clean, then apply the convention change across SimWeaponProfile, AbilityProcessor, SimulationAdapter, and the AP modifier handling in the simulation request pipeline. Two new Gherkin tests were added for combat simulation - ensure they are added to the test suite."
+"Read CLAUDE.md and all files in .claude/. Then read PROGRESS.md for current state."

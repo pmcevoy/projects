@@ -9,7 +9,7 @@ public record SimWeaponProfile
     public DiceExpression Attacks { get; init; } = DiceExpression.Fixed(1);
     public int Skill { get; init; }              // effective after BS/WS characteristic modifier
     public int Strength { get; init; }           // effective after strength modifier
-    public int Ap { get; init; }                 // positive integer (negated from Contracts)
+    public int Ap { get; init; }                 // negative integer matching game value (e.g. AP-2 → -2)
     public DiceExpression Damage { get; init; } = DiceExpression.Fixed(1);
     public SimWeaponAbilities Abilities { get; init; } = new();
     public int AttackModifier { get; init; }

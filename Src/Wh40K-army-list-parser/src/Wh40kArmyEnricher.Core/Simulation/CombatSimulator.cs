@@ -165,7 +165,7 @@ public sealed class CombatSimulator
             return;
         }
 
-        int armourSave = defender.Save + weapon.Ap;
+        int armourSave = defender.Save - weapon.Ap;
         bool useInvuln = defender.InvulnerableSave.HasValue && defender.InvulnerableSave.Value < armourSave;
         int effectiveSave = useInvuln ? defender.InvulnerableSave!.Value : armourSave;
 

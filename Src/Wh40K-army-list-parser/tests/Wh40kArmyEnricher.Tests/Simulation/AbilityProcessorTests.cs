@@ -23,32 +23,32 @@ public class AbilityProcessorTests
     [Fact]
     public void EffectiveSave_NoInvuln_AppliesAp()
     {
+        // AP-2 (stored as -2): effectiveSave = 3 - (-2) = 5
         var defender = new SimDefenderProfile { Save = 3, InvulnerableSave = null };
-        AbilityProcessor.EffectiveSave(defender, 2).Should().Be(5); // 3+2=5
+        AbilityProcessor.EffectiveSave(defender, -2).Should().Be(5);
     }
 
     [Fact]
     public void EffectiveSave_InvulnBetter_UsesInvuln()
     {
         var defender = new SimDefenderProfile { Save = 3, InvulnerableSave = 4 };
-        // Armour with AP3: 3+3=6; invuln 4 → 4 is better (lower)
-        AbilityProcessor.EffectiveSave(defender, 3).Should().Be(4);
+        // AP-3 (stored as -3): armour = 3 - (-3) = 6; invuln 4 is lower → 4 returned
+        AbilityProcessor.EffectiveSave(defender, -3).Should().Be(4);
     }
 
     [Fact]
     public void EffectiveSave_ArmourBetter_UsesArmour()
     {
         var defender = new SimDefenderProfile { Save = 2, InvulnerableSave = 5 };
-        // Armour with AP0: 2+0=2; invuln 5 → armour better
+        // AP0: armour = 2 - 0 = 2; invuln 5 → armour is lower
         AbilityProcessor.EffectiveSave(defender, 0).Should().Be(2);
     }
 
     [Fact]
-    public void EffectiveSave_InvulnEqual_UsesInvuln()
+    public void EffectiveSave_InvulnEqual_ArmourUsed()
     {
-        // Both give same value — invuln path taken (value same, no practical difference)
         var defender = new SimDefenderProfile { Save = 3, InvulnerableSave = 4 };
-        // Armour + AP1 = 4, invuln = 4 → invuln is NOT strictly less, so armour is used
-        AbilityProcessor.EffectiveSave(defender, 1).Should().Be(4);
+        // AP-1 (stored as -1): armour = 3 - (-1) = 4; invuln = 4 → NOT strictly less, armour used
+        AbilityProcessor.EffectiveSave(defender, -1).Should().Be(4);
     }
 }

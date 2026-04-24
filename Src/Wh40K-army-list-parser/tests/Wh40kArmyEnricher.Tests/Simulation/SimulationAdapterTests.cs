@@ -121,12 +121,12 @@ public class SimulationAdapterTests
     }
 
     [Fact]
-    public void Adapt_ApIsNegatedFromContracts()
+    public void Adapt_NegativeApPassedThrough_RaisesSaveThreshold()
     {
-        // AP-2 in contracts (stored as -2); sim engine needs positive +2.
-        // Save=3, AP+2 → effectiveSave=5. With correct negation: effective 5+.
+        // AP-2 in contracts (stored as -2); passed unchanged into sim engine.
+        // effectiveSave = 3 - (-2) = 5 → some attacks get through → MeanDamage > 0.
         var adapter = new SimulationAdapter();
-        var attacker = MakeAttacker(ap: 2); // contracts Ap = -2 → sim Ap = +2
+        var attacker = MakeAttacker(ap: 2); // MakeAttacker sets Ap = -ap = -2
         var defender = MakeDefender(t: 4, save: 3);
 
         var response = adapter.Adapt(BasicRequest(), attacker, defender);

@@ -12,11 +12,12 @@ public static class AbilityProcessor
         return 5;
     }
 
-    // Returns the minimum D6 roll needed to pass the save. AP is a positive integer in the sim engine.
-    // Uses whichever of armour save (modified by AP) or invulnerable save is numerically lower (easier).
+    // Returns the minimum D6 roll needed to pass the save. AP is a negative integer (e.g. AP-2 → -2).
+    // effectiveSave = save - ap; since ap is negative, subtracting it raises the threshold.
+    // Uses whichever of armour save (AP-modified) or invulnerable save is numerically lower (easier).
     public static int EffectiveSave(SimDefenderProfile defender, int ap)
     {
-        int armourSave = defender.Save + ap;
+        int armourSave = defender.Save - ap;
         if (defender.InvulnerableSave.HasValue && defender.InvulnerableSave.Value < armourSave)
             return defender.InvulnerableSave.Value;
         return armourSave;
