@@ -1,7 +1,5 @@
 # Simulation Engine
 
-Ported from the retired `wh40k-sim` standalone project. Located in `Wh40kArmyEnricher.Core/Simulation/`.
-
 The full 40K combat rules and attack sequence spec: @rules/combat-rules.md
 
 ---

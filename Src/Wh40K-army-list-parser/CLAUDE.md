@@ -16,10 +16,10 @@ A live-game tool for use on a phone or tablet at the Warhammer 40K table. The us
 
 ```
 wh40k-army-enricher/
-  Wh40kArmyEnricher.Web/        ASP.NET Core web application (Razor Pages + JS)
-  Wh40kArmyEnricher.Core/       Domain logic: parsing, enrichment, simulation
+  ProbHammer.Web/        ASP.NET Core web application (Razor Pages + JS)
+  ProbHammer.Core/       Domain logic: parsing, enrichment, simulation
     Simulation/                 Monte Carlo engine (ported from retired wh40k-sim)
-  Wh40kArmyEnricher.Tests/      xUnit test suite
+  ProbHammer.Tests/      xUnit test suite
   data/                         Sample army list exports for manual testing
 ```
 
@@ -85,7 +85,7 @@ docker compose up           # subsequent runs: cache volume present, starts fast
 # browse to http://localhost:8080
 ```
 
-`Enricher:CachePath` in `appsettings.json` controls the catalogue cache location (default `~/.wh40k-enricher/cache/`; `/root/.wh40k-enricher/cache` in the container).
+`Enricher:CachePath` in `appsettings.json` controls the catalogue cache location (default `~/.probhammer/cache/`; `/root/.probhammer/cache` in the container).
 
 ---
 

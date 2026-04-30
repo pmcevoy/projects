@@ -11,8 +11,8 @@
 Download everything on first run rather than attempting faction-to-filename mapping (fragile — link names frequently differ from actual filenames).
 
 1. Load `Warhammer 40,000.gst` (game system root)
-2. Fetch full file listing: `GET https://api.github.com/repos/BSData/wh40k-10e/contents/` — cache to `~/.wh40k-enricher/cache/catalogue-list.json`
-3. Download and parse each `.cat` file — cache each to `~/.wh40k-enricher/cache/{filename}`
+2. Fetch full file listing: `GET https://api.github.com/repos/BSData/wh40k-10e/contents/` — cache to `~/.probhammer/cache/catalogue-list.json`
+3. Download and parse each `.cat` file — cache each to `~/.probhammer/cache/{filename}`
 4. All catalogues remain in memory for the lifetime of the run; no lazy loading
 
 **Do not** use the GitHub Commits API for staleness checking — aggressively rate-limited even for unauthenticated reads.

@@ -39,7 +39,7 @@ Feature acceptance criteria:
 ### Session 1 — Project Scaffolding
 **Status:** Complete  
 **What happened:**
-- Created `Wh40kArmyEnricher.sln` with three projects: Core (classlib), Web (Razor Pages), Tests (xUnit)
+- Created `ProbHammer.sln` with three projects: Core (classlib), Web (Razor Pages), Tests (xUnit)
 - Added all package dependencies: FuzzySharp 2.0.2, YamlDotNet 17.0.1, FluentAssertions 8.9.0, Moq 4.20.72
 - Wired Core → Web and Core → Tests project references
 - Set up directory structure: `Core/{Contracts,Parsing,Catalogue,Enrichment,Simulation}/`, `Web/Pages/`, `Web/wwwroot/`, `Tests/Fixtures/`, `Tests/Parsing/`
@@ -146,7 +146,7 @@ Feature acceptance criteria:
 **Status:** Complete  
 **What happened:**
 - Implemented `ICatalogueFetcher` interface and `CatalogueFileInfo` record
-- Implemented `CatalogueFetcher` — `IHttpClientFactory` named client "github", User-Agent header, GitHub raw URL with `Uri.EscapeDataString`, disk cache to `~/.wh40k-enricher/cache/`, file list cached to `catalogue-list.json`, supports `.cat`/`.catz`/`.gst`/`.gstz`
+- Implemented `CatalogueFetcher` — `IHttpClientFactory` named client "github", User-Agent header, GitHub raw URL with `Uri.EscapeDataString`, disk cache to `~/.probhammer/cache/`, file list cached to `catalogue-list.json`, supports `.cat`/`.catz`/`.gst`/`.gstz`
 - Implemented `CatalogueEntry.cs` domain types: `CatalogueStatline`, `CatalogueWeaponAbilities` (includes `IndirectFire` — not in Contracts `WeaponAbilities`), `CatalogueWeaponVariant`, `CatalogueWeaponEntry`, `CatalogueEntry`, `CatalogueData` (record for `with` expressions)
 - Implemented `CatalogueParser` (static class) — compiled regexes; `LoadDocumentAsync` (raw DeflateStream for `.catz`); `ExtractSharedProfiles` (pass 1); `Parse` (pass 2 using global profiles); `ParseEntry` recursive to depth 6; invuln/FNP from ability text and infoLink resolution; weapon keyword parsing; multi-profile variant label stripping
 - Implemented `CatalogueStore` — two-pass `InitialiseAsync`; `_globalProfiles` retained as field (required by `RefreshCataloguesAsync`); `RefreshCataloguesAsync` with `forceRefresh: true`; `GetAllCatalogues`, `GetCatalogue`, `GetAllTopLevelEntries`
