@@ -1,8 +1,8 @@
 namespace Wh40kArmyEnricher.Core.Simulation;
 
-public sealed record SimDefenderProfile
+public record SimDefenderProfile
 {
-    public string Name { get; init; } = string.Empty;
+    public string Name { get; init; } = "";
     public int Models { get; init; }
     public int Toughness { get; init; }
     public int Save { get; init; }

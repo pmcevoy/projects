@@ -2,14 +2,28 @@ services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: src/Wh40kArmyEnricher.Web/Dockerfile
     ports:
       - "8080:8080"
-    volumes:
-      - wh40k-cache:/root/.wh40k-enricher/cache
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - Enricher__CachePath=/root/.wh40k-enricher/cache
+      - Enricher__CachePath=/home/app/.wh40k-enricher/cache
+    volumes:
+      - catalogue-cache:/home/app/.wh40k-enricher/cache
+      - dataprotection-keys:/home/app/.aspnet/DataProtection-Keys
+    depends_on:
+      volume-init:
+        condition: service_completed_successfully
+
+  volume-init:
+    image: busybox
+    user: root
+    # web will run as "USER app" which has these UID:GIDs.  we need to ensure "app" has correct perms on the mounted volumes
+    command: ["sh", "-c", "chown -R 1654:1654 /home/app"]
+    volumes:
+      - catalogue-cache:/home/app/.wh40k-enricher
+      - dataprotection-keys:/home/app/.aspnet/DataProtection-Keys
 
 volumes:
-  wh40k-cache:
+  catalogue-cache:
+  dataprotection-keys:

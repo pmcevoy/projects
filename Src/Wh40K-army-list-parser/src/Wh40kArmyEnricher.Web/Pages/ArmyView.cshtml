@@ -1,444 +1,60 @@
 @page
+@using System.Text.Json
+@using Wh40kArmyEnricher.Web.Helpers
 @model ArmyViewModel
 @{
     ViewData["Title"] = "Army View";
-    string attackerName = Model.AttackerArmy.FirstOrDefault()?.Faction ?? "Attacker";
-    string defenderName = Model.DefenderArmy.FirstOrDefault()?.Faction ?? "Defender";
-    var camelCaseJson = new System.Text.Json.JsonSerializerOptions
+}
+
+<main class="army-view">
+    @if (Model.CatalogueVersions.Any())
     {
-        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-    };
-}
-
-@* Inline helper to render a unit card *@
-@functions {
-    string FormatStat(int val, string suffix = "") => val == 0 ? "-" : $"{val}{suffix}";
-    string FormatSave(int val) => val == 0 ? "-" : $"{val}+";
-    string FormatOptional(int? val, string suffix = "+") => val.HasValue ? $"{val}{suffix}" : "-";
-}
-
-<div id="loading-overlay">
-    <div class="spinner-border text-light mb-3" style="width:2rem;height:2rem;"></div>
-    <div>Running simulation...</div>
-</div>
-
-<div class="d-flex justify-content-center mb-2">
-    <form method="post" asp-page-handler="Swap">
-        <button type="submit" class="btn btn-sm btn-outline-secondary" title="Swap attacker and defender armies">
-            ⇄ Swap Armies
-        </button>
-    </form>
-</div>
-
-<div class="row g-2 mb-3">
-    <!-- Attacker column -->
-    <div class="col-md-6">
-        <div class="army-header attacker">⚔ @attackerName — Attacker</div>
-        @for (int i = 0; i < Model.AttackerArmy.Count; i++)
-        {
-            var unit = Model.AttackerArmy[i];
-            <div class="unit-card" data-role="attacker" data-index="@i" data-unit='@System.Text.Json.JsonSerializer.Serialize(unit, camelCaseJson)'>
-                @await Html.PartialAsync("_UnitCard", unit)
+        <div class="catalogue-bar">
+            <div class="catalogue-versions">
+                @foreach (var cat in Model.CatalogueVersions)
+                {
+                    <span class="catalogue-badge">@cat.Name <small>rev @cat.Revision</small></span>
+                }
             </div>
-        }
-    </div>
-
-    <!-- Defender column -->
-    <div class="col-md-6">
-        <div class="army-header defender">🛡 @defenderName — Defender</div>
-        @for (int i = 0; i < Model.DefenderArmy.Count; i++)
-        {
-            var unit = Model.DefenderArmy[i];
-            <div class="unit-card" data-role="defender" data-index="@i" data-unit='@System.Text.Json.JsonSerializer.Serialize(unit, camelCaseJson)'>
-                @await Html.PartialAsync("_UnitCard", unit)
-            </div>
-        }
-    </div>
-</div>
-
-<!-- Catalogue data sources -->
-<details class="mb-3" style="font-size:0.72rem; color:#6c757d;">
-    <summary style="cursor:pointer; user-select:none; list-style:none; display:flex; align-items:center; gap:0.3rem;">
-        <span style="font-size:0.6rem;">▶</span> BSData sources (@Model.CatalogueInfo.Count catalogues)
-    </summary>
-    <div class="mt-2" style="columns: 2 14rem; column-gap: 1.5rem; padding: 0.4rem 0.5rem; background:#0f1221; border-radius:3px;">
-        @foreach (var cat in Model.CatalogueInfo)
-        {
-            <div style="break-inside: avoid;">@cat.Name <span style="opacity:0.5;">r@(cat.Revision)</span></div>
-        }
-    </div>
-    <div class="mt-2 d-flex align-items-center gap-2">
-        <button id="refresh-catalogues-btn" class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem; padding:0.15rem 0.5rem;">
-            ↻ Refresh
-        </button>
-        <span id="refresh-status" style="font-size:0.7rem;"></span>
-    </div>
-</details>
-
-<!-- Combat panel — shown when attacker(s) and defender are selected -->
-<div id="combat-panel" class="mb-3" style="display:none;">
-    <div class="combat-panel-title">⚡ Combat Setup</div>
-
-    <div class="row g-2 mb-2">
-        <div class="col-12 text-muted small" id="selection-summary">No units selected.</div>
-    </div>
-
-    <!-- Weapon display + models firing -->
-    <div class="row g-2 mb-3">
-        <div class="col-md-7">
-            <label class="form-label small text-muted mb-1">Selected Weapon</label>
-            <div id="weapon-display" class="weapon-display-hint">
-                Expand an attacker unit and click a weapon row to select it.
-            </div>
+            <button class="btn-refresh" onclick="refreshCatalogues(this)">Re-download catalogues</button>
         </div>
-        <div class="col-md-2" id="attacking-models-col">
-            <label class="form-label small text-muted mb-1">Models firing</label>
-            <input type="number" id="attacking-models" class="form-control form-control-sm bg-dark text-light border-secondary" min="1" value="1" />
+    }
+
+    <div class="army-columns">
+        <div class="army-column">
+            <h2>Attacker</h2>
+            @for (int i = 0; i < Model.Attackers.Count; i++)
+            {
+                var unit = Model.Attackers[i];
+                var camelCaseJson = JsonSerializer.Serialize(unit, SessionJson.CamelCaseOptions);
+                <partial name="_UnitCard" model="@unit" view-data='@(new ViewDataDictionary(ViewData) { ["Side"] = "attacker", ["Index"] = i, ["UnitJson"] = camelCaseJson })'/>
+            }
         </div>
-        <div class="col-md-2" id="defending-models-col" style="display:none">
-            <label class="form-label small text-muted mb-1">Surviving models</label>
-            <input type="number" id="defending-models" class="form-control form-control-sm bg-dark text-light border-secondary" min="1" value="1" />
+        <div class="army-column">
+            <h2>Defender</h2>
+            @for (int i = 0; i < Model.Defenders.Count; i++)
+            {
+                var unit = Model.Defenders[i];
+                var camelCaseJson = JsonSerializer.Serialize(unit, SessionJson.CamelCaseOptions);
+                <partial name="_UnitCard" model="@unit" view-data='@(new ViewDataDictionary(ViewData) { ["Side"] = "defender", ["Index"] = i, ["UnitJson"] = camelCaseJson })'/>
+            }
         </div>
     </div>
 
-    <!-- 5 collapsible modifier sections -->
-    <div class="accordion accordion-flush modifier-accordion mb-3" id="modifierAccordion">
-
-        <!-- ── Attack Modifiers ── -->
-        <div class="accordion-item modifier-accordion-item">
-            <h2 class="accordion-header">
-                <button class="accordion-button modifier-section-btn collapsed" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#mods-attack" aria-expanded="false">
-                    Attack Modifiers
-                    <span class="modifier-summary ms-2" id="summary-attack"></span>
-                </button>
-            </h2>
-            <div id="mods-attack" class="accordion-collapse collapse">
-                <div class="accordion-body modifier-body">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-auto">
-                            <div class="small text-muted mb-1">+/− Attacks</div>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <input type="radio" class="btn-check" name="attack-mod" id="atk-mod-minus" value="-1" />
-                                <label class="btn btn-outline-secondary" for="atk-mod-minus">−1</label>
-                                <input type="radio" class="btn-check" name="attack-mod" id="atk-mod-zero" value="0" checked />
-                                <label class="btn btn-outline-secondary" for="atk-mod-zero">0</label>
-                                <input type="radio" class="btn-check" name="attack-mod" id="atk-mod-plus" value="1" />
-                                <label class="btn btn-outline-secondary" for="atk-mod-plus">+1</label>
-                            </div>
-                        </div>
-                        <div class="col-auto d-flex gap-3 align-items-end">
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="blast-override" />
-                                <label class="form-check-label small" for="blast-override">Blast</label>
-                            </div>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="reroll-attacks" />
-                                <label class="form-check-label small" for="reroll-attacks">Reroll attack dice</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── Hit Modifiers ── -->
-        <div class="accordion-item modifier-accordion-item">
-            <h2 class="accordion-header">
-                <button class="accordion-button modifier-section-btn collapsed" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#mods-hit" aria-expanded="false">
-                    Hit Modifiers
-                    <span class="modifier-summary ms-2" id="summary-hit"></span>
-                </button>
-            </h2>
-            <div id="mods-hit" class="accordion-collapse collapse">
-                <div class="accordion-body modifier-body">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-auto">
-                            <div class="small text-muted mb-1">+/− Hit Roll</div>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <input type="radio" class="btn-check" name="hit-roll-mod" id="hit-roll-minus" value="-1" />
-                                <label class="btn btn-outline-secondary" for="hit-roll-minus">−1</label>
-                                <input type="radio" class="btn-check" name="hit-roll-mod" id="hit-roll-zero" value="0" checked />
-                                <label class="btn btn-outline-secondary" for="hit-roll-zero">0</label>
-                                <input type="radio" class="btn-check" name="hit-roll-mod" id="hit-roll-plus" value="1" />
-                                <label class="btn btn-outline-secondary" for="hit-roll-plus">+1</label>
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="small text-muted mb-1">+/− BS/WS</div>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <input type="radio" class="btn-check" name="bsws-mod" id="bsws-minus" value="-1" />
-                                <label class="btn btn-outline-secondary" for="bsws-minus">−1</label>
-                                <input type="radio" class="btn-check" name="bsws-mod" id="bsws-zero" value="0" checked />
-                                <label class="btn btn-outline-secondary" for="bsws-zero">0</label>
-                                <input type="radio" class="btn-check" name="bsws-mod" id="bsws-plus" value="1" />
-                                <label class="btn btn-outline-secondary" for="bsws-plus">+1</label>
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="small text-muted mb-1">Hit Rerolls</div>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <input type="radio" class="btn-check" name="hit-rerolls" id="hr-none" value="none" checked />
-                                <label class="btn btn-outline-secondary" for="hr-none">None</label>
-                                <input type="radio" class="btn-check" name="hit-rerolls" id="hr-ones" value="ones" />
-                                <label class="btn btn-outline-secondary" for="hr-ones">1s</label>
-                                <input type="radio" class="btn-check" name="hit-rerolls" id="hr-all" value="all" />
-                                <label class="btn btn-outline-secondary" for="hr-all">All</label>
-                            </div>
-                        </div>
-                        <div class="col-auto align-self-end" id="fish-hit-col" style="display:none;">
-                            <div class="form-check mb-0">
-                                <input class="form-check-input" type="checkbox" id="fish-crit-hits" />
-                                <label class="form-check-label small" for="fish-crit-hits">Fish for Crits</label>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row g-3 mt-0 align-items-end">
-                        <div class="col-auto d-flex flex-wrap gap-3 align-items-end">
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="within-half-range" />
-                                <label class="form-check-label small" for="within-half-range">Half Range</label>
-                            </div>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="indirect-fire" />
-                                <label class="form-check-label small" for="indirect-fire">Indirect Fire</label>
-                            </div>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="crit-5" />
-                                <label class="form-check-label small" for="crit-5">Crit Hit 5+</label>
-                            </div>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="sustained-hits-override" />
-                                <label class="form-check-label small" for="sustained-hits-override">Sustained Hits 1</label>
-                            </div>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="lethal-hits-override" />
-                                <label class="form-check-label small" for="lethal-hits-override">Lethal Hits</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── Wound Modifiers ── -->
-        <div class="accordion-item modifier-accordion-item">
-            <h2 class="accordion-header">
-                <button class="accordion-button modifier-section-btn collapsed" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#mods-wound" aria-expanded="false">
-                    Wound Modifiers
-                    <span class="modifier-summary ms-2" id="summary-wound"></span>
-                </button>
-            </h2>
-            <div id="mods-wound" class="accordion-collapse collapse">
-                <div class="accordion-body modifier-body">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-auto">
-                            <div class="small text-muted mb-1">+/− Wound Roll</div>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <input type="radio" class="btn-check" name="wound-roll-mod" id="wr-roll-minus" value="-1" />
-                                <label class="btn btn-outline-secondary" for="wr-roll-minus">−1</label>
-                                <input type="radio" class="btn-check" name="wound-roll-mod" id="wr-roll-zero" value="0" checked />
-                                <label class="btn btn-outline-secondary" for="wr-roll-zero">0</label>
-                                <input type="radio" class="btn-check" name="wound-roll-mod" id="wr-roll-plus" value="1" />
-                                <label class="btn btn-outline-secondary" for="wr-roll-plus">+1</label>
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="small text-muted mb-1">+/− Strength</div>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <input type="radio" class="btn-check" name="str-mod" id="str-minus" value="-1" />
-                                <label class="btn btn-outline-secondary" for="str-minus">−1</label>
-                                <input type="radio" class="btn-check" name="str-mod" id="str-zero" value="0" checked />
-                                <label class="btn btn-outline-secondary" for="str-zero">0</label>
-                                <input type="radio" class="btn-check" name="str-mod" id="str-plus" value="1" />
-                                <label class="btn btn-outline-secondary" for="str-plus">+1</label>
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="small text-muted mb-1">+/− Toughness</div>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <input type="radio" class="btn-check" name="tough-mod" id="tough-minus" value="-1" />
-                                <label class="btn btn-outline-secondary" for="tough-minus">−1</label>
-                                <input type="radio" class="btn-check" name="tough-mod" id="tough-zero" value="0" checked />
-                                <label class="btn btn-outline-secondary" for="tough-zero">0</label>
-                                <input type="radio" class="btn-check" name="tough-mod" id="tough-plus" value="1" />
-                                <label class="btn btn-outline-secondary" for="tough-plus">+1</label>
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="small text-muted mb-1">Wound Rerolls</div>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <input type="radio" class="btn-check" name="wound-rerolls" id="wr-none" value="none" checked />
-                                <label class="btn btn-outline-secondary" for="wr-none">None</label>
-                                <input type="radio" class="btn-check" name="wound-rerolls" id="wr-ones" value="ones" />
-                                <label class="btn btn-outline-secondary" for="wr-ones">1s</label>
-                                <input type="radio" class="btn-check" name="wound-rerolls" id="wr-all" value="all" />
-                                <label class="btn btn-outline-secondary" for="wr-all">All</label>
-                            </div>
-                        </div>
-                        <div class="col-auto align-self-end" id="fish-wound-col" style="display:none;">
-                            <div class="form-check mb-0">
-                                <input class="form-check-input" type="checkbox" id="fish-crit-wounds" />
-                                <label class="form-check-label small" for="fish-crit-wounds">Fish for Crits</label>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row g-3 mt-0 align-items-end">
-                        <div class="col-auto d-flex flex-wrap gap-3 align-items-end">
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="crit-wound-5" />
-                                <label class="form-check-label small" for="crit-wound-5">Crit Wound 5+</label>
-                            </div>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="dev-wounds-override" />
-                                <label class="form-check-label small" for="dev-wounds-override">Devastating Wounds</label>
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="small text-muted mb-1">Anti-X</div>
-                            <div class="d-flex gap-2 align-items-center">
-                                <select id="anti-keyword" class="form-select form-select-sm bg-dark text-light border-secondary" style="width:auto;">
-                                    <option value="">—</option>
-                                    <option value="Infantry">Infantry</option>
-                                    <option value="Monster">Monster</option>
-                                    <option value="Vehicle">Vehicle</option>
-                                    <option value="Fly">Fly</option>
-                                    <option value="Psyker">Psyker</option>
-                                    <option value="Character">Character</option>
-                                    <option value="Daemon">Daemon</option>
-                                </select>
-                                <select id="anti-threshold" class="form-select form-select-sm bg-dark text-light border-secondary" style="width:auto;">
-                                    <option value="4">4+</option>
-                                    <option value="5">5+</option>
-                                    <option value="6">6+</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── Save Modifiers ── -->
-        <div class="accordion-item modifier-accordion-item">
-            <h2 class="accordion-header">
-                <button class="accordion-button modifier-section-btn collapsed" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#mods-save" aria-expanded="false">
-                    Save Modifiers
-                    <span class="modifier-summary ms-2" id="summary-save"></span>
-                </button>
-            </h2>
-            <div id="mods-save" class="accordion-collapse collapse">
-                <div class="accordion-body modifier-body">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-auto">
-                            <div class="small text-muted mb-1">+/− AP</div>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <input type="radio" class="btn-check" name="ap-mod" id="ap-minus" value="-1" />
-                                <label class="btn btn-outline-secondary" for="ap-minus">−1</label>
-                                <input type="radio" class="btn-check" name="ap-mod" id="ap-zero" value="0" checked />
-                                <label class="btn btn-outline-secondary" for="ap-zero">0</label>
-                                <input type="radio" class="btn-check" name="ap-mod" id="ap-plus" value="1" />
-                                <label class="btn btn-outline-secondary" for="ap-plus">+1</label>
-                            </div>
-                        </div>
-                        <div class="col-auto d-flex gap-3 align-items-end">
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="in-cover" />
-                                <label class="form-check-label small" for="in-cover">Cover (+1 Sv)</label>
-                            </div>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="ignores-cover" />
-                                <label class="form-check-label small" for="ignores-cover">Ignores Cover</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── Damage Modifiers ── -->
-        <div class="accordion-item modifier-accordion-item">
-            <h2 class="accordion-header">
-                <button class="accordion-button modifier-section-btn collapsed" type="button"
-                        data-bs-toggle="collapse" data-bs-target="#mods-damage" aria-expanded="false">
-                    Damage Modifiers
-                    <span class="modifier-summary ms-2" id="summary-damage"></span>
-                </button>
-            </h2>
-            <div id="mods-damage" class="accordion-collapse collapse">
-                <div class="accordion-body modifier-body">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-auto">
-                            <div class="small text-muted mb-1">+/− Damage</div>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <input type="radio" class="btn-check" name="dmg-mod" id="dmg-minus" value="-1" />
-                                <label class="btn btn-outline-secondary" for="dmg-minus">−1</label>
-                                <input type="radio" class="btn-check" name="dmg-mod" id="dmg-zero" value="0" checked />
-                                <label class="btn btn-outline-secondary" for="dmg-zero">0</label>
-                                <input type="radio" class="btn-check" name="dmg-mod" id="dmg-plus" value="1" />
-                                <label class="btn btn-outline-secondary" for="dmg-plus">+1</label>
-                            </div>
-                        </div>
-                        <div class="col-auto align-self-end">
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="reroll-damage" />
-                                <label class="form-check-label small" for="reroll-damage">Reroll damage dice</label>
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="small text-muted mb-1">Feel No Pain</div>
-                            <select id="fnp-override" class="form-select form-select-sm bg-dark text-light border-secondary" style="width:auto;">
-                                <option value="0">—</option>
-                                <option value="4">4+++</option>
-                                <option value="5">5+++</option>
-                                <option value="6">6+++</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </div><!-- /accordion -->
-
-    <div class="mt-2">
-        <button id="run-sim-btn" class="btn btn-danger px-4" disabled>Run Simulation</button>
+    <div id="combat-panel" class="combat-panel" style="display:none">
+        <!-- Combat panel — populated by JavaScript in Session 6 -->
     </div>
-
-    <!-- Results -->
-    <div id="results-panel" style="display:none;">
-        <div class="small text-muted mb-2" id="results-description"></div>
-        <div class="row text-center g-3">
-            <div class="col-6 col-md-3">
-                <div class="result-value" id="res-mean">—</div>
-                <div class="result-label">Mean Damage</div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="result-value" id="res-kills">—</div>
-                <div class="result-label">Expected Kills</div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="result-value" id="res-prob-kill">—</div>
-                <div class="result-label">P(Kill ≥ 1)</div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="result-value" id="res-std">—</div>
-                <div class="result-label">Std Deviation</div>
-            </div>
-        </div>
-        <div class="mt-2 small text-muted" id="res-range"></div>
-
-        <!-- Attack pipeline funnel — content generated by army-view.js -->
-        <div class="pipeline-section mt-3" id="pipeline-section" style="display:none;">
-            <div class="pipeline-title">Attack Pipeline</div>
-            <div id="pipeline-content"></div>
-        </div>
-    </div>
-</div>
+</main>
 
 @section Scripts {
-<script src="~/js/army-view.js"></script>
+<script>
+function refreshCatalogues(btn) {
+    btn.disabled = true;
+    btn.textContent = 'Refreshing...';
+    fetch('/api/refresh-catalogues', { method: 'POST' })
+        .then(r => r.json())
+        .then(() => { btn.textContent = 'Done — reload to use updated data'; })
+        .catch(() => { btn.textContent = 'Refresh failed'; btn.disabled = false; });
+}
+</script>
 }

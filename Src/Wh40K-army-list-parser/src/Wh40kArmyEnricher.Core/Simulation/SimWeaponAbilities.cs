@@ -1,17 +1,15 @@
 namespace Wh40kArmyEnricher.Core.Simulation;
 
-public sealed record SimWeaponAbilities
+public record SimWeaponAbilities
 {
     public bool Torrent { get; init; }
     public bool Blast { get; init; }
-    public int Melta { get; init; }
-    public int RapidFire { get; init; }
-    public int SustainedHits { get; init; }
+    public int Melta { get; init; }          // 0 = absent
+    public int RapidFire { get; init; }      // 0 = absent
+    public int SustainedHits { get; init; }  // 0 = absent
     public bool LethalHits { get; init; }
     public bool DevastatingWounds { get; init; }
-    /// <summary>Anti ability: maps defender keyword → minimum unmodified wound roll for a Critical Wound.</summary>
-    public IReadOnlyDictionary<string, int> Anti { get; init; } = new Dictionary<string, int>();
     public bool TwinLinked { get; init; }
-    /// <summary>Weapon hits on a flat 4+ regardless of BS/WS. Torrent takes precedence if both active.</summary>
     public bool IndirectFire { get; init; }
+    public IReadOnlyDictionary<string, int> Anti { get; init; } = new Dictionary<string, int>();
 }

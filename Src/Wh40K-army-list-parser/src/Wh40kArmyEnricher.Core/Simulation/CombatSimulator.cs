@@ -4,392 +4,336 @@ public sealed class CombatSimulator
 {
     private readonly IDiceRoller _dice;
 
-    public CombatSimulator(IDiceRoller dice)
+    public CombatSimulator() : this(new DiceRoller()) { }
+    public CombatSimulator(IDiceRoller dice) => _dice = dice;
+
+    public (IReadOnlyList<int> Damage, IReadOnlyList<int> Kills, CombatStageStats Aggregate, IReadOnlyList<WeaponGroupStats> PerWeapon)
+        Run(SimAttackerProfile attacker, SimDefenderProfile defender, int iterations = 10_000)
     {
-        _dice = dice;
-    }
+        var damages = new int[iterations];
+        var kills = new int[iterations];
+        int wc = attacker.Weapons.Count;
+        var totals = new RunTotals[wc];
 
-    // Per-run counters (int — reset each run, never overflow within a single run).
-    private struct RunTally
-    {
-        public int Attacks;
-        public int Hits;
-        public int CritHits;
-        public int Wounds;
-        public int CritWounds;
-        public int FailedSaves;
-        public int DamageBeforeFnp;
-        public int FnpSaved;
-        public int SustainedHitsBonus;
-        public int LethalHitsAutoWounds;
-        public int DevastatingWoundsTriggers;
-        public int AntiCritWounds;
-        public int ArmourSaveRolls;
-        public int InvulnSaveRolls;
-    }
-
-    // Cross-run accumulator (long — avoids overflow at 10k+ runs).
-    private struct RunTotals
-    {
-        public long Attacks, Hits, CritHits, Wounds, CritWounds;
-        public long FailedSaves, DamageBeforeFnp, FnpSaved;
-        public long SustainedHitsBonus, LethalHitsAutoWounds, DevastatingWoundsTriggers, AntiCritWounds;
-        public long ArmourSaveRolls, InvulnSaveRolls;
-
-        public void Add(in RunTally t)
+        for (int iter = 0; iter < iterations; iter++)
         {
-            Attacks += t.Attacks; Hits += t.Hits; CritHits += t.CritHits;
-            Wounds += t.Wounds; CritWounds += t.CritWounds;
-            FailedSaves += t.FailedSaves; DamageBeforeFnp += t.DamageBeforeFnp;
-            FnpSaved += t.FnpSaved; SustainedHitsBonus += t.SustainedHitsBonus;
-            LethalHitsAutoWounds += t.LethalHitsAutoWounds;
-            DevastatingWoundsTriggers += t.DevastatingWoundsTriggers;
-            AntiCritWounds += t.AntiCritWounds;
-            ArmourSaveRolls += t.ArmourSaveRolls; InvulnSaveRolls += t.InvulnSaveRolls;
-        }
+            var pool = new WoundPool(defender.Models, defender.Wounds);
+            var tallies = new RunTally[wc];
+            int runDamage = 0;
 
-        public void Add(in RunTotals other)
-        {
-            Attacks += other.Attacks; Hits += other.Hits; CritHits += other.CritHits;
-            Wounds += other.Wounds; CritWounds += other.CritWounds;
-            FailedSaves += other.FailedSaves; DamageBeforeFnp += other.DamageBeforeFnp;
-            FnpSaved += other.FnpSaved; SustainedHitsBonus += other.SustainedHitsBonus;
-            LethalHitsAutoWounds += other.LethalHitsAutoWounds;
-            DevastatingWoundsTriggers += other.DevastatingWoundsTriggers;
-            AntiCritWounds += other.AntiCritWounds;
-            ArmourSaveRolls += other.ArmourSaveRolls; InvulnSaveRolls += other.InvulnSaveRolls;
-        }
-    }
-
-    // Tracks per-model wound state across all weapon attacks in a single simulation run.
-    // Damage from each failed save is capped at the current model's remaining wounds; excess is lost.
-    private struct WoundPool
-    {
-        private readonly int _woundsPerModel;
-        public int ModelsRemaining;
-        public int CurrentModelWoundsRemaining;
-        public int Kills;
-
-        public WoundPool(SimDefenderProfile defender)
-        {
-            _woundsPerModel = Math.Max(1, defender.Wounds);
-            ModelsRemaining = defender.Models;
-            CurrentModelWoundsRemaining = _woundsPerModel;
-            Kills = 0;
-        }
-
-        public void Apply(int damage)
-        {
-            if (ModelsRemaining <= 0 || damage <= 0) return;
-            int absorbed = Math.Min(damage, CurrentModelWoundsRemaining);
-            CurrentModelWoundsRemaining -= absorbed;
-            if (CurrentModelWoundsRemaining == 0)
+            for (int w = 0; w < wc; w++)
             {
-                Kills++;
-                ModelsRemaining--;
-                if (ModelsRemaining > 0)
-                    CurrentModelWoundsRemaining = _woundsPerModel;
+                SimulateWeapon(attacker.Weapons[w], attacker, defender, ref pool, ref tallies[w], ref runDamage);
+                AccumulateTotals(ref totals[w], tallies[w]);
             }
+
+            damages[iter] = runDamage;
+            kills[iter] = pool.Kills;
         }
-    }
 
-    public (IReadOnlyList<int> Damage, IReadOnlyList<int> Kills, CombatStageStats Aggregate, IReadOnlyList<WeaponGroupStats> PerWeapon) Run(SimulationConfig config)
-    {
-        int weaponCount = config.Attacker.Weapons.Count;
-        var results = new List<int>(config.SimulationRuns);
-        var kills   = new List<int>(config.SimulationRuns);
-
-        var weaponTotals = new RunTotals[weaponCount];
-        var weaponTallies = new RunTally[weaponCount]; // reused buffer, cleared each run
-
-        for (int i = 0; i < config.SimulationRuns; i++)
+        var aggregate = BuildStats(SumTotals(totals), iterations);
+        var perWeapon = attacker.Weapons.Select((w, i) => new WeaponGroupStats
         {
-            Array.Clear(weaponTallies, 0, weaponCount);
-            var (dmg, k) = SimulateOneRun(config.Attacker, config.Defender, weaponTallies);
-            results.Add(dmg);
-            kills.Add(k);
-            for (int w = 0; w < weaponCount; w++)
-                weaponTotals[w].Add(weaponTallies[w]);
-        }
+            WeaponName = w.WeaponName,
+            Stats = BuildStats(totals[i], iterations)
+        }).ToArray();
 
-        double n = config.SimulationRuns;
-
-        // Aggregate = element-wise sum of all per-weapon totals.
-        var aggregateTotals = new RunTotals();
-        for (int w = 0; w < weaponCount; w++)
-            aggregateTotals.Add(weaponTotals[w]);
-
-        var aggregate = ToStats(aggregateTotals, n);
-
-        var perWeapon = config.Attacker.Weapons
-            .Select((w, idx) => new WeaponGroupStats
-            {
-                WeaponName = w.Name,
-                Stats = ToStats(weaponTotals[idx], n),
-            })
-            .ToList();
-
-        return (results, kills, aggregate, perWeapon);
+        return (damages, kills, aggregate, perWeapon);
     }
 
-    private static CombatStageStats ToStats(in RunTotals t, double n) => new()
-    {
-        AvgAttacks                   = t.Attacks / n,
-        AvgHits                      = t.Hits / n,
-        AvgCritHits                  = t.CritHits / n,
-        AvgWounds                    = t.Wounds / n,
-        AvgCritWounds                = t.CritWounds / n,
-        AvgFailedSaves               = t.FailedSaves / n,
-        AvgDamageBeforeFnp           = t.DamageBeforeFnp / n,
-        AvgFnpSaved                  = t.FnpSaved / n,
-        AvgSustainedHitsBonus        = t.SustainedHitsBonus / n,
-        AvgLethalHitsAutoWounds      = t.LethalHitsAutoWounds / n,
-        AvgDevastatingWoundsTriggers = t.DevastatingWoundsTriggers / n,
-        AvgAntiCritWounds            = t.AntiCritWounds / n,
-        AvgArmourSaveRolls           = t.ArmourSaveRolls / n,
-        AvgInvulnSaveRolls           = t.InvulnSaveRolls / n,
-    };
-
-    private (int damage, int kills) SimulateOneRun(SimAttackerProfile attacker, SimDefenderProfile defender, RunTally[] weaponTallies)
-    {
-        int totalDamage = 0;
-        var pool = new WoundPool(defender);
-
-        for (int wi = 0; wi < attacker.Weapons.Count; wi++)
-        {
-            var weapon = attacker.Weapons[wi];
-
-            int attacks = weapon.RerollAttackDice
-                ? _dice.RollWithReroll(weapon.Attacks)
-                : _dice.Roll(weapon.Attacks);
-
-            // Blast: +1 attack per 5 defender models
-            if (weapon.Abilities.Blast && defender.Models > 0)
-                attacks += defender.Models / 5;
-
-            // Rapid Fire: +X attacks at half range
-            if (weapon.Abilities.RapidFire > 0 && weapon.WithinHalfRange)
-                attacks += weapon.Abilities.RapidFire;
-
-            // Attack modifier applied last, minimum 0
-            attacks = Math.Max(0, attacks + weapon.AttackModifier);
-
-            weaponTallies[wi].Attacks = attacks;
-
-            int criticalWoundsOn = ComputeCriticalWoundsOn(weapon, defender, attacker.CriticalWoundsOn);
-            for (int i = 0; i < attacks; i++)
-                totalDamage += ResolveOneAttack(weapon, attacker, defender, criticalWoundsOn,
-                    isFromSustainedHits: false, ref weaponTallies[wi], ref pool);
-        }
-        return (totalDamage, pool.Kills);
-    }
-
-    private int ResolveOneAttack(
+    private void SimulateWeapon(
         SimWeaponProfile weapon,
         SimAttackerProfile attacker,
         SimDefenderProfile defender,
-        int criticalWoundsOn,
-        bool isFromSustainedHits,
+        ref WoundPool pool,
         ref RunTally tally,
-        ref WoundPool pool)
+        ref int totalDamage)
     {
-        int damage = 0;
-        bool isCriticalHit = false;
+        // Step 1: Determine attack count
+        int attacks = weapon.RerollAttackDice
+            ? _dice.RollWithReroll(weapon.Attacks)
+            : RollAll(weapon.Attacks);
 
-        if (isFromSustainedHits)
+        if (weapon.Abilities.Blast)
+            attacks += defender.Models / 5;
+        if (weapon.WithinHalfRange && weapon.Abilities.RapidFire > 0)
+            attacks += weapon.Abilities.RapidFire;
+        attacks = Math.Max(0, attacks + weapon.AttackModifier);
+        tally.Attacks = attacks;
+
+        int bonusSHHits = 0;
+
+        // Step 2a: Process original attacks through hit roll
+        for (int i = 0; i < attacks; i++)
         {
-            tally.Hits++;
-            tally.SustainedHitsBonus++;
-        }
-        else if (weapon.Abilities.Torrent)
-        {
-            tally.Hits++;
-        }
-        else
-        {
-            bool hit = RollHit(weapon, attacker, out isCriticalHit);
-            if (!hit) return 0;
-            tally.Hits++;
-            if (isCriticalHit) tally.CritHits++;
-        }
+            bool isCritHit;
 
-        if (isCriticalHit && weapon.Abilities.SustainedHits > 0 && !isFromSustainedHits)
-        {
-            for (int s = 0; s < weapon.Abilities.SustainedHits; s++)
-                damage += ResolveOneAttack(weapon, attacker, defender, criticalWoundsOn,
-                    isFromSustainedHits: true, ref tally, ref pool);
-        }
+            if (weapon.Abilities.Torrent)
+            {
+                // Auto-hit; Torrent does not produce critical hits
+                isCritHit = false;
+                tally.Hits++;
+            }
+            else
+            {
+                int baseTarget = weapon.Abilities.IndirectFire ? 4 : weapon.Skill;
+                int roll = RollHit(attacker, baseTarget);
+                bool isHit = roll != 1 && (roll == 6 || roll + weapon.HitRollModifier >= baseTarget);
+                isCritHit = roll >= attacker.CriticalHitsOn;
 
-        bool isLethalHit = isCriticalHit && weapon.Abilities.LethalHits && !isFromSustainedHits;
+                if (!isHit) continue;
 
-        bool wounded = RollWound(weapon, attacker, defender, isLethalHit, criticalWoundsOn,
-            out bool devastatingWound, ref tally);
+                tally.Hits++;
+                if (isCritHit) tally.CritHits++;
 
-        if (devastatingWound)
-        {
-            tally.DevastatingWoundsTriggers++;
-            int rawDmg = RollDamage(weapon);
-            if (weapon.WithinHalfRange && weapon.Abilities.Melta > 0)
-                rawDmg += weapon.Abilities.Melta;
-            damage += ApplyDamageWithFnp(rawDmg, defender, ref tally, ref pool);
-            return damage;
+                if (isCritHit && weapon.Abilities.SustainedHits > 0)
+                {
+                    bonusSHHits += weapon.Abilities.SustainedHits;
+                    tally.SustainedHitsBonus += weapon.Abilities.SustainedHits;
+                }
+            }
+
+            // Lethal Hits: critical hit auto-wounds (skips wound roll)
+            bool lethalAutoWound = isCritHit && weapon.Abilities.LethalHits;
+            ProcessWoundSaveDamage(weapon, attacker, defender, ref pool, ref tally, ref totalDamage, lethalAutoWound);
         }
 
-        if (!wounded) return damage;
-
-        bool savedRoll = RollSave(weapon, defender, ref tally);
-        if (savedRoll) return damage;
-
-        tally.FailedSaves++;
-        int d = RollDamage(weapon);
-        if (weapon.WithinHalfRange && weapon.Abilities.Melta > 0)
-            d += weapon.Abilities.Melta;
-        damage += ApplyDamageWithFnp(d, defender, ref tally, ref pool);
-        return damage;
+        // Step 2b: Sustained Hits bonus attacks — already hits, no hit roll, not crits (no Lethal Hits)
+        tally.Hits += bonusSHHits;
+        for (int i = 0; i < bonusSHHits; i++)
+            ProcessWoundSaveDamage(weapon, attacker, defender, ref pool, ref tally, ref totalDamage, false);
     }
 
-    private int RollDamage(SimWeaponProfile weapon)
-    {
-        int raw = weapon.RerollDamageDice
-            ? _dice.RollWithReroll(weapon.Damage)
-            : _dice.Roll(weapon.Damage);
-        return Math.Max(1, raw + weapon.DamageModifier);
-    }
-
-    private bool RollHit(SimWeaponProfile weapon, SimAttackerProfile attacker, out bool isCriticalHit)
-    {
-        // Indirect Fire overrides BS/WS with a flat 4+ (Torrent takes precedence and is handled before this call).
-        int skillTarget = weapon.Abilities.IndirectFire ? 4 : weapon.Skill;
-        int criticalHitsOn = attacker.CriticalHitsOn;
-
-        int raw = _dice.RollD6();
-
-        bool shouldReroll =
-            attacker.Rerolls.HitRerollAll && attacker.FishForCriticalHits ? raw < criticalHitsOn :
-            attacker.Rerolls.HitRerollAll                                  ? (raw < criticalHitsOn && raw < skillTarget) :
-            attacker.Rerolls.HitRerollOnes                                 ? raw == 1 :
-            false;
-
-        if (shouldReroll)
-            raw = _dice.RollD6();
-
-        if (raw == 1) { isCriticalHit = false; return false; }
-        if (raw >= criticalHitsOn) { isCriticalHit = true; return true; }
-
-        isCriticalHit = false;
-        int mod = Math.Clamp(attacker.HitRollModifier, -1, 1);
-        return raw + mod >= skillTarget;
-    }
-
-    private bool RollWound(
+    private void ProcessWoundSaveDamage(
         SimWeaponProfile weapon,
         SimAttackerProfile attacker,
         SimDefenderProfile defender,
-        bool isLethalHit,
-        int criticalWoundsOn,
-        out bool devastatingWound,
-        ref RunTally tally)
+        ref WoundPool pool,
+        ref RunTally tally,
+        ref int totalDamage,
+        bool lethalAutoWound)
     {
-        if (isLethalHit)
+        // Step 2: Wound roll
+        bool isCritWound;
+
+        if (lethalAutoWound)
         {
+            // Skip wound roll; result is not a critical wound so DevW does not trigger
+            isCritWound = false;
             tally.Wounds++;
             tally.LethalHitsAutoWounds++;
-            devastatingWound = false;
-            return true;
-        }
-
-        int raw = _dice.RollD6();
-        int threshold = AbilityProcessor.WoundThreshold(weapon.Strength, defender.Toughness);
-
-        // Rerolls are applied before modifiers (per rules). Reroll decision uses raw die only.
-        bool canRerollAll = attacker.Rerolls.WoundRerollAll || weapon.Abilities.TwinLinked;
-        bool shouldReroll =
-            canRerollAll && attacker.FishForCriticalWounds ? raw < criticalWoundsOn :
-            canRerollAll                                    ? (raw < criticalWoundsOn && raw < threshold) :
-            attacker.Rerolls.WoundRerollOnes                ? raw == 1 :
-            false;
-
-        if (shouldReroll)
-            raw = _dice.RollD6();
-
-        // Natural 1 always fails regardless of modifier.
-        if (raw == 1) { devastatingWound = false; return false; }
-
-        // Critical wound check uses the raw (unmodified) die.
-        if (raw >= criticalWoundsOn)
-        {
-            tally.Wounds++;
-            tally.CritWounds++;
-            if (criticalWoundsOn < 6 && raw < 6)
-                tally.AntiCritWounds++;
-            devastatingWound = weapon.Abilities.DevastatingWounds;
-            return true;
-        }
-
-        // Apply wound roll modifier (capped at +1/-1 per 40K rules) to the threshold comparison.
-        int mod = Math.Clamp(attacker.WoundRollModifier, -1, 1);
-        devastatingWound = false;
-        if (raw + mod >= threshold)
-        {
-            tally.Wounds++;
-            return true;
-        }
-        return false;
-    }
-
-    private static int ComputeCriticalWoundsOn(SimWeaponProfile weapon, SimDefenderProfile defender, int attackerCritWoundsOn)
-    {
-        int threshold = attackerCritWoundsOn; // may already be 5 from "Crit Wound on 5+" toggle
-        foreach (var (keyword, value) in weapon.Abilities.Anti)
-        {
-            if (defender.Keywords.Any(k => string.Equals(k, keyword, StringComparison.OrdinalIgnoreCase)))
-                threshold = Math.Min(threshold, value);
-        }
-        return threshold;
-    }
-
-    private bool RollSave(SimWeaponProfile weapon, SimDefenderProfile defender, ref RunTally tally)
-    {
-        int armourSave = defender.Save + weapon.Ap;
-        bool usingInvuln = defender.InvulnerableSave.HasValue
-            && defender.InvulnerableSave.Value < armourSave;
-
-        if (usingInvuln)
-            tally.InvulnSaveRolls++;
-        else
-            tally.ArmourSaveRolls++;
-
-        int raw = _dice.RollD6();
-        if (raw == 1) return false;
-
-        int effectiveSave = usingInvuln ? defender.InvulnerableSave!.Value : armourSave;
-        return raw >= effectiveSave;
-    }
-
-    private int ApplyDamageWithFnp(int rawDamage, SimDefenderProfile defender, ref RunTally tally, ref WoundPool pool)
-    {
-        tally.DamageBeforeFnp += rawDamage;
-
-        int throughFnp;
-        if (!defender.FeelNoPain.HasValue)
-        {
-            throughFnp = rawDamage;
         }
         else
         {
-            int fnpValue = defender.FeelNoPain.Value;
-            throughFnp = 0;
-            for (int i = 0; i < rawDamage; i++)
+            int woundTarget = AbilityProcessor.WoundThreshold(weapon.Strength, defender.Toughness);
+            int roll = RollWound(weapon, attacker, woundTarget);
+
+            // Determine critical wound threshold; Anti can lower it below CriticalWoundsOn
+            int critThreshold = attacker.CriticalWoundsOn;
+            bool antiLowered = false;
+            foreach (var (keyword, threshold) in weapon.Abilities.Anti)
             {
-                if (_dice.RollD6() < fnpValue)
-                    throughFnp++;
-                else
-                    tally.FnpSaved++;
+                if (defender.Keywords.Any(k => string.Equals(k, keyword, StringComparison.OrdinalIgnoreCase))
+                    && threshold < critThreshold)
+                {
+                    critThreshold = threshold;
+                    antiLowered = true;
+                }
+            }
+
+            bool normalWound = roll != 1 && (roll == 6 || roll + weapon.WoundRollModifier >= woundTarget);
+            isCritWound = roll != 1 && roll >= critThreshold;
+            bool isWound = normalWound || isCritWound;
+
+            if (!isWound) return;
+
+            tally.Wounds++;
+            if (isCritWound)
+            {
+                tally.CritWounds++;
+                // AntiCritWound: only a crit because Anti lowered the threshold, and a normal wound would have failed
+                if (antiLowered && roll < attacker.CriticalWoundsOn && !normalWound)
+                    tally.AntiCritWounds++;
             }
         }
 
-        // Each failed save allocates all its damage to one model; excess is lost (no spillover).
-        pool.Apply(throughFnp);
-        return throughFnp;
+        // Step 3: Save roll (skipped for Devastating Wounds triggers)
+        if (isCritWound && weapon.Abilities.DevastatingWounds)
+        {
+            tally.DevastatingWoundsTriggers++;
+            ApplyDamage(weapon, defender, ref pool, ref tally, ref totalDamage);
+            return;
+        }
+
+        int armourSave = defender.Save - weapon.Ap;
+        bool useInvuln = defender.InvulnerableSave.HasValue && defender.InvulnerableSave.Value < armourSave;
+        int effectiveSave = useInvuln ? defender.InvulnerableSave!.Value : armourSave;
+
+        int saveRoll = _dice.Roll(6);
+        bool savePassed = saveRoll != 1 && saveRoll >= effectiveSave;
+
+        if (useInvuln) tally.InvulnSaveRolls++;
+        else tally.ArmourSaveRolls++;
+
+        if (savePassed) return;
+
+        tally.FailedSaves++;
+        ApplyDamage(weapon, defender, ref pool, ref tally, ref totalDamage);
     }
+
+    private void ApplyDamage(
+        SimWeaponProfile weapon,
+        SimDefenderProfile defender,
+        ref WoundPool pool,
+        ref RunTally tally,
+        ref int totalDamage)
+    {
+        int dmg = weapon.RerollDamageDice
+            ? _dice.RollWithReroll(weapon.Damage)
+            : RollAll(weapon.Damage);
+
+        dmg = Math.Max(1, dmg + weapon.DamageModifier);
+
+        if (weapon.WithinHalfRange && weapon.Abilities.Melta > 0)
+            dmg += weapon.Abilities.Melta;
+
+        tally.DamageBeforeFnp += dmg;
+
+        int fnpSaved = 0;
+        if (defender.FeelNoPain.HasValue)
+        {
+            int fnpValue = defender.FeelNoPain.Value;
+            for (int i = 0; i < dmg; i++)
+                if (_dice.Roll(6) >= fnpValue) fnpSaved++;
+        }
+        tally.FnpSaved += fnpSaved;
+
+        // totalDamage is post-FNP before wound pool capping
+        int netDmg = dmg - fnpSaved;
+        totalDamage += netDmg;
+        pool.Apply(netDmg);
+    }
+
+    private int RollAll(DiceExpression expr)
+    {
+        if (expr.Count == 0) return expr.Modifier;
+        int total = expr.Modifier;
+        for (int i = 0; i < expr.Count; i++)
+            total += _dice.Roll(expr.Sides);
+        return total;
+    }
+
+    // Rerolls applied before modifiers; check uses unmodified roll vs unmodified target.
+    private int RollHit(SimAttackerProfile attacker, int baseTarget)
+    {
+        int roll = _dice.Roll(6);
+        bool shouldReroll;
+        if (attacker.HitRerollAll && attacker.FishForCriticalHits)
+            shouldReroll = roll < attacker.CriticalHitsOn;
+        else if (attacker.HitRerollAll)
+            shouldReroll = roll < baseTarget;
+        else if (attacker.HitRerollOnes)
+            shouldReroll = roll == 1;
+        else
+            shouldReroll = false;
+
+        if (shouldReroll) roll = _dice.Roll(6);
+        return roll;
+    }
+
+    // TwinLinked forces wound reroll all (scoped to this weapon).
+    private int RollWound(SimWeaponProfile weapon, SimAttackerProfile attacker, int woundTarget)
+    {
+        int roll = _dice.Roll(6);
+        bool rerollAll = attacker.WoundRerollAll || weapon.Abilities.TwinLinked;
+        bool shouldReroll;
+        if (rerollAll && attacker.FishForCriticalWounds)
+            shouldReroll = roll < attacker.CriticalWoundsOn;
+        else if (rerollAll)
+            shouldReroll = roll < woundTarget;
+        else if (attacker.WoundRerollOnes)
+            shouldReroll = roll == 1;
+        else
+            shouldReroll = false;
+
+        if (shouldReroll) roll = _dice.Roll(6);
+        return roll;
+    }
+
+    private struct RunTally
+    {
+        public int Attacks, Hits, CritHits, SustainedHitsBonus;
+        public int Wounds, CritWounds, LethalHitsAutoWounds, AntiCritWounds;
+        public int FailedSaves, DevastatingWoundsTriggers;
+        public int ArmourSaveRolls, InvulnSaveRolls;
+        public int DamageBeforeFnp, FnpSaved;
+    }
+
+    private struct RunTotals
+    {
+        public long Attacks, Hits, CritHits, SustainedHitsBonus;
+        public long Wounds, CritWounds, LethalHitsAutoWounds, AntiCritWounds;
+        public long FailedSaves, DevastatingWoundsTriggers;
+        public long ArmourSaveRolls, InvulnSaveRolls;
+        public long DamageBeforeFnp, FnpSaved;
+    }
+
+    private static void AccumulateTotals(ref RunTotals t, RunTally r)
+    {
+        t.Attacks += r.Attacks;
+        t.Hits += r.Hits;
+        t.CritHits += r.CritHits;
+        t.SustainedHitsBonus += r.SustainedHitsBonus;
+        t.Wounds += r.Wounds;
+        t.CritWounds += r.CritWounds;
+        t.LethalHitsAutoWounds += r.LethalHitsAutoWounds;
+        t.AntiCritWounds += r.AntiCritWounds;
+        t.FailedSaves += r.FailedSaves;
+        t.DevastatingWoundsTriggers += r.DevastatingWoundsTriggers;
+        t.ArmourSaveRolls += r.ArmourSaveRolls;
+        t.InvulnSaveRolls += r.InvulnSaveRolls;
+        t.DamageBeforeFnp += r.DamageBeforeFnp;
+        t.FnpSaved += r.FnpSaved;
+    }
+
+    private static RunTotals SumTotals(RunTotals[] totals)
+    {
+        var s = new RunTotals();
+        foreach (var t in totals)
+        {
+            s.Attacks += t.Attacks;
+            s.Hits += t.Hits;
+            s.CritHits += t.CritHits;
+            s.SustainedHitsBonus += t.SustainedHitsBonus;
+            s.Wounds += t.Wounds;
+            s.CritWounds += t.CritWounds;
+            s.LethalHitsAutoWounds += t.LethalHitsAutoWounds;
+            s.AntiCritWounds += t.AntiCritWounds;
+            s.FailedSaves += t.FailedSaves;
+            s.DevastatingWoundsTriggers += t.DevastatingWoundsTriggers;
+            s.ArmourSaveRolls += t.ArmourSaveRolls;
+            s.InvulnSaveRolls += t.InvulnSaveRolls;
+            s.DamageBeforeFnp += t.DamageBeforeFnp;
+            s.FnpSaved += t.FnpSaved;
+        }
+        return s;
+    }
+
+    private static CombatStageStats BuildStats(RunTotals t, int iterations) => new()
+    {
+        AvgAttacks = (double)t.Attacks / iterations,
+        AvgHits = (double)t.Hits / iterations,
+        AvgCritHits = (double)t.CritHits / iterations,
+        AvgSustainedHitsBonus = (double)t.SustainedHitsBonus / iterations,
+        AvgWounds = (double)t.Wounds / iterations,
+        AvgCritWounds = (double)t.CritWounds / iterations,
+        AvgLethalHitsAutoWounds = (double)t.LethalHitsAutoWounds / iterations,
+        AvgAntiCritWounds = (double)t.AntiCritWounds / iterations,
+        AvgFailedSaves = (double)t.FailedSaves / iterations,
+        AvgDevastatingWoundsTriggers = (double)t.DevastatingWoundsTriggers / iterations,
+        AvgArmourSaveRolls = (double)t.ArmourSaveRolls / iterations,
+        AvgInvulnSaveRolls = (double)t.InvulnSaveRolls / iterations,
+        AvgDamageBeforeFnp = (double)t.DamageBeforeFnp / iterations,
+        AvgFnpSaved = (double)t.FnpSaved / iterations,
+    };
 }

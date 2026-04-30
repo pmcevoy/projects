@@ -1,570 +1,577 @@
-// WH40K Army Tool — Army View interactive logic
+// army-view.js — weapon selection, combat panel, simulation, pipeline display
 
-(function () {
-    'use strict';
+// ── Persistent state ──────────────────────────────────────────────────────────
 
-    // ---------------------------------------------------------------------------
-    // State
-    // ---------------------------------------------------------------------------
+const state = {
+    attackerUnitName: null,   // primary attacker unit name (first selection)
+    selections: [],           // {cardId, unitName, weaponName, variantName, modelName, weaponType, modelCount}
+    lockedPhase: null,        // 'Ranged' | 'Melee' | null
+    defenderCardId: null,
+    defenderUnitName: null,
+};
 
-    const selectedAttackers = new Map();  // unitIndex -> unitProfile
-    let selectedDefenderIndex = null;
-    let selectedDefenderUnit  = null;
+// Modifier values — persists across weapon selection changes
+const mods = {
+    attackModifier: 0, blastOverride: false, rerollAttackDice: false,
+    withinHalfRange: false, hitRollModifier: 0, bsWsModifier: 0,
+    rerollHitOnes: false, rerollHitAll: false, fishForCritHits: false,
+    indirectFire: false, critHitOn5Plus: false, sustainedHitsOverride: false, lethalHitsOverride: false,
+    woundRollModifier: 0, strengthModifier: 0, toughnessModifier: 0,
+    rerollWoundOnes: false, rerollWoundAll: false, fishForCritWounds: false,
+    critWoundOn5Plus: false, devastatingWoundsOverride: false, antiKeyword: '', antiThreshold: 0,
+    cover: false, ignoresCover: false, apModifier: 0,
+    damageModifier: 0, rerollDamageDice: false, fnpOverride: 0,
+    defenderModelCount: 0,
+};
 
-    // Map of weaponKey -> { weaponName, variantName, modelName, modelCount, weaponType, unitIndex, rowElement }
-    // weaponKey = `${unitIndex}::${modelName}::${weaponName}::${variantName}`
-    const selectedWeapons = new Map();
-    let activeWeaponType = null; // 'Melee' | 'Ranged' | null
+// Open/closed state of modifier <details> sections — survives panel rebuilds
+const sectionState = { attack: false, hit: false, wound: false, save: false, damage: false };
 
-    const combatPanel          = document.getElementById('combat-panel');
-    const selectionSummary     = document.getElementById('selection-summary');
-    const weaponDisplay        = document.getElementById('weapon-display');
-    const attackingModelsInput = document.getElementById('attacking-models');
-    const attackingModelsCol   = document.getElementById('attacking-models-col');
-    const defendingModelsInput = document.getElementById('defending-models');
-    const defendingModelsCol   = document.getElementById('defending-models-col');
-    const runSimBtn            = document.getElementById('run-sim-btn');
-    const resultsPanel         = document.getElementById('results-panel');
-    const loadingOverlay       = document.getElementById('loading-overlay');
+// ── Card toggle ───────────────────────────────────────────────────────────────
 
-    // ---------------------------------------------------------------------------
-    // Unit card click handling (header — selection toggle)
-    // ---------------------------------------------------------------------------
+function toggleCard(cardId) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    const body = card.querySelector('.unit-card-body');
+    const isOpen = card.classList.contains('open');
+    if (isOpen) {
+        body.style.display = 'none';
+        card.classList.remove('open');
+    } else {
+        body.style.display = 'block';
+        card.classList.add('open');
+    }
+}
 
-    document.querySelectorAll('.unit-card').forEach(card => {
-        card.addEventListener('click', function (e) {
-            if (e.target.closest('.collapse')) return;
+// ── Defender selection ────────────────────────────────────────────────────────
 
-            const role  = card.dataset.role;
-            const index = parseInt(card.dataset.index, 10);
-            const unit  = JSON.parse(card.dataset.unit);
+function onDefenderHeaderClick(cardId) {
+    toggleCard(cardId);
+    selectDefender(cardId);
+}
 
-            if (role === 'attacker') {
-                toggleAttacker(card, index, unit);
-            } else if (role === 'defender') {
-                selectDefender(card, index, unit);
-            }
+function selectDefender(cardId) {
+    if (state.defenderCardId === cardId) {
+        clearDefender();
+    } else {
+        clearDefender();
+        const card = document.getElementById(cardId);
+        if (!card) return;
+        state.defenderCardId = cardId;
+        state.defenderUnitName = card.dataset.unitName || '';
+        card.classList.add('selected-defender');
+    }
+    updateCombatPanel();
+}
 
-            updateUI();
-        });
-    });
+function clearDefender() {
+    if (state.defenderCardId) {
+        const prev = document.getElementById(state.defenderCardId);
+        if (prev) prev.classList.remove('selected-defender');
+    }
+    state.defenderCardId = null;
+    state.defenderUnitName = null;
+}
 
-    function toggleAttacker(card, index, unit) {
-        if (selectedAttackers.has(index)) {
-            selectedAttackers.delete(index);
-            card.classList.remove('selected-attacker');
+// ── Weapon row selection ──────────────────────────────────────────────────────
 
-            // Remove any weapons that came from this unit.
-            for (const [key, w] of selectedWeapons.entries()) {
-                if (w.unitIndex === index) {
-                    w.rowElement.classList.remove('selected-weapon');
-                    selectedWeapons.delete(key);
-                }
-            }
-            if (selectedWeapons.size === 0) activeWeaponType = null;
+function selectWeaponRow(row) {
+    const card = row.closest('.unit-card');
+    if (!card || card.dataset.side !== 'attacker') return;
+    if (row.classList.contains('weapon-type-locked')) return;
+
+    const weaponName = row.dataset.weapon || '';
+    const variantName = row.dataset.variant || '';
+    const modelName = row.dataset.model || '';
+    const weaponType = row.dataset.weaponType || '';
+    const unitName = card.dataset.unitName || '';
+
+    const idx = state.selections.findIndex(s =>
+        s.cardId === card.id &&
+        s.weaponName === weaponName &&
+        s.variantName === variantName &&
+        s.modelName === modelName);
+
+    if (idx >= 0) {
+        state.selections.splice(idx, 1);
+        row.classList.remove('selected-attacker');
+    } else {
+        const unitData = getUnitData(card);
+        let defaultCount = 1;
+        if (unitData) {
+            const modelEntry = (unitData.models || []).find(m => m.modelName === modelName);
+            if (modelEntry) defaultCount = modelEntry.count || 1;
+        }
+        state.selections.push({ cardId: card.id, unitName, weaponName, variantName, modelName, weaponType, modelCount: defaultCount });
+        row.classList.add('selected-attacker');
+
+        if (!state.lockedPhase) {
+            state.lockedPhase = weaponType;
+            state.attackerUnitName = unitName;
+        }
+    }
+
+    if (state.selections.length === 0) {
+        state.lockedPhase = null;
+        state.attackerUnitName = null;
+    }
+
+    applyPhaseLock();
+    updateCombatPanel();
+}
+
+function applyPhaseLock() {
+    document.querySelectorAll('.unit-card[data-side="attacker"] .weapon-row').forEach(row => {
+        const rowType = row.dataset.weaponType || '';
+        if (state.lockedPhase && rowType && rowType !== state.lockedPhase) {
+            row.classList.add('weapon-type-locked');
         } else {
-            selectedAttackers.set(index, unit);
-            card.classList.add('selected-attacker');
+            row.classList.remove('weapon-type-locked');
         }
+    });
+}
+
+function getUnitData(card) {
+    try { return JSON.parse(card.dataset.unit || '{}'); } catch { return null; }
+}
+
+// ── Combat panel ──────────────────────────────────────────────────────────────
+
+function updateCombatPanel() {
+    const panel = document.getElementById('combat-panel');
+    if (!panel) return;
+
+    if (state.selections.length === 0 || !state.defenderCardId) {
+        panel.style.display = 'none';
+        return;
     }
 
-    function selectDefender(card, index, unit) {
-        document.querySelectorAll('.unit-card[data-role="defender"]').forEach(c =>
-            c.classList.remove('selected-defender'));
+    panel.style.display = 'block';
+    panel.innerHTML = buildPanelHtml();
+    attachPanelListeners();
+}
 
-        if (selectedDefenderIndex === index) {
-            selectedDefenderIndex = null;
-            selectedDefenderUnit  = null;
-        } else {
-            selectedDefenderIndex = index;
-            selectedDefenderUnit  = unit;
-            card.classList.add('selected-defender');
-            defendingModelsInput.value = unit.modelCount || 1;
-        }
-    }
+function buildPanelHtml() {
+    const attackerNames = [...new Set(state.selections.map(s => s.unitName))];
+    const attackerDisplay = attackerNames.join(' + ');
 
-    // ---------------------------------------------------------------------------
-    // Weapon row click handling — toggle-based multi-select
-    // ---------------------------------------------------------------------------
+    let html = `<div class="panel-header">
+        <span class="panel-title">${escHtml(attackerDisplay)} <span class="panel-arrow">→</span> ${escHtml(state.defenderUnitName || '')}</span>
+    </div>`;
 
-    document.querySelectorAll('.unit-card[data-role="attacker"] .weapon-variant-row').forEach(row => {
-        row.addEventListener('click', function (e) {
-            e.stopPropagation();
+    // Weapon selections with per-selection model count inputs
+    html += `<div class="panel-selections">`;
+    state.selections.forEach((sel, i) => {
+        const label = sel.variantName ? `${sel.weaponName} (${sel.variantName})` : sel.weaponName;
+        html += `<div class="panel-selection">
+            <span class="panel-sel-name">${escHtml(label)}</span>
+            <span class="panel-sel-model">${escHtml(sel.modelName)}</span>
+            <label class="panel-count-label">×<input type="number" class="panel-count-input" min="1" data-sel-idx="${i}" value="${sel.modelCount}"></label>
+        </div>`;
+    });
+    html += `</div>`;
 
-            const card       = row.closest('.unit-card');
-            const unitIndex  = parseInt(card.dataset.index, 10);
-            const unit       = JSON.parse(card.dataset.unit);
-            const weaponName  = row.dataset.weaponName;
-            const variantName = row.dataset.variant;
-            const modelName   = row.dataset.modelName;
-            const modelCount  = parseInt(row.dataset.modelCount, 10);
-            const weaponType  = row.dataset.weaponType;
+    html += buildSection('attack', 'Attack', buildAttackControls(), attackSummary());
+    html += buildSection('hit', 'Hit', buildHitControls(), hitSummary());
+    html += buildSection('wound', 'Wound', buildWoundControls(), woundSummary());
+    html += buildSection('save', 'Save', buildSaveControls(), saveSummary());
+    html += buildSection('damage', 'Damage', buildDamageControls(), damageSummary());
 
-            const weaponKey = `${unitIndex}::${modelName}::${weaponName}::${variantName}`;
+    html += `<div class="panel-row">
+        <label class="panel-label">Surviving defenders (0 = use profile count):
+            <input type="number" class="mod-num" id="mod-defenderModelCount" min="0" value="${mods.defenderModelCount}">
+        </label>
+    </div>`;
 
-            if (selectedWeapons.has(weaponKey)) {
-                // Deselect this weapon.
-                row.classList.remove('selected-weapon');
-                selectedWeapons.delete(weaponKey);
-                if (selectedWeapons.size === 0) activeWeaponType = null;
-            } else {
-                // Enforce phase constraint.
-                if (activeWeaponType && weaponType !== activeWeaponType) return;
+    html += `<button class="btn-run" onclick="runSimulation()">Run Simulation</button>`;
+    html += `<div id="pipeline-content"></div>`;
 
-                // Auto-select the parent unit as attacker.
-                if (!selectedAttackers.has(unitIndex)) {
-                    selectedAttackers.set(unitIndex, unit);
-                    card.classList.add('selected-attacker');
-                }
+    return html;
+}
 
-                activeWeaponType = weaponType;
-                selectedWeapons.set(weaponKey, {
-                    weaponName, variantName, modelName, modelCount,
-                    weaponType, unitIndex, rowElement: row
-                });
-                row.classList.add('selected-weapon');
+function buildSection(id, title, controls, summary) {
+    const isOpen = sectionState[id] ? ' open' : '';
+    return `<details class="mod-section" id="section-${id}"${isOpen} ontoggle="onSectionToggle('${id}', this.open)">
+        <summary class="mod-section-header">
+            <span class="mod-section-title">${title}</span>
+            <span class="mod-section-summary" id="summary-${id}">${escHtml(summary)}</span>
+        </summary>
+        <div class="mod-section-body">${controls}</div>
+    </details>`;
+}
 
-                // Seed the models-firing input on first selection.
-                if (selectedWeapons.size === 1)
-                    attackingModelsInput.value = modelCount;
-            }
+function onSectionToggle(id, open) {
+    sectionState[id] = open;
+}
 
-            updateUI();
+// ── Modifier controls ─────────────────────────────────────────────────────────
+
+function tog(field, hidden) {
+    const style = hidden ? ' style="display:none"' : '';
+    return `<button class="mod-toggle${mods[field] ? ' active' : ''}" id="tog-${field}"${style} onclick="toggleMod('${field}')">${modLabel(field)}</button>`;
+}
+
+function stepCtrl(field, label) {
+    const val = mods[field] || 0;
+    const display = val > 0 ? `+${val}` : `${val}`;
+    return `<span class="mod-step">
+        <button class="mod-step-btn" onclick="stepMod('${field}',-1)">−</button>
+        <span class="mod-step-val" id="val-${field}">${display}</span>
+        <button class="mod-step-btn" onclick="stepMod('${field}',1)">+</button>
+        <span class="mod-step-label">${label}</span>
+    </span>`;
+}
+
+function buildAttackControls() {
+    return `<div class="mod-controls">
+        ${stepCtrl('attackModifier', 'Attacks')}
+        ${tog('blastOverride')}
+        ${tog('rerollAttackDice')}
+    </div>`;
+}
+
+function buildHitControls() {
+    return `<div class="mod-controls">
+        ${tog('withinHalfRange')}
+        ${stepCtrl('hitRollModifier', '+/− Hit')}
+        ${stepCtrl('bsWsModifier', '+/− BS/WS')}
+    </div>
+    <div class="mod-controls">
+        ${tog('rerollHitOnes')}
+        ${tog('rerollHitAll')}
+        ${tog('fishForCritHits', !mods.rerollHitAll)}
+        ${tog('indirectFire')}
+        ${tog('critHitOn5Plus')}
+        ${tog('sustainedHitsOverride')}
+        ${tog('lethalHitsOverride')}
+    </div>`;
+}
+
+function buildWoundControls() {
+    return `<div class="mod-controls">
+        ${stepCtrl('woundRollModifier', '+/− Wound')}
+        ${stepCtrl('strengthModifier', '+/− Str')}
+        ${stepCtrl('toughnessModifier', '+/− Tgh')}
+    </div>
+    <div class="mod-controls">
+        ${tog('rerollWoundOnes')}
+        ${tog('rerollWoundAll')}
+        ${tog('fishForCritWounds', !mods.rerollWoundAll)}
+        ${tog('critWoundOn5Plus')}
+        ${tog('devastatingWoundsOverride')}
+    </div>
+    <div class="mod-controls anti-row">
+        <span class="mod-step-label">Anti:</span>
+        <input type="text" class="mod-text" id="mod-antiKeyword" value="${escHtml(mods.antiKeyword)}" placeholder="Keyword" oninput="setModText('antiKeyword',this.value,'wound')">
+        <input type="number" class="mod-num" id="mod-antiThreshold" min="2" max="6" value="${mods.antiThreshold || ''}" placeholder="thr" oninput="setModNum('antiThreshold',parseInt(this.value)||0,'wound')">
+    </div>`;
+}
+
+function buildSaveControls() {
+    return `<div class="mod-controls">
+        ${tog('cover')}
+        ${tog('ignoresCover')}
+        ${stepCtrl('apModifier', '+/− AP')}
+    </div>`;
+}
+
+function buildDamageControls() {
+    const fnpOpts = [
+        [0, 'None'], [4, '4+++'], [5, '5+++'], [6, '6+++'],
+    ].map(([v, l]) => `<option value="${v}"${mods.fnpOverride === v ? ' selected' : ''}>${l}</option>`).join('');
+    return `<div class="mod-controls">
+        ${stepCtrl('damageModifier', '+/− Dmg')}
+        ${tog('rerollDamageDice')}
+        <span class="mod-step">
+            <span class="mod-step-label">FNP:</span>
+            <select class="mod-select" id="mod-fnpOverride" onchange="setModNum('fnpOverride',parseInt(this.value),'damage')">${fnpOpts}</select>
+        </span>
+    </div>`;
+}
+
+const modLabels = {
+    blastOverride: 'Blast', rerollAttackDice: 'RR Attacks',
+    withinHalfRange: '½ Range',
+    rerollHitOnes: 'RR 1s', rerollHitAll: 'RR All', fishForCritHits: 'Fish Crits',
+    indirectFire: 'Indirect', critHitOn5Plus: 'Crit 5+',
+    sustainedHitsOverride: 'SH+1', lethalHitsOverride: 'Lethal Hits',
+    rerollWoundOnes: 'RR 1s', rerollWoundAll: 'RR All', fishForCritWounds: 'Fish Crits',
+    critWoundOn5Plus: 'Crit W 5+', devastatingWoundsOverride: 'Dev Wounds',
+    cover: 'Cover', ignoresCover: 'Ign Cover',
+    rerollDamageDice: 'RR Damage',
+};
+function modLabel(field) { return modLabels[field] || field; }
+
+// ── Summary strings ───────────────────────────────────────────────────────────
+
+function attackSummary() {
+    const p = [];
+    if (mods.attackModifier) p.push(`${mods.attackModifier > 0 ? '+' : ''}${mods.attackModifier} Atk`);
+    if (mods.blastOverride) p.push('Blast');
+    if (mods.rerollAttackDice) p.push('RR');
+    return p.join(' · ');
+}
+function hitSummary() {
+    const p = [];
+    if (mods.withinHalfRange) p.push('½ Range');
+    if (mods.hitRollModifier) p.push(`${mods.hitRollModifier > 0 ? '+' : ''}${mods.hitRollModifier} Hit`);
+    if (mods.bsWsModifier) p.push(`${mods.bsWsModifier > 0 ? '+' : ''}${mods.bsWsModifier} BS/WS`);
+    if (mods.rerollHitAll) p.push('RR All'); else if (mods.rerollHitOnes) p.push('RR 1s');
+    if (mods.fishForCritHits) p.push('Fish');
+    if (mods.indirectFire) p.push('Indirect');
+    if (mods.critHitOn5Plus) p.push('Crit 5+');
+    if (mods.sustainedHitsOverride) p.push('SH+1');
+    if (mods.lethalHitsOverride) p.push('LH');
+    return p.join(' · ');
+}
+function woundSummary() {
+    const p = [];
+    if (mods.woundRollModifier) p.push(`${mods.woundRollModifier > 0 ? '+' : ''}${mods.woundRollModifier} W`);
+    if (mods.strengthModifier) p.push(`S${mods.strengthModifier > 0 ? '+' : ''}${mods.strengthModifier}`);
+    if (mods.toughnessModifier) p.push(`T${mods.toughnessModifier > 0 ? '+' : ''}${mods.toughnessModifier}`);
+    if (mods.rerollWoundAll) p.push('RR All'); else if (mods.rerollWoundOnes) p.push('RR 1s');
+    if (mods.fishForCritWounds) p.push('Fish');
+    if (mods.critWoundOn5Plus) p.push('Crit W 5+');
+    if (mods.devastatingWoundsOverride) p.push('DevW');
+    if (mods.antiKeyword && mods.antiThreshold) p.push(`Anti-${mods.antiKeyword} ${mods.antiThreshold}+`);
+    return p.join(' · ');
+}
+function saveSummary() {
+    const p = [];
+    if (mods.cover) p.push('Cover');
+    if (mods.ignoresCover) p.push('Ign Cover');
+    if (mods.apModifier) p.push(`AP${mods.apModifier > 0 ? '+' : ''}${mods.apModifier}`);
+    return p.join(' · ');
+}
+function damageSummary() {
+    const p = [];
+    if (mods.damageModifier) p.push(`${mods.damageModifier > 0 ? '+' : ''}${mods.damageModifier}D`);
+    if (mods.rerollDamageDice) p.push('RR');
+    if (mods.fnpOverride) p.push(`FNP${mods.fnpOverride}+`);
+    return p.join(' · ');
+}
+
+function updateSummary(section) {
+    const el = document.getElementById(`summary-${section}`);
+    if (!el) return;
+    const fns = { attack: attackSummary, hit: hitSummary, wound: woundSummary, save: saveSummary, damage: damageSummary };
+    el.textContent = fns[section]?.() || '';
+}
+
+// ── Modifier actions (called from onclick attributes in generated HTML) ────────
+
+const fieldSection = {
+    blastOverride: 'attack', rerollAttackDice: 'attack',
+    withinHalfRange: 'hit', rerollHitOnes: 'hit', rerollHitAll: 'hit',
+    fishForCritHits: 'hit', indirectFire: 'hit', critHitOn5Plus: 'hit',
+    sustainedHitsOverride: 'hit', lethalHitsOverride: 'hit',
+    rerollWoundOnes: 'wound', rerollWoundAll: 'wound', fishForCritWounds: 'wound',
+    critWoundOn5Plus: 'wound', devastatingWoundsOverride: 'wound',
+    cover: 'save', ignoresCover: 'save',
+    rerollDamageDice: 'damage',
+};
+
+function toggleMod(field) {
+    mods[field] = !mods[field];
+
+    // Mutual exclusivity: reroll ones/all
+    if (field === 'rerollHitOnes' && mods.rerollHitOnes) { mods.rerollHitAll = false; _updateBtn('rerollHitAll'); }
+    if (field === 'rerollHitAll' && mods.rerollHitAll) { mods.rerollHitOnes = false; _updateBtn('rerollHitOnes'); }
+    if (field === 'rerollWoundOnes' && mods.rerollWoundOnes) { mods.rerollWoundAll = false; _updateBtn('rerollWoundAll'); }
+    if (field === 'rerollWoundAll' && mods.rerollWoundAll) { mods.rerollWoundOnes = false; _updateBtn('rerollWoundOnes'); }
+
+    // Fish for crits only valid when reroll all is on
+    if (!mods.rerollHitAll) { mods.fishForCritHits = false; _updateBtn('fishForCritHits'); }
+    if (!mods.rerollWoundAll) { mods.fishForCritWounds = false; _updateBtn('fishForCritWounds'); }
+
+    // Sync Fish visibility
+    _setVisible('tog-fishForCritHits', mods.rerollHitAll);
+    _setVisible('tog-fishForCritWounds', mods.rerollWoundAll);
+
+    _updateBtn(field);
+    const section = fieldSection[field];
+    if (section) updateSummary(section);
+}
+
+function stepMod(field, delta) {
+    mods[field] = (mods[field] || 0) + delta;
+    if (field === 'hitRollModifier') mods[field] = Math.max(-1, Math.min(1, mods[field]));
+    if (field === 'woundRollModifier') mods[field] = Math.max(-1, Math.min(1, mods[field]));
+    const valEl = document.getElementById(`val-${field}`);
+    if (valEl) valEl.textContent = mods[field] > 0 ? `+${mods[field]}` : `${mods[field]}`;
+    const section = { attackModifier: 'attack', hitRollModifier: 'hit', bsWsModifier: 'hit', woundRollModifier: 'wound', strengthModifier: 'wound', toughnessModifier: 'wound', apModifier: 'save', damageModifier: 'damage' }[field];
+    if (section) updateSummary(section);
+}
+
+function setModText(field, val, section) {
+    mods[field] = val;
+    if (section) updateSummary(section);
+}
+function setModNum(field, val, section) {
+    mods[field] = val;
+    if (section) updateSummary(section);
+}
+
+function _updateBtn(field) {
+    const btn = document.getElementById(`tog-${field}`);
+    if (btn) btn.classList.toggle('active', !!mods[field]);
+}
+function _setVisible(id, visible) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = visible ? '' : 'none';
+}
+
+// ── Panel listeners (inputs that update state without full rebuild) ────────────
+
+function attachPanelListeners() {
+    document.querySelectorAll('.panel-count-input').forEach(input => {
+        input.addEventListener('change', () => {
+            const idx = parseInt(input.dataset.selIdx);
+            if (idx >= 0 && idx < state.selections.length)
+                state.selections[idx].modelCount = parseInt(input.value) || 1;
         });
     });
 
-    // Keep per-weapon model count in sync when user edits inline inputs in multi-weapon display.
-    weaponDisplay.addEventListener('input', function (e) {
-        const input = e.target.closest('.models-count-input');
-        if (!input) return;
-        const key = input.dataset.weaponKey;
-        const w = selectedWeapons.get(key);
-        if (w) {
-            const val = parseInt(input.value, 10);
-            if (val > 0) w.modelCount = val;
-        }
+    const defCount = document.getElementById('mod-defenderModelCount');
+    if (defCount) defCount.addEventListener('change', () => {
+        mods.defenderModelCount = parseInt(defCount.value) || 0;
     });
+}
 
-    // ---------------------------------------------------------------------------
-    // Fish for Crits — show/hide conditional checkboxes
-    // ---------------------------------------------------------------------------
+// ── Run simulation ────────────────────────────────────────────────────────────
 
-    document.querySelectorAll('input[name="hit-rerolls"]').forEach(r => {
-        r.addEventListener('change', function () {
-            const fishCol = document.getElementById('fish-hit-col');
-            const fishCheck = document.getElementById('fish-crit-hits');
-            if (this.value === 'all') {
-                fishCol.style.display = '';
-            } else {
-                fishCol.style.display = 'none';
-                fishCheck.checked = false;
-            }
-            updateModifierSummaries();
+function runSimulation() {
+    if (!state.selections.length || !state.defenderCardId) return;
+    const btn = document.querySelector('.btn-run');
+    if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+
+    fetch('/api/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildRequest()),
+    })
+        .then(r => r.ok ? r.json() : r.json().then(e => { throw new Error(e.error || `HTTP ${r.status}`); }))
+        .then(resp => {
+            displayPipeline(resp);
+            if (btn) { btn.disabled = false; btn.textContent = 'Run Simulation'; }
+            document.getElementById('pipeline-content')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        })
+        .catch(err => {
+            const pc = document.getElementById('pipeline-content');
+            if (pc) pc.innerHTML = `<div class="sim-error">Error: ${escHtml(err.message)}</div>`;
+            if (btn) { btn.disabled = false; btn.textContent = 'Run Simulation'; }
         });
-    });
+}
 
-    document.querySelectorAll('input[name="wound-rerolls"]').forEach(r => {
-        r.addEventListener('change', function () {
-            const fishCol = document.getElementById('fish-wound-col');
-            const fishCheck = document.getElementById('fish-crit-wounds');
-            if (this.value === 'all') {
-                fishCol.style.display = '';
-            } else {
-                fishCol.style.display = 'none';
-                fishCheck.checked = false;
-            }
-            updateModifierSummaries();
+function buildRequest() {
+    return {
+        attackerName: state.attackerUnitName || '',
+        defenderName: state.defenderUnitName || '',
+        weaponSelections: state.selections.map(s => ({
+            weaponName: s.weaponName, variantName: s.variantName,
+            modelName: s.modelName, modelCount: s.modelCount,
+            weaponType: s.weaponType, unitName: s.unitName,
+        })),
+        defenderModelCount: mods.defenderModelCount,
+        attackModifier: mods.attackModifier, blastOverride: mods.blastOverride,
+        rerollAttackDice: mods.rerollAttackDice,
+        withinHalfRange: mods.withinHalfRange, hitRollModifier: mods.hitRollModifier,
+        bsWsModifier: mods.bsWsModifier, rerollHitOnes: mods.rerollHitOnes,
+        rerollHitAll: mods.rerollHitAll, fishForCritHits: mods.fishForCritHits,
+        indirectFire: mods.indirectFire, critHitOn5Plus: mods.critHitOn5Plus,
+        sustainedHitsOverride: mods.sustainedHitsOverride, lethalHitsOverride: mods.lethalHitsOverride,
+        woundRollModifier: mods.woundRollModifier, strengthModifier: mods.strengthModifier,
+        toughnessModifier: mods.toughnessModifier, rerollWoundOnes: mods.rerollWoundOnes,
+        rerollWoundAll: mods.rerollWoundAll, fishForCritWounds: mods.fishForCritWounds,
+        critWoundOn5Plus: mods.critWoundOn5Plus, devastatingWoundsOverride: mods.devastatingWoundsOverride,
+        antiKeyword: mods.antiKeyword, antiThreshold: mods.antiThreshold,
+        cover: mods.cover, ignoresCover: mods.ignoresCover, apModifier: mods.apModifier,
+        damageModifier: mods.damageModifier, rerollDamageDice: mods.rerollDamageDice,
+        fnpOverride: mods.fnpOverride,
+    };
+}
+
+// ── Pipeline display ──────────────────────────────────────────────────────────
+
+function displayPipeline(resp) {
+    const el = document.getElementById('pipeline-content');
+    if (!el) return;
+
+    let html = `<div class="sim-results">
+        <div class="sim-stats">
+            <div class="sim-stat"><div class="sim-stat-label">Mean Damage</div><div class="sim-stat-value">${fmt(resp.meanDamage)}</div></div>
+            <div class="sim-stat"><div class="sim-stat-label">Exp. Kills</div><div class="sim-stat-value">${fmt(resp.expectedKills)}</div></div>
+            <div class="sim-stat"><div class="sim-stat-label">P(kill ≥ 1)</div><div class="sim-stat-value">${pct(resp.pKillAtLeastOne)}</div></div>
+            <div class="sim-stat"><div class="sim-stat-label">Std Dev</div><div class="sim-stat-value">${fmt(resp.stdDev)}</div></div>
+        </div>`;
+
+    if (resp.weaponBreakdown && resp.weaponBreakdown.length > 0) {
+        resp.weaponBreakdown.forEach(g => {
+            const groupFinal = g.stats.avgDamageBeforeFnp - g.stats.avgFnpSaved;
+            html += `<div class="pipeline-weapon-header">${escHtml(g.weaponName)}</div>`;
+            html += buildFullFunnel(g.stats, groupFinal);
         });
-    });
-
-    // Update summaries whenever any modifier changes.
-    document.getElementById('modifierAccordion').addEventListener('change', updateModifierSummaries);
-
-    // ---------------------------------------------------------------------------
-    // Modifier summaries (brief text shown on collapsed accordion headers)
-    // ---------------------------------------------------------------------------
-
-    function updateModifierSummaries() {
-        document.getElementById('summary-attack').textContent  = buildAttackSummary();
-        document.getElementById('summary-hit').textContent     = buildHitSummary();
-        document.getElementById('summary-wound').textContent   = buildWoundSummary();
-        document.getElementById('summary-save').textContent    = buildSaveSummary();
-        document.getElementById('summary-damage').textContent  = buildDamageSummary();
+        html += `<div class="pipeline-weapon-header">Combined</div>`;
+        html += buildCompactFunnel(resp.stageStats, resp.meanDamage);
+    } else {
+        html += buildFullFunnel(resp.stageStats, resp.meanDamage);
     }
 
-    function radioVal(name)    { return document.querySelector(`input[name="${name}"]:checked`)?.value ?? '0'; }
-    function checkVal(id)      { return document.getElementById(id)?.checked ?? false; }
-    function selectVal(id)     { return document.getElementById(id)?.value ?? ''; }
+    html += `</div>`;
+    el.innerHTML = html;
+}
 
-    function buildAttackSummary() {
-        const parts = [];
-        const mod = parseInt(radioVal('attack-mod'), 10);
-        if (mod !== 0) parts.push(mod > 0 ? `+${mod} Atk` : `${mod} Atk`);
-        if (checkVal('blast-override')) parts.push('Blast');
-        if (checkVal('reroll-attacks')) parts.push('RR Atk');
-        return parts.join(' · ');
-    }
+function buildFullFunnel(s, finalDamage) {
+    let rows = '';
+    rows += fRow('Attacks', s.avgAttacks, null, true);
+    rows += fRow('Hits', s.avgHits, s.avgAttacks);
+    if (s.avgCritHits >= 0.001) rows += fSub('Crit hits', s.avgCritHits);
+    if (s.avgSustainedHitsBonus >= 0.001) rows += fSub('Sustained +', s.avgSustainedHitsBonus);
+    rows += fRow('Wounds', s.avgWounds, s.avgHits);
+    if (s.avgLethalHitsAutoWounds >= 0.001) rows += fSub('Lethal auto', s.avgLethalHitsAutoWounds);
+    if (s.avgCritWounds >= 0.001) rows += fSub('Crit wounds', s.avgCritWounds);
+    if (s.avgAntiCritWounds >= 0.001) rows += fSub('Anti crits', s.avgAntiCritWounds);
+    const totalSaveFails = (s.avgFailedSaves || 0) + (s.avgDevastatingWoundsTriggers || 0);
+    rows += fRow('Failed saves', totalSaveFails, s.avgWounds);
+    if (s.avgArmourSaveRolls >= 0.001) rows += fSub('Armour saves', s.avgArmourSaveRolls);
+    if (s.avgInvulnSaveRolls >= 0.001) rows += fSub('Invuln saves', s.avgInvulnSaveRolls);
+    if (s.avgDevastatingWoundsTriggers >= 0.001) rows += fSub('DevW bypass', s.avgDevastatingWoundsTriggers);
+    rows += fRow('Dmg pre-FNP', s.avgDamageBeforeFnp, null);
+    if (s.avgFnpSaved >= 0.001) rows += fSub('FNP saved', s.avgFnpSaved);
+    rows += fRow('Final Damage', finalDamage, null, true, 'final');
+    return `<table class="pipeline-table"><thead><tr><th>Stage</th><th>Avg</th><th>Rate</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
 
-    function buildHitSummary() {
-        const parts = [];
-        if (checkVal('within-half-range')) parts.push('½ Range');
-        const hitMod = parseInt(radioVal('hit-roll-mod'), 10);
-        const bswsMod = parseInt(radioVal('bsws-mod'), 10);
-        if (hitMod !== 0) parts.push(hitMod > 0 ? `+${hitMod} Hit` : `${hitMod} Hit`);
-        if (bswsMod !== 0) parts.push(bswsMod > 0 ? `+${bswsMod} BS` : `${bswsMod} BS`);
-        const rr = radioVal('hit-rerolls');
-        if (rr === 'ones') parts.push('RR1s');
-        if (rr === 'all') parts.push(checkVal('fish-crit-hits') ? 'Fish Crits' : 'RR All');
-        if (checkVal('indirect-fire')) parts.push('Indirect');
-        if (checkVal('crit-5')) parts.push('Crit 5+');
-        if (checkVal('sustained-hits-override')) parts.push('SH1');
-        if (checkVal('lethal-hits-override')) parts.push('LH');
-        return parts.join(' · ');
-    }
+function buildCompactFunnel(s, finalDamage) {
+    let rows = '';
+    rows += fRow('Attacks', s.avgAttacks);
+    rows += fRow('Hits', s.avgHits);
+    rows += fRow('Wounds', s.avgWounds);
+    rows += fRow('Failed saves', (s.avgFailedSaves || 0) + (s.avgDevastatingWoundsTriggers || 0));
+    rows += fRow('Dmg pre-FNP', s.avgDamageBeforeFnp);
+    if (s.avgFnpSaved >= 0.001) rows += fRow('FNP saved', s.avgFnpSaved);
+    rows += fRow('Final Damage', finalDamage, null, true, 'final');
+    return `<table class="pipeline-table compact"><thead><tr><th>Stage</th><th>Avg</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
 
-    function buildWoundSummary() {
-        const parts = [];
-        const wMod = parseInt(radioVal('wound-roll-mod'), 10);
-        const sMod = parseInt(radioVal('str-mod'), 10);
-        const tMod = parseInt(radioVal('tough-mod'), 10);
-        if (wMod !== 0) parts.push(wMod > 0 ? `+${wMod} Wnd` : `${wMod} Wnd`);
-        if (sMod !== 0) parts.push(sMod > 0 ? `+${sMod} S` : `${sMod} S`);
-        if (tMod !== 0) parts.push(tMod > 0 ? `+${tMod} T` : `${tMod} T`);
-        const rr = radioVal('wound-rerolls');
-        if (rr === 'ones') parts.push('RR1s');
-        if (rr === 'all') parts.push(checkVal('fish-crit-wounds') ? 'Fish Crits' : 'RR All');
-        if (checkVal('crit-wound-5')) parts.push('CritWnd 5+');
-        if (checkVal('dev-wounds-override')) parts.push('DW');
-        const anti = selectVal('anti-keyword');
-        if (anti) parts.push(`Anti-${anti} ${selectVal('anti-threshold')}+`);
-        return parts.join(' · ');
-    }
+function fRow(label, val, prev, bold, cls) {
+    const rate = (prev != null && prev > 0.001) ? pct(val / prev) : '';
+    const c = cls ? ` class="${cls}"` : '';
+    const w = bold ? ' style="font-weight:600"' : '';
+    return `<tr${c}><td${w}>${label}</td><td${w}>${fmt(val)}</td><td class="rate">${rate}</td></tr>`;
+}
+function fSub(label, val) {
+    return `<tr class="sub-row"><td class="sub-label">↳ ${label}</td><td>${fmt(val)}</td><td></td></tr>`;
+}
 
-    function buildSaveSummary() {
-        const parts = [];
-        const apMod = parseInt(radioVal('ap-mod'), 10);
-        if (apMod !== 0) parts.push(apMod > 0 ? `+${apMod} AP` : `${apMod} AP`);
-        if (checkVal('in-cover')) parts.push(checkVal('ignores-cover') ? 'Cover (ignored)' : 'Cover');
-        return parts.join(' · ');
-    }
+// ── Utilities ─────────────────────────────────────────────────────────────────
 
-    function buildDamageSummary() {
-        const parts = [];
-        const dMod = parseInt(radioVal('dmg-mod'), 10);
-        if (dMod !== 0) parts.push(dMod > 0 ? `+${dMod} Dmg` : `${dMod} Dmg`);
-        if (checkVal('reroll-damage')) parts.push('RR Dmg');
-        const fnp = parseInt(selectVal('fnp-override'), 10);
-        if (fnp > 0) parts.push(`FNP ${fnp}+++`);
-        return parts.join(' · ');
-    }
+function fmt(v) { return (typeof v === 'number' && isFinite(v)) ? v.toFixed(2) : '—'; }
+function pct(v) { return (typeof v === 'number' && isFinite(v)) ? (v * 100).toFixed(1) + '%' : '—'; }
+function escHtml(s) {
+    return String(s || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
-    // ---------------------------------------------------------------------------
-    // UI updates
-    // ---------------------------------------------------------------------------
-
-    function updateUI() {
-        const hasAttackers = selectedAttackers.size > 0;
-        const hasDefender  = selectedDefenderIndex !== null;
-
-        combatPanel.style.display = (hasAttackers || hasDefender) ? 'block' : 'none';
-        defendingModelsCol.style.display = hasDefender ? '' : 'none';
-
-        const attackerNames  = [...selectedAttackers.values()].map(u => u.name).join(' + ');
-        const defenderNameStr = selectedDefenderUnit ? selectedDefenderUnit.name : '—';
-        selectionSummary.textContent = hasAttackers
-            ? `Attacker: ${attackerNames} vs Defender: ${defenderNameStr}`
-            : 'Select one or more attacker units and a defender unit.';
-
-        updateWeaponDisplay();
-        updateWeaponTypeConstraints();
-        updateRunButton();
-    }
-
-    function updateWeaponDisplay() {
-        const count = selectedWeapons.size;
-
-        if (count === 0) {
-            weaponDisplay.className = 'weapon-display-hint';
-            weaponDisplay.textContent = 'Expand an attacker unit and click a weapon row to select it.';
-            attackingModelsCol.style.display = '';
-            return;
-        }
-
-        weaponDisplay.className = 'weapon-display-selected';
-
-        if (count === 1) {
-            const w = [...selectedWeapons.values()][0];
-            const variantStr = w.variantName === 'default' ? '' : ` [${w.variantName}]`;
-            weaponDisplay.textContent = `${w.weaponName}${variantStr}  —  ${w.modelName} ×${w.modelCount}`;
-            attackingModelsCol.style.display = '';
-        } else {
-            const rows = [...selectedWeapons.entries()].map(([key, w]) => {
-                const variantStr = w.variantName === 'default' ? '' : ` [${w.variantName}]`;
-                const label = escHtml(`${w.weaponName}${variantStr} — ${w.modelName}`);
-                return `<div class="d-flex align-items-center gap-2 mb-1">` +
-                    `<span class="flex-grow-1 small">${label}</span>` +
-                    `<input type="number" class="form-control form-control-sm bg-dark text-light border-secondary models-count-input"` +
-                    ` data-weapon-key="${escHtml(key)}" value="${w.modelCount}" min="1" style="width:70px" />` +
-                    `</div>`;
-            });
-            weaponDisplay.innerHTML = rows.join('');
-            attackingModelsCol.style.display = 'none';
-        }
-    }
-
-    function updateWeaponTypeConstraints() {
-        document.querySelectorAll('.unit-card[data-role="attacker"] .weapon-variant-row').forEach(row => {
-            if (activeWeaponType && row.dataset.weaponType !== activeWeaponType)
-                row.classList.add('weapon-type-locked');
-            else
-                row.classList.remove('weapon-type-locked');
-        });
-    }
-
-    function updateRunButton() {
-        const hasAttackers = selectedAttackers.size > 0;
-        const hasDefender  = selectedDefenderIndex !== null;
-        runSimBtn.disabled = !(hasAttackers && hasDefender && selectedWeapons.size > 0);
-    }
-
-    // ---------------------------------------------------------------------------
-    // Run simulation
-    // ---------------------------------------------------------------------------
-
-    runSimBtn.addEventListener('click', async function () {
-        loadingOverlay.classList.add('active');
-        resultsPanel.style.display = 'none';
-        document.getElementById('pipeline-section').style.display = 'none';
-
-        const isSingleWeapon = selectedWeapons.size === 1;
-        const modelsOverride = isSingleWeapon ? (parseInt(attackingModelsInput.value) || 0) : 0;
-
-        const weaponSelections = [...selectedWeapons.values()].map(w => ({
-            weaponName:  w.weaponName,
-            variantName: w.variantName,
-            modelName:   w.modelName,
-            modelCount:  isSingleWeapon && modelsOverride > 0 ? modelsOverride : w.modelCount,
-        }));
-
-        const defenderModelCount = parseInt(defendingModelsInput.value, 10) || 0;
-
-        const antiKeyword = selectVal('anti-keyword');
-
-        const request = {
-            attackerUnitIndices: [...selectedAttackers.keys()],
-            defenderUnitIndex:   selectedDefenderIndex,
-            weaponSelections,
-            defenderModelCount,
-            withinHalfRange:  checkVal('within-half-range'),
-            runs: 10000,
-
-            // Attack modifiers
-            attackModifier:    parseInt(radioVal('attack-mod'), 10),
-            blastOverride:     checkVal('blast-override'),
-            rerollAttackDice:  checkVal('reroll-attacks'),
-
-            // Hit modifiers
-            hitRollModifier:      parseInt(radioVal('hit-roll-mod'), 10),
-            bsWsModifier:         parseInt(radioVal('bsws-mod'), 10),
-            hitRerolls:           radioVal('hit-rerolls'),
-            fishForCriticalHits:  checkVal('fish-crit-hits'),
-            indirectFireOverride: checkVal('indirect-fire'),
-            criticalHitsOn5:      checkVal('crit-5'),
-            sustainedHitsOverride: checkVal('sustained-hits-override'),
-            lethalHitsOverride:   checkVal('lethal-hits-override'),
-
-            // Wound modifiers
-            woundRollModifier:    parseInt(radioVal('wound-roll-mod'), 10),
-            strengthModifier:     parseInt(radioVal('str-mod'), 10),
-            toughnessModifier:    parseInt(radioVal('tough-mod'), 10),
-            woundRerolls:         radioVal('wound-rerolls'),
-            fishForCriticalWounds: checkVal('fish-crit-wounds'),
-            critWoundOn5:         checkVal('crit-wound-5'),
-            devastatingWoundsOverride: checkVal('dev-wounds-override'),
-            antiOverrideKeyword:  antiKeyword,
-            antiOverrideThreshold: antiKeyword ? parseInt(selectVal('anti-threshold'), 10) : 4,
-
-            // Save modifiers
-            inCover:       checkVal('in-cover'),
-            ignoresCover:  checkVal('ignores-cover'),
-            apModifier:    parseInt(radioVal('ap-mod'), 10),
-            fnpOverride:   parseInt(selectVal('fnp-override'), 10),
-
-            // Damage modifiers
-            damageModifier:   parseInt(radioVal('dmg-mod'), 10),
-            rerollDamageDice: checkVal('reroll-damage'),
-        };
-
-        try {
-            const resp = await fetch('/api/simulate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(request),
-            });
-
-            const data = await resp.json();
-
-            if (!data.success) {
-                alert(data.error || 'Simulation failed.');
-                return;
-            }
-
-            displayResults(data);
-        } catch (err) {
-            alert('Network error: ' + err.message);
-        } finally {
-            loadingOverlay.classList.remove('active');
-        }
-    });
-
-    // ---------------------------------------------------------------------------
-    // Results display
-    // ---------------------------------------------------------------------------
-
-    function displayResults(data) {
-        document.getElementById('results-description').textContent =
-            `${data.attackerName} firing ${data.weaponDescription} at ${data.defenderName} (${data.runs.toLocaleString()} runs)`;
-
-        document.getElementById('res-mean').textContent    = data.meanDamage.toFixed(2);
-        document.getElementById('res-kills').textContent   = data.expectedKills.toFixed(2);
-        document.getElementById('res-prob-kill').textContent = (data.probKillAtLeastOne * 100).toFixed(1) + '%';
-        document.getElementById('res-std').textContent     = '±' + data.stdDeviation.toFixed(2);
-        document.getElementById('res-range').textContent   = `Damage range: ${data.minDamage} – ${data.maxDamage}`;
-
-        resultsPanel.style.display = 'block';
-
-        if (data.stageStats) {
-            displayPipeline(data.stageStats, data.weaponBreakdown || [], data.meanDamage);
-        }
-
-        resultsPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-
-    // ---------------------------------------------------------------------------
-    // Pipeline display — dynamically generated
-    // ---------------------------------------------------------------------------
-
-    function displayPipeline(aggregate, weaponBreakdown, finalDamage) {
-        const content = document.getElementById('pipeline-content');
-        let html = '';
-
-        if (weaponBreakdown.length > 1) {
-            // Per-weapon sections followed by a combined summary.
-            for (const group of weaponBreakdown) {
-                html += `<div class="pipeline-weapon-header">${escHtml(group.weaponName)}</div>`;
-                html += buildFunnelTable(group.stats, null);
-            }
-            html += '<div class="pipeline-weapon-header pipeline-combined">Combined</div>';
-            html += buildSummaryTable(aggregate, finalDamage);
-        } else {
-            // Single weapon: full funnel with Final Damage at the bottom.
-            html += buildFunnelTable(aggregate, finalDamage);
-        }
-
-        content.innerHTML = html;
-        document.getElementById('pipeline-section').style.display = 'block';
-    }
-
-    /** Full funnel table: all stages and ability sub-rows. finalDamage appended when non-null. */
-    function buildFunnelTable(s, finalDamage) {
-        const rows = [];
-
-        rows.push(pRow('main', 'Attacks', s.avgAttacks, ''));
-        rows.push(pRow('main', 'Hits', s.avgHits, pct(s.avgHits, s.avgAttacks)));
-        rows.push(pRow('sub',  '↳ Critical Hits', s.avgCritHits, ''));
-        if (s.avgSustainedHitsBonus > 0.001)
-            rows.push(pRow('sub', '↳ Sustained Hits bonus', s.avgSustainedHitsBonus, ''));
-
-        rows.push(pRow('main', 'Wounds', s.avgWounds, pct(s.avgWounds, s.avgHits)));
-        rows.push(pRow('sub',  '↳ Critical Wounds', s.avgCritWounds, ''));
-        if (s.avgLethalHitsAutoWounds > 0.001)
-            rows.push(pRow('sub', '↳ Lethal Hits auto-wounds', s.avgLethalHitsAutoWounds, ''));
-        if (s.avgAntiCritWounds > 0.001)
-            rows.push(pRow('sub', '↳ Anti-X crit wounds', s.avgAntiCritWounds, ''));
-
-        const totalFailed = s.avgFailedSaves + s.avgDevastatingWoundsTriggers;
-        rows.push(pRow('main', 'Failed Saves', totalFailed, pct(totalFailed, s.avgWounds)));
-        if (s.avgDevastatingWoundsTriggers > 0.001)
-            rows.push(pRow('sub', '↳ Devastating Wounds (bypassed)', s.avgDevastatingWoundsTriggers, ''));
-
-        const totalSaveRolls = s.avgArmourSaveRolls + s.avgInvulnSaveRolls;
-        if (totalSaveRolls > 0.001) {
-            rows.push(pRow('sub', '↳ vs Armour save', s.avgArmourSaveRolls, ''));
-            if (s.avgInvulnSaveRolls > 0.001)
-                rows.push(pRow('sub', '↳ vs Invulnerable save', s.avgInvulnSaveRolls, ''));
-        }
-
-        rows.push(pRow('main', 'Damage (pre-FNP)', s.avgDamageBeforeFnp, ''));
-        if (s.avgFnpSaved > 0.001)
-            rows.push(pRow('sub', '↳ Feel No Pain saved', s.avgFnpSaved, pct(s.avgFnpSaved, s.avgDamageBeforeFnp)));
-
-        if (finalDamage !== null)
-            rows.push(pRow('final', 'Final Damage', finalDamage, ''));
-
-        return `<table class="pipeline-table"><tbody>${rows.join('')}</tbody></table>`;
-    }
-
-    /** Compact summary table for the combined row in multi-weapon mode. */
-    function buildSummaryTable(s, finalDamage) {
-        const totalFailed = s.avgFailedSaves + s.avgDevastatingWoundsTriggers;
-        const rows = [
-            pRow('main',  'Attacks',           s.avgAttacks,        ''),
-            pRow('main',  'Hits',               s.avgHits,           ''),
-            pRow('main',  'Wounds',             s.avgWounds,         ''),
-            pRow('main',  'Failed Saves',       totalFailed,         ''),
-            pRow('main',  'Damage (pre-FNP)',   s.avgDamageBeforeFnp,''),
-            pRow('final', 'Final Damage',       finalDamage,         ''),
-        ];
-        return `<table class="pipeline-table"><tbody>${rows.join('')}</tbody></table>`;
-    }
-
-    function pRow(cls, label, value, rate) {
-        return `<tr class="pipeline-row pipeline-${escHtml(cls)}">` +
-            `<td class="pipeline-stage">${escHtml(label)}</td>` +
-            `<td class="pipeline-value">${fmt(value)}</td>` +
-            `<td class="pipeline-rate">${escHtml(rate)}</td>` +
-            `</tr>`;
-    }
-
-    // ---------------------------------------------------------------------------
-    // Catalogue refresh
-    // ---------------------------------------------------------------------------
-
-    const refreshBtn    = document.getElementById('refresh-catalogues-btn');
-    const refreshStatus = document.getElementById('refresh-status');
-
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', async () => {
-            refreshBtn.disabled = true;
-            refreshStatus.style.color = '#adb5bd';
-            refreshStatus.textContent = 'Refreshing…';
-
-            try {
-                const res  = await fetch('/api/refresh-catalogues', { method: 'POST' });
-                const data = await res.json();
-
-                if (data.success) {
-                    refreshStatus.style.color = '#57cc99';
-                    refreshStatus.textContent = `Updated: ${data.refreshed.join(', ')}`;
-                } else {
-                    refreshStatus.style.color = '#e63946';
-                    refreshStatus.textContent = data.error ?? 'Refresh failed.';
-                }
-            } catch (e) {
-                refreshStatus.style.color = '#e63946';
-                refreshStatus.textContent = 'Network error.';
-            } finally {
-                refreshBtn.disabled = false;
-            }
-        });
-    }
-
-    // ---------------------------------------------------------------------------
-    // Utilities
-    // ---------------------------------------------------------------------------
-
-    function fmt(n)         { return (typeof n === 'number' ? n : 0).toFixed(2); }
-    function pct(num, denom){ return (!denom || denom < 0.001) ? '' : `(${(num / denom * 100).toFixed(1)}%)`; }
-    function escHtml(s)     { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-})();
+// refreshCatalogues is defined inline in ArmyView.cshtml Scripts section

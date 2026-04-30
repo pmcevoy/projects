@@ -1,189 +1,185 @@
-@model Wh40kArmyEnricher.Contracts.UnitProfile
+@using Wh40kArmyEnricher.Core.Contracts
+@model UnitProfile
 @{
-    var safeName = new string(Model.Name.ToLower().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
-    string cardId = $"unit-{safeName}-{Model.ArmyListIndex}";
-    string collapseId = $"collapse-{cardId}";
-    string invulnText = Model.InvulnerableSave.HasValue ? $"{Model.InvulnerableSave}++" : "-";
-    string fnpText = Model.FeelNoPain.HasValue ? $"{Model.FeelNoPain}+++" : "-";
+    var side = ViewData["Side"]?.ToString() ?? "attacker";
+    var index = ViewData["Index"]?.ToString() ?? "0";
+    var unitJson = ViewData["UnitJson"]?.ToString() ?? "{}";
+    var cardId = $"card-{side}-{index}";
+    var headerOnclick = side == "defender"
+        ? $"onDefenderHeaderClick('{cardId}')"
+        : $"toggleCard('{cardId}')";
 }
 
-<div class="unit-card-header" data-bs-toggle="collapse" data-bs-target="#@collapseId">
-    <div>
+<div class="unit-card" id="@cardId" data-side="@side" data-unit="@unitJson" data-unit-name="@Model.Name">
+    <div class="unit-card-header" onclick="@Html.Raw(headerOnclick)">
         <span class="unit-name">@Model.Name</span>
-        <span class="ms-2 small" style="color:#9aa8c0;">(@Model.ModelCount models)</span>
+        <span class="unit-statline">
+            T@(Model.Toughness) &nbsp;Sv@(Model.Save)+&nbsp;
+            @if (Model.InvulnerableSave.HasValue) { <span class="invuln">@(Model.InvulnerableSave)++&nbsp;</span> }
+            W@(Model.Wounds)
+            @if (Model.FeelNoPain.HasValue) { <span class="fnp">&nbsp;FNP@(Model.FeelNoPain)+++</span> }
+        </span>
+        <span class="collapse-icon">▶</span>
     </div>
-    <span class="unit-stats-inline">
-        T@(Model.Toughness) Sv@(Model.Save)+ W@(Model.Wounds)
-        @if (Model.InvulnerableSave.HasValue) { <span>/@(Model.InvulnerableSave)++</span> }
-    </span>
-</div>
-
-<div class="collapse" id="@collapseId">
-    <div class="unit-card-body">
-        <!-- Statline -->
-        <table class="statline-table mb-2">
-            <thead>
-                <tr>
-                    <th>T</th><th>Sv</th><th>W</th><th>Inv</th><th>FNP</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>@Model.Toughness</td>
-                    <td>@Model.Save+</td>
-                    <td>@Model.Wounds</td>
-                    <td>@invulnText</td>
-                    <td>@fnpText</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <!-- Models & weapons -->
-        @foreach (var modelProfile in Model.Models)
+    <div class="unit-card-body" style="display:none">
+        @if (Model.Keywords.Any())
         {
-            <div class="mb-1 small fw-semibold text-light">
-                @modelProfile.ModelName
-                @if (modelProfile.Count > 1) { <span style="color:#9aa8c0;">×@modelProfile.Count</span> }
-            </div>
-            @foreach (var weapon in modelProfile.Weapons)
-            {
-                <div class="mb-1">
-                    <span class="small" style="color:#a8dadc;">@weapon.WeaponName</span>
-                    @if (weapon.ModelCount > 1) { <span class="small ms-1" style="color:#9aa8c0;">×@weapon.ModelCount</span> }
-                    <span class="badge bg-secondary ms-1" style="font-size:0.6rem;">@weapon.Type</span>
-                    @if (weapon.Range > 0) { <span class="text-muted small ms-1">@(weapon.Range)"</span> }
-                    <div class="weapon-table-scroll">
-                        <table class="weapon-table">
-                            <thead>
-                                <tr>
-                                    <th>Profile</th><th>A</th><th>Sk</th><th>S</th><th>AP</th><th>D</th><th>Abilities</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var variant in weapon.Profiles)
-                                {
-                                    var abilityList = BuildAbilityList(variant.Abilities);
-                                    <tr class="weapon-variant-row"
-                                        data-weapon-name="@weapon.WeaponName"
-                                        data-variant="@variant.Variant"
-                                        data-model-name="@modelProfile.ModelName"
-                                        data-model-count="@weapon.ModelCount"
-                                        data-weapon-type="@weapon.Type">
-                                        <td>@variant.Variant</td>
-                                        <td>@variant.Attacks</td>
-                                        <td>@variant.Skill+</td>
-                                        <td>@variant.Strength</td>
-                                        <td>@variant.Ap</td>
-                                        <td>@variant.Damage</td>
-                                        <td style="font-size:0.65rem;text-align:left;">@abilityList</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            }
+            <div class="keywords">@string.Join(", ", Model.Keywords)</div>
         }
 
-        <!-- Keywords -->
-        @if (Model.Keywords.Count > 0)
+        @foreach (var modelEntry in Model.Models)
         {
-            <div class="mt-1">
-                @foreach (var kw in Model.Keywords)
+            <div class="model-section">
+                @if (Model.Models.Count > 1 || modelEntry.Count > 1)
                 {
-                    <span class="keyword-pill">@kw</span>
+                    <div class="model-label">@modelEntry.Count× @modelEntry.ModelName</div>
                 }
-            </div>
-        }
-
-        <!-- Enhancements -->
-        @if (Model.Enhancements.Count > 0)
-        {
-            <div class="mt-1 small" style="color:#c77dff;">
-                Enhancements: @string.Join(", ", Model.Enhancements)
-            </div>
-        }
-
-        <!-- Abilities -->
-        @if (Model.Abilities.Count > 0)
-        {
-            <div class="abilities-section mt-2">
-                <div class="abilities-label">Abilities</div>
-                @for (int ai = 0; ai < Model.Abilities.Count; ai++)
-                {
-                    var ability = Model.Abilities[ai];
-                    string abilityCollapseId = $"{collapseId}-ability-{ai}";
-                    <div class="ability-item">
-                        <div class="ability-item-header"
-                             data-bs-toggle="collapse"
-                             data-bs-target="#@abilityCollapseId"
-                             aria-expanded="false"
-                             aria-controls="@abilityCollapseId">
-                            <span class="ability-item-name">@ability.Name</span>
-                            <span class="ability-item-chevron">›</span>
-                        </div>
-                        <div class="collapse" id="@abilityCollapseId">
-                            <div class="ability-item-body">@ability.Text</div>
-                            @if (ability.SubAbilities.Count > 0)
+                <table class="weapon-table">
+                    <thead>
+                        <tr>
+                            <th>Weapon</th>
+                            <th>Rng</th>
+                            <th>A</th>
+                            <th>BS/WS</th>
+                            <th>S</th>
+                            <th>AP</th>
+                            <th>D</th>
+                            <th>Abilities</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var weapon in modelEntry.Weapons)
+                        {
+                            foreach (var variant in weapon.Profiles)
                             {
-                                <div class="ability-sub-list">
-                                    @foreach (var sub in ability.SubAbilities)
+                                var label = string.IsNullOrEmpty(variant.Variant)
+                                    ? weapon.WeaponName
+                                    : $"{weapon.WeaponName} ({variant.Variant})";
+                                var rangeText = weapon.Type == WeaponType.Ranged
+                                    ? $"{weapon.Range}\""
+                                    : "Melee";
+                                var skillText = weapon.Type == WeaponType.Ranged
+                                    ? $"{variant.Skill}+"
+                                    : $"{variant.Skill}+";
+                                var abilities = WeaponAbilityText(variant.Abilities);
+                                <tr class="weapon-row"
+                                    onclick="selectWeaponRow(this)"
+                                    data-weapon="@weapon.WeaponName"
+                                    data-variant="@variant.Variant"
+                                    data-model="@modelEntry.ModelName"
+                                    data-weapon-type="@(weapon.Type == WeaponType.Melee ? "Melee" : "Ranged")">
+                                    <td class="weapon-name">@label</td>
+                                    <td>@rangeText</td>
+                                    <td>@variant.Attacks</td>
+                                    <td>@skillText</td>
+                                    <td>@variant.Strength</td>
+                                    <td>@variant.Ap</td>
+                                    <td>@variant.Damage</td>
+                                    <td class="abilities-cell">@abilities</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (Model.Abilities.Any())
+        {
+            <details class="ability-block">
+                <summary>Abilities</summary>
+                @foreach (var ability in Model.Abilities)
+                {
+                    if (ability.Text.Contains('•'))
+                    {
+                        <div class="ability">
+                            <strong>@ability.Name:</strong>
+                            @foreach (var line in ability.Text.Split('\n'))
+                            {
+                                if (line.StartsWith('•'))
+                                {
+                                    var colonIdx = line.IndexOf(':', 2);
+                                    if (colonIdx >= 0)
                                     {
-                                        <div class="ability-sub-item">
-                                            <div class="ability-sub-name">@sub.Name</div>
-                                            <div class="ability-sub-text">@sub.Text</div>
+                                        var subName = line[2..colonIdx].Trim();
+                                        var subText = line[(colonIdx + 1)..].Trim();
+                                        <div class="sub-ability">
+                                            <span class="sub-ability-name">@subName</span>
+                                            <span class="sub-ability-text">@subText</span>
                                         </div>
                                     }
-                                </div>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(line))
+                                {
+                                    <p>@line</p>
+                                }
                             }
                         </div>
-                    </div>
+                    }
+                    else
+                    {
+                        <p class="ability"><strong>@ability.Name:</strong> @ability.Text</p>
+                    }
                 }
-            </div>
+            </details>
         }
 
-        <!-- Leading Abilities (displayed when this unit has "While this model is leading" abilities) -->
-        @if (Model.LeadingAbilities.Count > 0)
+        @if (Model.LeadingAbilities.Any())
         {
-            <div class="abilities-section mt-2">
-                <div class="abilities-label leading-abilities-label">While Leading</div>
-                @for (int ai = 0; ai < Model.LeadingAbilities.Count; ai++)
+            <details class="ability-block leading">
+                <summary>While Leading</summary>
+                @foreach (var ability in Model.LeadingAbilities)
                 {
-                    var ability = Model.LeadingAbilities[ai];
-                    string abilityCollapseId = $"{collapseId}-leading-{ai}";
-                    <div class="ability-item">
-                        <div class="ability-item-header"
-                             data-bs-toggle="collapse"
-                             data-bs-target="#@abilityCollapseId"
-                             aria-expanded="false"
-                             aria-controls="@abilityCollapseId">
-                            <span class="ability-item-name leading-ability-name">@ability.Name</span>
-                            <span class="ability-item-chevron">›</span>
+                    if (ability.Text.Contains('•'))
+                    {
+                        <div class="ability">
+                            <strong>@ability.Name:</strong>
+                            @foreach (var line in ability.Text.Split('\n'))
+                            {
+                                if (line.StartsWith('•'))
+                                {
+                                    var colonIdx = line.IndexOf(':', 2);
+                                    if (colonIdx >= 0)
+                                    {
+                                        var subName = line[2..colonIdx].Trim();
+                                        var subText = line[(colonIdx + 1)..].Trim();
+                                        <div class="sub-ability">
+                                            <span class="sub-ability-name">@subName</span>
+                                            <span class="sub-ability-text">@subText</span>
+                                        </div>
+                                    }
+                                }
+                                else if (!string.IsNullOrWhiteSpace(line))
+                                {
+                                    <p>@line</p>
+                                }
+                            }
                         </div>
-                        <div class="collapse" id="@abilityCollapseId">
-                            <div class="ability-item-body">@ability.Text</div>
-                        </div>
-                    </div>
+                    }
+                    else
+                    {
+                        <p class="ability"><strong>@ability.Name:</strong> @ability.Text</p>
+                    }
                 }
-            </div>
+            </details>
         }
     </div>
 </div>
 
 @functions {
-    string BuildAbilityList(Wh40kArmyEnricher.Contracts.WeaponAbilities a)
+    static string WeaponAbilityText(WeaponAbilities a)
     {
         var parts = new List<string>();
         if (a.Torrent) parts.Add("Torrent");
         if (a.Blast) parts.Add("Blast");
         if (a.Melta > 0) parts.Add($"Melta {a.Melta}");
-        if (a.RapidFire > 0) parts.Add($"RF {a.RapidFire}");
-        if (a.SustainedHits > 0) parts.Add($"Sus {a.SustainedHits}");
-        if (a.LethalHits) parts.Add("Lethal");
-        if (a.DevastatingWounds) parts.Add("Dev.W");
-        if (a.TwinLinked) parts.Add("Twin");
-        foreach (var (kw, threshold) in a.Anti)
-            parts.Add($"Anti-{kw} {threshold}+");
-        return string.Join(", ", parts);
+        if (a.RapidFire > 0) parts.Add($"Rapid Fire {a.RapidFire}");
+        if (a.SustainedHits > 0) parts.Add($"Sustained Hits {a.SustainedHits}");
+        if (a.LethalHits) parts.Add("Lethal Hits");
+        if (a.DevastatingWounds) parts.Add("Devastating Wounds");
+        if (a.TwinLinked) parts.Add("Twin-linked");
+        foreach (var (kw, thr) in a.Anti)
+            parts.Add($"Anti-{kw} {thr}+");
+        return parts.Count > 0 ? string.Join(", ", parts) : "-";
     }
 }

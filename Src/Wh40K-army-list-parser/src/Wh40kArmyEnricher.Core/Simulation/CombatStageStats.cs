@@ -1,36 +1,25 @@
 namespace Wh40kArmyEnricher.Core.Simulation;
 
-/// <summary>
-/// Per-run averages for each stage of the WH40K attack pipeline.
-/// All values are means across simulation runs.
-/// </summary>
-public sealed record CombatStageStats
+public record CombatStageStats
 {
-    // Main pipeline
-    public required double AvgAttacks { get; init; }
-    public required double AvgHits { get; init; }
-    public required double AvgCritHits { get; init; }
-    public required double AvgWounds { get; init; }
-    public required double AvgCritWounds { get; init; }
-    public required double AvgFailedSaves { get; init; }
-    public required double AvgDamageBeforeFnp { get; init; }
-    public required double AvgFnpSaved { get; init; }
-
-    // Ability contributions (shown as sub-rows when non-zero)
-    public required double AvgSustainedHitsBonus { get; init; }
-    public required double AvgLethalHitsAutoWounds { get; init; }
-    public required double AvgDevastatingWoundsTriggers { get; init; }
-    /// <summary>Wound rolls that scored a critical wound only because Anti lowered the threshold below 6.</summary>
-    public required double AvgAntiCritWounds { get; init; }
-
-    // Save type breakdown
-    public required double AvgArmourSaveRolls { get; init; }
-    public required double AvgInvulnSaveRolls { get; init; }
+    public double AvgAttacks { get; init; }
+    public double AvgHits { get; init; }
+    public double AvgCritHits { get; init; }
+    public double AvgSustainedHitsBonus { get; init; }
+    public double AvgWounds { get; init; }
+    public double AvgCritWounds { get; init; }
+    public double AvgLethalHitsAutoWounds { get; init; }
+    public double AvgAntiCritWounds { get; init; }
+    public double AvgFailedSaves { get; init; }
+    public double AvgDevastatingWoundsTriggers { get; init; }
+    public double AvgArmourSaveRolls { get; init; }
+    public double AvgInvulnSaveRolls { get; init; }
+    public double AvgDamageBeforeFnp { get; init; }
+    public double AvgFnpSaved { get; init; }
 }
 
-/// <summary>Per-weapon breakdown entry returned alongside the aggregate stats.</summary>
-public sealed record WeaponGroupStats
+public record WeaponGroupStats
 {
-    public required string WeaponName { get; init; }
-    public required CombatStageStats Stats { get; init; }
+    public string WeaponName { get; init; } = "";
+    public CombatStageStats Stats { get; init; } = new();
 }

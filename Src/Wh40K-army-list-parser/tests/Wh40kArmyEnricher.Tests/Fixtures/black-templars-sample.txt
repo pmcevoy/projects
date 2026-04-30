@@ -1,4 +1,4 @@
-Iron Canticle (1970 Points)
+Iron Canticle (2035 Points)
 
 Space Marines
 Black Templars
@@ -22,20 +22,18 @@ Chaplain Grimaldus (110 Points)
 • 3x Cenobyte Servitor
 ◦ 3x Close combat weapon
 
-Emperor’s Champion (115 Points)
+Emperor’s Champion (100 Points)
 • 1x Black Sword
 • 1x Bolt Pistol
-• Enhancements: Blades of Valour
 
 High Marshal Helbrecht (120 Points)
 • Warlord
 • 1x Ferocity
 • 1x Sword of the High Marshals
 
-Marshal (100 Points)
+Marshal (80 Points)
 • 1x Combi-weapon
 • 1x Master-crafted power weapon
-• Enhancements: Hero of the Chapter
 
 Marshal (80 Points)
 • 1x Combi-weapon
@@ -59,19 +57,44 @@ Assault Intercessor Squad (75 Points)
 ◦ 4x Astartes chainsword
 ◦ 4x Heavy bolt pistol
 
-Crusader Squad (300 Points)
+Crusader Squad (150 Points)
 • 1x Sword Brother
 ◦ 1x Master-crafted power weapon
 ◦ 1x Pyre pistol
-• 11x Initiate
-◦ 7x Astartes chainsword
-◦ 11x Bolt pistol
-◦ 11x Close combat weapon
-◦ 11x Heavy bolt pistol
-◦ 4x Power fist
-• 8x Neophyte
-◦ 8x Astartes chainsword
-◦ 8x Bolt pistol
+• 5x Initiate
+◦ 3x Astartes chainsword
+◦ 5x Bolt pistol
+◦ 5x Close combat weapon
+◦ 5x Heavy bolt pistol
+◦ 2x Power fist
+• 4x Neophyte
+◦ 4x Astartes chainsword
+◦ 4x Bolt pistol
+
+Crusader Squad (150 Points)
+• 1x Sword Brother
+◦ 1x Master-crafted power weapon
+◦ 1x Pyre pistol
+• 5x Initiate
+◦ 3x Astartes chainsword
+◦ 5x Bolt pistol
+◦ 5x Close combat weapon
+◦ 5x Heavy bolt pistol
+◦ 2x Power fist
+• 4x Neophyte
+◦ 4x Astartes chainsword
+◦ 4x Bolt pistol
+
+Heavy Intercessor Squad (100 Points)
+• 1x Heavy Intercessor Sergeant
+◦ 1x Bolt pistol
+◦ 1x Close combat weapon
+◦ 1x Heavy bolt rifle
+• 4x Heavy Intercessor
+◦ 4x Bolt pistol
+◦ 4x Close combat weapon
+◦ 3x Heavy bolt rifle
+◦ 1x Heavy bolter
 
 DEDICATED TRANSPORTS
 
@@ -124,4 +147,4 @@ Sword Brethren Squad (105 Points)
 ◦ 4x Heavy bolt pistol
 ◦ 4x Master-crafted power weapon
 
-Exported with App Version: v1.48.2 (1), Data Version: v754
+Exported with App Version: v1.49.0 (1), Data Version: v757
