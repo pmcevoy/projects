@@ -1,0 +1,29 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: src/ProbHammer.Web/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Enricher__CachePath=/home/app/.probhammer/cache
+    volumes:
+      - catalogue-cache:/home/app/.probhammer/cache
+      - dataprotection-keys:/home/app/.aspnet/DataProtection-Keys
+    depends_on:
+      volume-init:
+        condition: service_completed_successfully
+
+  volume-init:
+    image: busybox
+    user: root
+    # web will run as "USER app" which has these UID:GIDs.  we need to ensure "app" has correct perms on the mounted volumes
+    command: ["sh", "-c", "chown -R 1654:1654 /home/app"]
+    volumes:
+      - catalogue-cache:/home/app/.probhammer
+      - dataprotection-keys:/home/app/.aspnet/DataProtection-Keys
+
+volumes:
+  catalogue-cache:
+  dataprotection-keys:
