@@ -10,13 +10,18 @@ Install-AWSToolsModule -CleanUp -Scope AllUsers `
 
 #Call this function from your Prompt function in $PROFILE
 function Get-AwsPrompt {
-	try {
-		$accountAlias = Get-IamAccountAlias
-		$userName = (Get-IamUser).UserName
-		"[$($accountAlias)/$($userName)]"
+	if ($env:AWS_ACCESS_KEY_ID){
+		try {
+			$accountAlias = Get-IamAccountAlias
+			$userName = (Get-IamUser).UserName
+			"[$($accountAlias)/$($userName)]" + [Environment]::NewLine
+		}
+		catch {
+			"[Invalid Aws Creds]" + [Environment]::NewLine
+		}
 	}
-	catch {
-		"[No Aws Creds]"
+	else {
+		""
 	}
 }
 
