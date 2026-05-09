@@ -8,6 +8,7 @@ call plug#begin()
 Plug 'morhetz/gruvbox'
 Plug 'pprovost/vim-ps1'
 Plug 'pedrohdz/vim-yaml-folds'
+Plug 'hashivim/vim-terraform'
 call plug#end()
 
 colorscheme gruvbox
@@ -28,6 +29,9 @@ set nocindent
 
 set relativenumber
 set hlsearch
+
+"Enable terraform format on save:
+let g:terraform_fmt_on_save = 1
 
 "Enable syntax folding for XML files, but start with foldsopen
 let g:xml_syntax_folding = 1
