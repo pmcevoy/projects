@@ -1,10 +1,20 @@
 {
-	"env": {
-		"CLAUDE_CODE_USE_POWERSHELL_TOOL": "1",
-		"CLAUDE_CODE_GLOB_NO_IGNORE": "false"
-	},
-
-	"autoUpdatesChannel": "latest",
-	"theme": "dark-ansi",
-	"defaultShell": "powershell"
+  "env": {
+    "CLAUDE_CODE_USE_POWERSHELL_TOOL": "1",
+    "CLAUDE_CODE_GLOB_NO_IGNORE": "false"
+  },
+  "defaultShell": "powershell",
+  "extraKnownMarketplaces": {
+    "karpathy-skills": {
+      "source": {
+        "source": "github",
+        "repo": "forrestchang/andrej-karpathy-skills"
+      }
+    }
+  },
+  "autoUpdatesChannel": "latest",
+  "theme": "dark-ansi",
+  "enabledPlugins": {
+    "andrej-karpathy-skills@karpathy-skills": true
+  }
 }
