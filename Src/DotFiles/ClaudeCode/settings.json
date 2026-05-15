@@ -1,9 +1,10 @@
 {
+	"env": {
+		"CLAUDE_CODE_USE_POWERSHELL_TOOL": "1",
+		"CLAUDE_CODE_GLOB_NO_IGNORE": "false"
+	},
+
 	"autoUpdatesChannel": "latest",
 	"theme": "dark-ansi",
-
-	"env": {
-		"CLAUDE_CODE_USE_POWERSHELL_TOOL": "1"
-	},
 	"defaultShell": "powershell"
 }
