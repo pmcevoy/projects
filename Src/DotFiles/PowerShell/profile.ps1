@@ -3,8 +3,8 @@ function prompt {
 
 	$prompt += Get-AwsPrompt
 
-    $prompt += Write-Prompt "$($ExecutionContext.SessionState.Path.CurrentLocation)"
     $prompt += Write-VcsStatus
+    $prompt += Write-Prompt "$($ExecutionContext.SessionState.Path.CurrentLocation)"
     $prompt += Write-Prompt "$(if ($PsDebugContext) {' [DBG]: '} else {''})" -ForegroundColor Magenta
     $prompt += "$('>' * ($nestedPromptLevel + 1)) "
 
@@ -13,6 +13,9 @@ function prompt {
 }
 
 Import-Module posh-git
+$GitPromptSettings.PathStatusSeparator.Text = ""
+$GitPromptSettings.AfterStatus.Text = "]`n"
+
 Import-Module TerraformHelpers
 
 #Disable directory higlighting for dir
