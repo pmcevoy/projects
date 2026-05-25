@@ -1,20 +1,34 @@
 {
-  "env": {
-    "CLAUDE_CODE_USE_POWERSHELL_TOOL": "1",
-    "CLAUDE_CODE_GLOB_NO_IGNORE": "false"
-  },
-  "defaultShell": "powershell",
-  "extraKnownMarketplaces": {
-    "karpathy-skills": {
-      "source": {
-        "source": "github",
-        "repo": "forrestchang/andrej-karpathy-skills"
-      }
-    }
-  },
-  "autoUpdatesChannel": "latest",
-  "theme": "dark-ansi",
-  "enabledPlugins": {
-    "andrej-karpathy-skills@karpathy-skills": true
-  }
+	"env": {
+		"CLAUDE_CODE_USE_POWERSHELL_TOOL": "1",
+		"CLAUDE_CODE_GLOB_NO_IGNORE": "false"
+	},
+	"defaultShell": "powershell",
+	"extraKnownMarketplaces": {
+		"karpathy-skills": {
+			"source": {
+				"source": "github",
+				"repo": "forrestchang/andrej-karpathy-skills"
+			}
+		}
+	},
+	"autoUpdatesChannel": "latest",
+	"theme": "dark-ansi",
+	"enabledPlugins": {
+		"andrej-karpathy-skills@karpathy-skills": true
+	},
+	"permissions": {
+		"allow": [
+			"Bash(git checkout *)",
+			"Bash(git pull *)",
+			"Bash(git fetch *)",
+			"Bash(git branch *)",
+			"Bash(git add *)",
+			"Bash(git commit -m ' *)",
+			"Bash(git commit *)"
+		],
+		"deny": [
+			"Bash(git push*)"
+		]
+	}
 }
