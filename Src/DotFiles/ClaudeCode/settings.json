@@ -34,7 +34,13 @@
       "mcp__jetbrains__generate_inspection_kts_api",
       "mcp__jetbrains__generate_inspection_kts_examples",
       "mcp__jetbrains__open_file_in_editor",
-      "mcp__jetbrains__build_solution"
+      "mcp__jetbrains__build_solution",
+      "Bash(cd * && git log*)",
+      "Bash(cd * && git show*)",
+      "Bash(cd * && git diff*)"
+    ],
+    "deny": [
+      "Bash(git push*)"
     ],
     "ask": [
       "mcp__jetbrains__create_new_file",
@@ -45,9 +51,6 @@
       "mcp__jetbrains__execute_run_configuration",
       "mcp__jetbrains__execute_terminal_command",
       "mcp__jetbrains__run_inspection_kts"
-    ],
-    "deny": [
-      "Bash(git push*)"
     ]
   },
   "defaultShell": "powershell",
@@ -62,7 +65,7 @@
       }
     }
   },
+  "effortLevel": "high",
   "autoUpdatesChannel": "latest",
-  "theme": "dark-ansi",
-  "model": "opus"
+  "theme": "dark-ansi"
 }
