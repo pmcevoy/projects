@@ -37,10 +37,28 @@
       "mcp__jetbrains__build_solution",
       "Bash(cd * && git log*)",
       "Bash(cd * && git show*)",
-      "Bash(cd * && git diff*)"
+      "Bash(cd * && git diff*)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git diff*)",
+      "PowerShell(git status*)",
+      "PowerShell(git log*)",
+      "PowerShell(git show*)",
+      "PowerShell(git diff*)",
+      "PowerShell(git add *)",
+      "PowerShell(git commit *)",
+      "PowerShell(git checkout *)",
+      "PowerShell(git pull *)",
+      "PowerShell(git fetch *)",
+      "PowerShell(git branch *)",
+      "PowerShell(msbuild *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Select-String *)"
     ],
     "deny": [
-      "Bash(git push*)"
+      "Bash(git push*)",
+      "PowerShell(git push*)"
     ],
     "ask": [
       "mcp__jetbrains__create_new_file",
@@ -67,5 +85,6 @@
   },
   "effortLevel": "high",
   "autoUpdatesChannel": "latest",
-  "theme": "dark-ansi"
+  "theme": "dark-ansi",
+  "tui": "fullscreen"
 }
