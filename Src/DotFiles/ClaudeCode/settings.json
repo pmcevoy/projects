@@ -54,6 +54,7 @@
       "PowerShell(git branch *)",
       "PowerShell(msbuild *)",
       "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-Content *)",
       "PowerShell(Select-String *)"
     ],
     "deny": [
@@ -71,9 +72,12 @@
       "mcp__jetbrains__run_inspection_kts"
     ]
   },
+  "model": "sonnet",
   "defaultShell": "powershell",
   "enabledPlugins": {
-    "andrej-karpathy-skills@karpathy-skills": true
+    "andrej-karpathy-skills@karpathy-skills": true,
+    "frontend-design@claude-plugins-official": true,
+    "slack@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "karpathy-skills": {
@@ -85,6 +89,6 @@
   },
   "effortLevel": "high",
   "autoUpdatesChannel": "latest",
-  "theme": "dark-ansi",
-  "tui": "fullscreen"
+  "tui": "fullscreen",
+  "theme": "dark-ansi"
 }
